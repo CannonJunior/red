@@ -1,0 +1,304 @@
+#!/usr/bin/env python3
+"""
+Simple HTTP server for the Agentic UI web application.
+Serves static files on port 9090.
+"""
+
+import os
+import sys
+import json
+import urllib.request
+import urllib.parse
+from http.server import HTTPServer, BaseHTTPRequestHandler
+import mimetypes
+from pathlib import Path
+
+
+class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
+    """Custom handler to serve static files with proper MIME types."""
+    
+    def do_GET(self):
+        """Handle GET requests."""
+        try:
+            # Handle root path
+            if self.path == '/':
+                self.path = '/index.html'
+            
+            # Remove leading slash and resolve file path
+            file_path = self.path.lstrip('/')
+            full_path = os.path.join(os.getcwd(), file_path)
+            
+            print(f"Request: {self.path} -> {file_path}")
+            
+            # Check if file exists
+            if not os.path.exists(full_path) or not os.path.isfile(full_path):
+                self.send_error(404, f"File not found: {self.path}")
+                return
+            
+            # Determine content type
+            content_type = self.get_content_type(file_path)
+            
+            # Read and serve file
+            with open(full_path, 'rb') as f:
+                content = f.read()
+            
+            # Send response
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(len(content)))
+            self.send_header('Cache-Control', 'no-cache')
+            # Add CORS headers
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            self.end_headers()
+            
+            # Send content
+            self.wfile.write(content)
+            
+            print(f"✅ Served {file_path} as {content_type}")
+            
+        except Exception as e:
+            print(f"❌ Error serving {self.path}: {e}")
+            self.send_error(500, f"Internal server error: {e}")
+    
+    def do_POST(self):
+        """Handle POST requests for API endpoints."""
+        try:
+            # Parse request path
+            if self.path == '/api/chat':
+                self.handle_chat_api()
+            elif self.path == '/api/models':
+                self.handle_models_api()
+            else:
+                self.send_error(404, f"API endpoint not found: {self.path}")
+                
+        except Exception as e:
+            print(f"❌ Error handling POST {self.path}: {e}")
+            self.send_error(500, f"Internal server error: {e}")
+    
+    def handle_chat_api(self):
+        """Handle chat API requests to Ollama."""
+        try:
+            # Read request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            # Extract message and model
+            message = request_data.get('message', '').strip()
+            model = request_data.get('model', 'qwen2.5:3b')  # Default to smaller model
+            
+            if not message:
+                self.send_json_response({'error': 'Message is required'}, 400)
+                return
+            
+            print(f"💬 Chat request: {message[:50]}... (model: {model})")
+            
+            # Prepare Ollama API request
+            ollama_data = {
+                'model': model,
+                'prompt': message,
+                'stream': False
+            }
+            
+            # Make request to Ollama
+            ollama_url = 'http://localhost:11434/api/generate'
+            req = urllib.request.Request(
+                ollama_url,
+                data=json.dumps(ollama_data).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            with urllib.request.urlopen(req, timeout=30) as response:
+                ollama_response = json.loads(response.read().decode('utf-8'))
+            
+            # Extract response text
+            response_text = ollama_response.get('response', 'Sorry, I could not generate a response.')
+            
+            print(f"🤖 Ollama response: {response_text[:50]}...")
+            
+            # Send response back to client
+            self.send_json_response({
+                'response': response_text,
+                'model': model,
+                'timestamp': ollama_response.get('created_at', '')
+            })
+            
+        except urllib.error.URLError as e:
+            print(f"❌ Ollama connection error: {e}")
+            self.send_json_response({
+                'error': 'Unable to connect to Ollama. Please ensure Ollama is running on localhost:11434'
+            }, 503)
+            
+        except json.JSONDecodeError as e:
+            print(f"❌ JSON decode error: {e}")
+            self.send_json_response({'error': 'Invalid JSON in request'}, 400)
+            
+        except Exception as e:
+            print(f"❌ Chat API error: {e}")
+            self.send_json_response({'error': f'Chat API error: {str(e)}'}, 500)
+    
+    def handle_models_api(self):
+        """Handle models API requests to get available Ollama models."""
+        try:
+            # Make request to Ollama tags endpoint
+            ollama_url = 'http://localhost:11434/api/tags'
+            req = urllib.request.Request(ollama_url)
+            
+            with urllib.request.urlopen(req, timeout=10) as response:
+                ollama_response = json.loads(response.read().decode('utf-8'))
+            
+            # Extract model names
+            models = [model['name'] for model in ollama_response.get('models', [])]
+            
+            print(f"📋 Available models: {models}")
+            
+            self.send_json_response({
+                'models': models,
+                'count': len(models)
+            })
+            
+        except Exception as e:
+            print(f"❌ Models API error: {e}")
+            self.send_json_response({'error': f'Models API error: {str(e)}'}, 500)
+    
+    def send_json_response(self, data, status_code=200):
+        """Send a JSON response."""
+        response_json = json.dumps(data)
+        response_bytes = response_json.encode('utf-8')
+        
+        self.send_response(status_code)
+        self.send_header('Content-Type', 'application/json')
+        self.send_header('Content-Length', str(len(response_bytes)))
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+        
+        self.wfile.write(response_bytes)
+    
+    def do_HEAD(self):
+        """Handle HEAD requests (like GET but without body)."""
+        try:
+            # Handle root path
+            if self.path == '/':
+                self.path = '/index.html'
+            
+            # Remove leading slash and resolve file path
+            file_path = self.path.lstrip('/')
+            full_path = os.path.join(os.getcwd(), file_path)
+            
+            # Check if file exists
+            if not os.path.exists(full_path) or not os.path.isfile(full_path):
+                self.send_error(404, f"File not found: {self.path}")
+                return
+            
+            # Get file size and content type
+            file_size = os.path.getsize(full_path)
+            content_type = self.get_content_type(file_path)
+            
+            # Send headers only (no body for HEAD)
+            self.send_response(200)
+            self.send_header('Content-Type', content_type)
+            self.send_header('Content-Length', str(file_size))
+            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('Access-Control-Allow-Origin', '*')
+            self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
+            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            self.end_headers()
+            
+        except Exception as e:
+            print(f"❌ Error handling HEAD {self.path}: {e}")
+            self.send_error(500, f"Internal server error: {e}")
+    
+    def do_OPTIONS(self):
+        """Handle OPTIONS requests for CORS preflight."""
+        self.send_response(200)
+        self.send_header('Access-Control-Allow-Origin', '*')
+        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        self.end_headers()
+    
+    def get_content_type(self, file_path):
+        """Determine content type based on file extension."""
+        # Define explicit mappings for web files
+        content_types = {
+            '.html': 'text/html; charset=utf-8',
+            '.htm': 'text/html; charset=utf-8',
+            '.css': 'text/css; charset=utf-8',
+            '.js': 'application/javascript; charset=utf-8',
+            '.svg': 'image/svg+xml',
+            '.json': 'application/json',
+            '.png': 'image/png',
+            '.jpg': 'image/jpeg',
+            '.jpeg': 'image/jpeg',
+            '.gif': 'image/gif',
+            '.ico': 'image/x-icon',
+        }
+        
+        # Get file extension
+        _, ext = os.path.splitext(file_path.lower())
+        
+        # Return specific type or default
+        return content_types.get(ext, 'text/plain')
+    
+    def log_message(self, format, *args):
+        """Override to provide cleaner logging."""
+        return  # Disable default logging to reduce noise
+
+
+def main():
+    """Start the development server."""
+    port = 9090
+    server_address = ('localhost', port)
+    
+    try:
+        # Change to the directory containing the web files
+        web_dir = Path(__file__).parent
+        os.chdir(web_dir)
+        
+        # Verify required files exist
+        if not os.path.exists('index.html'):
+            print("❌ Error: index.html not found in current directory")
+            sys.exit(1)
+        
+        # Create and start the server
+        httpd = HTTPServer(server_address, CustomHTTPRequestHandler)
+        
+        print(f"🚀 Agentic UI Server starting...")
+        print(f"📁 Serving files from: {web_dir}")
+        print(f"🌐 Server running at: http://localhost:{port}")
+        print(f"🔗 Open in browser: http://localhost:{port}")
+        print(f"⏹️  Press Ctrl+C to stop the server")
+        print(f"💡 Started with: uv run server.py")
+        print(f"🔍 Available files:")
+        
+        # List available files
+        for file in os.listdir('.'):
+            if not file.startswith('.'):
+                print(f"   - {file}")
+        
+        # Start serving
+        httpd.serve_forever()
+        
+    except KeyboardInterrupt:
+        print(f"\n🛑 Server stopped by user")
+        if 'httpd' in locals():
+            httpd.server_close()
+        sys.exit(0)
+    except OSError as e:
+        if e.errno == 98:  # Address already in use
+            print(f"❌ Port {port} is already in use. Please try a different port or stop the existing server.")
+        else:
+            print(f"❌ Network error: {e}")
+        sys.exit(1)
+    except Exception as e:
+        print(f"❌ Server error: {e}")
+        import traceback
+        traceback.print_exc()
+        sys.exit(1)
+
+
+if __name__ == '__main__':
+    main()

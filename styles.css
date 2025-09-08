@@ -1,0 +1,253 @@
+/* Base styles and variables */
+:root {
+  --font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+}
+
+* {
+  font-family: var(--font-family);
+}
+
+/* Smooth transitions for theme switching */
+* {
+  transition: background-color 200ms ease, border-color 200ms ease, color 200ms ease;
+}
+
+/* Custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(156, 163, 175, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(156, 163, 175, 0.7);
+}
+
+.dark ::-webkit-scrollbar-thumb {
+  background: rgba(75, 85, 99, 0.5);
+}
+
+.dark ::-webkit-scrollbar-thumb:hover {
+  background: rgba(75, 85, 99, 0.7);
+}
+
+/* Splash screen animations */
+#splash .progress-bar {
+  width: 0%;
+  animation: progress 2s ease-out forwards;
+}
+
+@keyframes progress {
+  0% { width: 0%; }
+  100% { width: 100%; }
+}
+
+/* Navigation hover effects */
+.nav-item {
+  transition: all 150ms ease;
+}
+
+.nav-item:hover {
+  transform: translateX(2px);
+}
+
+/* Message input auto-resize */
+#messageInput {
+  min-height: 48px;
+  max-height: 120px;
+  overflow-y: hidden;
+  resize: none;
+}
+
+/* Focus states */
+.nav-item:focus {
+  outline: 2px solid rgb(59, 130, 246);
+  outline-offset: 2px;
+}
+
+#messageInput:focus {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.1);
+}
+
+/* Loading states */
+.animate-pulse {
+  animation: pulse 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: .5;
+  }
+}
+
+/* Responsive design */
+@media (max-width: 768px) {
+  .sidebar {
+    position: fixed;
+    left: -100%;
+    top: 0;
+    height: 100vh;
+    z-index: 40;
+    transition: left 300ms ease;
+  }
+  
+  .sidebar.open {
+    left: 0;
+  }
+  
+  .sidebar-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.5);
+    z-index: 30;
+    display: none;
+  }
+  
+  .sidebar-overlay.open {
+    display: block;
+  }
+}
+
+/* Theme toggle button */
+.theme-toggle {
+  transition: transform 150ms ease;
+}
+
+.theme-toggle:hover {
+  transform: scale(1.1);
+}
+
+/* Send button states */
+#sendButton:hover:not(:disabled) {
+  transform: translateY(-50%) scale(1.1);
+}
+
+#sendButton:active:not(:disabled) {
+  transform: translateY(-50%) scale(0.95);
+}
+
+/* Smooth fade-in for main app */
+#app {
+  opacity: 0;
+  transition: opacity 300ms ease;
+}
+
+#app.loaded {
+  opacity: 1;
+}
+
+/* Custom gradient backgrounds */
+.bg-gradient-subtle {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.1) 0%, rgba(147, 51, 234, 0.1) 100%);
+}
+
+.dark .bg-gradient-subtle {
+  background: linear-gradient(135deg, rgba(59, 130, 246, 0.05) 0%, rgba(147, 51, 234, 0.05) 100%);
+}
+
+/* Message bubbles (for future chat implementation) */
+.message-bubble {
+  max-width: 70%;
+  word-wrap: break-word;
+  border-radius: 18px;
+  padding: 12px 16px;
+  margin-bottom: 8px;
+}
+
+.message-user {
+  background: rgb(59, 130, 246);
+  color: white;
+  margin-left: auto;
+  margin-right: 0;
+}
+
+.message-assistant {
+  background: rgb(243, 244, 246);
+  color: rgb(17, 24, 39);
+  margin-left: 0;
+  margin-right: auto;
+}
+
+.dark .message-assistant {
+  background: rgb(55, 65, 81);
+  color: rgb(243, 244, 246);
+}
+
+/* Utility classes */
+.text-balance {
+  text-wrap: balance;
+}
+
+.text-pretty {
+  text-wrap: pretty;
+}
+
+/* Animation utilities */
+.animate-fade-in {
+  animation: fadeIn 200ms ease forwards;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; transform: translateY(10px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+/* Typing indicator */
+.typing-dot {
+  width: 8px;
+  height: 8px;
+  background: rgb(156, 163, 175);
+  border-radius: 50%;
+}
+
+.dark .typing-dot {
+  background: rgb(75, 85, 99);
+}
+
+/* Spin animation for loading button */
+@keyframes spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+
+/* Message styling improvements */
+.message-user {
+  background: rgb(59, 130, 246);
+  color: white;
+  word-wrap: break-word;
+}
+
+.message-assistant {
+  background: rgb(243, 244, 246);
+  color: rgb(17, 24, 39);
+  word-wrap: break-word;
+}
+
+.dark .message-assistant {
+  background: rgb(55, 65, 81);
+  color: rgb(243, 244, 246);
+}
+
+/* Smooth scrolling for chat area */
+.flex-1.overflow-y-auto {
+  scroll-behavior: smooth;
+}
+
+/* Message container styling */
+#messages-container {
+  min-height: 100%;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
