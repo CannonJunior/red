@@ -36,7 +36,17 @@
   transition: background-color 0.2s linear, 
               border-color 0.2s linear, 
               color 0.2s linear,
-              box-shadow 0.2s linear;
+              box-shadow 0.2s linear,
+              filter 0.2s linear;
+}
+
+/* RoboBrain logo styling - invert in dark mode */
+img[src*="robobrain.svg"], img[src*="robobrain"] {
+  transition: filter 0.2s linear;
+}
+
+.dark img[src*="robobrain.svg"], .dark img[src*="robobrain"] {
+  filter: invert(1) hue-rotate(180deg) brightness(1.2);
 }
 
 /* Base body styling */

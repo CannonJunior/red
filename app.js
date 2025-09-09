@@ -25,6 +25,9 @@ class ThemeManager {
         
         // Update theme toggle icons
         this.updateThemeIcons(isDark);
+        
+        // Update favicon for dark mode
+        this.updateFavicon(isDark);
     }
 
     updateThemeIcons(isDark) {
@@ -64,6 +67,21 @@ class ThemeManager {
         this.updateThemeSelectors();
         
         console.log(`Theme changed to: ${this.theme}`);
+    }
+
+    updateFavicon(isDark) {
+        const favicon = document.querySelector('link[rel="icon"]');
+        const appleTouchIcon = document.querySelector('link[rel="apple-touch-icon"]');
+        
+        if (isDark) {
+            // In dark mode, use the dark variant
+            if (favicon) favicon.href = 'robobrain-dark.svg';
+            if (appleTouchIcon) appleTouchIcon.href = 'robobrain-dark.svg';
+        } else {
+            // In light mode, use the original
+            if (favicon) favicon.href = 'robobrain.svg';
+            if (appleTouchIcon) appleTouchIcon.href = 'robobrain.svg';
+        }
     }
 
     updateThemeSelectors() {
