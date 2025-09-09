@@ -95,7 +95,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_error(500, f"Internal server error: {e}")
     
     def handle_chat_api(self):
-        """Handle chat API requests to Ollama."""
+        """Handle chat API requests with MCP-style RAG tool integration."""
         try:
             # Read request body
             content_length = int(self.headers.get('Content-Length', 0))
@@ -112,35 +112,53 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             
             print(f"💬 Chat request: {message[:50]}... (model: {model})")
             
-            # Prepare Ollama API request
-            ollama_data = {
-                'model': model,
-                'prompt': message,
-                'stream': False
-            }
+            # Check if RAG should be used based on query patterns
+            should_use_rag = RAG_AVAILABLE and self.should_trigger_rag(message)
             
-            # Make request to Ollama
-            ollama_url = 'http://localhost:11434/api/generate'
-            req = urllib.request.Request(
-                ollama_url,
-                data=json.dumps(ollama_data).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-            
-            with urllib.request.urlopen(req, timeout=30) as response:
-                ollama_response = json.loads(response.read().decode('utf-8'))
-            
-            # Extract response text
-            response_text = ollama_response.get('response', 'Sorry, I could not generate a response.')
-            
-            print(f"🤖 Ollama response: {response_text[:50]}...")
-            
-            # Send response back to client
-            self.send_json_response({
-                'response': response_text,
-                'model': model,
-                'timestamp': ollama_response.get('created_at', '')
-            })
+            if should_use_rag:
+                # Use RAG-enhanced response
+                response_text, model_used, sources = self.get_rag_enhanced_response(message, model)
+                print(f"🧠 RAG-enhanced response: {response_text[:50]}...")
+                
+                # Send RAG response back to client
+                self.send_json_response({
+                    'response': response_text,
+                    'model': model_used,
+                    'rag_enabled': True,
+                    'sources_used': len(sources) if sources else 0,
+                    'timestamp': ''
+                })
+            else:
+                # Use standard Ollama response
+                # Prepare Ollama API request
+                ollama_data = {
+                    'model': model,
+                    'prompt': message,
+                    'stream': False
+                }
+                
+                # Make request to Ollama
+                ollama_url = 'http://localhost:11434/api/generate'
+                req = urllib.request.Request(
+                    ollama_url,
+                    data=json.dumps(ollama_data).encode('utf-8'),
+                    headers={'Content-Type': 'application/json'}
+                )
+                
+                with urllib.request.urlopen(req, timeout=30) as response:
+                    ollama_response = json.loads(response.read().decode('utf-8'))
+                
+                # Extract response text
+                response_text = ollama_response.get('response', 'Sorry, I could not generate a response.')
+                print(f"🤖 Standard Ollama response: {response_text[:50]}...")
+                
+                # Send response back to client
+                self.send_json_response({
+                    'response': response_text,
+                    'model': model,
+                    'rag_enabled': False,
+                    'timestamp': ollama_response.get('created_at', '')
+                })
             
         except urllib.error.URLError as e:
             print(f"❌ Ollama connection error: {e}")
@@ -251,6 +269,88 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"❌ RAG ingest API error: {e}")
             self.send_json_response({'error': f'RAG ingest error: {str(e)}'}, 500)
+    
+    def should_trigger_rag(self, message):
+        """Determine if RAG should be used for this message."""
+        # Keywords that suggest the user wants information from documents
+        rag_triggers = [
+            # Question words
+            'what', 'how', 'when', 'where', 'why', 'which', 'who',
+            # Information seeking
+            'explain', 'describe', 'tell me about', 'information about',
+            'details about', 'summary of', 'analyze', 'analysis',
+            # Document-specific
+            'document', 'file', 'data', 'spreadsheet', 'csv', 'table',
+            'report', 'content', 'contains', 'mentions',
+            # Search patterns
+            'find', 'search', 'look for', 'show me', 'list',
+            # Knowledge queries
+            'know about', 'learn about', 'understand'
+        ]
+        
+        message_lower = message.lower()
+        
+        # Check if message contains RAG trigger words
+        for trigger in rag_triggers:
+            if trigger in message_lower:
+                return True
+        
+        # Check if it's a question (ends with ?)
+        if message.strip().endswith('?'):
+            return True
+        
+        return False
+    
+    def get_rag_enhanced_response(self, message, model):
+        """Get RAG-enhanced response using MCP-style tool integration."""
+        try:
+            # Use the RAG query endpoint
+            rag_result = handle_rag_query_request(message, max_context=5)
+            
+            if rag_result['status'] == 'success':
+                response_text = rag_result['answer']
+                sources = rag_result.get('sources', [])
+                model_used = rag_result.get('model_used', model)
+                
+                # Add source attribution if sources exist
+                if sources:
+                    source_info = f"\n\n📚 Sources consulted: {len(sources)} document(s)"
+                    response_text += source_info
+                
+                return response_text, model_used, sources
+            else:
+                # Fallback to standard Ollama if RAG fails
+                print(f"⚠️ RAG failed, falling back to standard response: {rag_result.get('message', 'Unknown error')}")
+                return self.get_standard_ollama_response(message, model), model, []
+                
+        except Exception as e:
+            print(f"❌ RAG enhancement error: {e}")
+            return self.get_standard_ollama_response(message, model), model, []
+    
+    def get_standard_ollama_response(self, message, model):
+        """Get standard Ollama response without RAG."""
+        try:
+            ollama_data = {
+                'model': model,
+                'prompt': message,
+                'stream': False
+            }
+            
+            ollama_url = 'http://localhost:11434/api/generate'
+            req = urllib.request.Request(
+                ollama_url,
+                data=json.dumps(ollama_data).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+            
+            with urllib.request.urlopen(req, timeout=30) as response:
+                ollama_response = json.loads(response.read().decode('utf-8'))
+            
+            return ollama_response.get('response', 'Sorry, I could not generate a response.')
+            
+        except Exception as e:
+            print(f"❌ Standard Ollama request failed: {e}")
+            return f"Sorry, I'm currently unable to process your request. Error: {str(e)}"
     
     def send_json_response(self, data, status_code=200):
         """Send a JSON response."""
