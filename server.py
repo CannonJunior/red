@@ -314,7 +314,21 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 
                 # Add source attribution if sources exist
                 if sources:
-                    source_info = f"\n\n📚 Sources consulted: {len(sources)} document(s)"
+                    # Extract unique document names from sources
+                    document_names = set()
+                    for source in sources:
+                        if 'metadata' in source and 'source' in source['metadata']:
+                            file_path = source['metadata']['source']
+                            # Extract just the filename from the full path
+                            document_name = os.path.basename(file_path)
+                            document_names.add(document_name)
+                    
+                    if document_names:
+                        doc_list = ', '.join(sorted(document_names))
+                        source_info = f"\n\n📚 Sources consulted: {doc_list}"
+                    else:
+                        source_info = f"\n\n📚 Sources consulted: {len(sources)} document(s)"
+                    
                     response_text += source_info
                 
                 return response_text, model_used, sources

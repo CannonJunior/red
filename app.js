@@ -112,6 +112,15 @@ class ChatInterface {
         this.messagesContainer = null;
         this.currentModel = 'qwen2.5:3b'; // Default model
         this.isLoading = false;
+        
+        // Chat history system - terminal-style command history
+        this.chatId = 'default'; // Default chat session
+        this.inputHistory = [];
+        this.historyIndex = -1; // -1 means current input, 0+ are history entries
+        this.currentDraft = ''; // Stores current input when navigating history
+        this.maxHistorySize = 50; // Limit history to last 50 commands
+        
+        this.loadChatHistory();
         this.init();
     }
 
@@ -158,11 +167,17 @@ class ChatInterface {
         // Send button click
         this.sendButton?.addEventListener('click', () => this.handleSend());
 
-        // Enter key handling
+        // Enhanced key handling for Enter and arrow keys
         this.messageInput?.addEventListener('keydown', (e) => {
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.handleSend();
+            } else if (e.key === 'ArrowUp') {
+                e.preventDefault();
+                this.navigateHistory('up');
+            } else if (e.key === 'ArrowDown') {
+                e.preventDefault();
+                this.navigateHistory('down');
             }
         });
 
@@ -187,14 +202,18 @@ class ChatInterface {
 
         console.log('Sending message:', message);
         
+        // Add message to history before sending
+        this.addToHistory(message);
+        
         // Display user message
         this.displayMessage('user', message);
         
-        // Clear input
+        // Clear input and reset history navigation
         if (this.messageInput) {
             this.messageInput.value = '';
             this.messageInput.style.height = 'auto';
             this.updateSendButtonState();
+            this.resetHistoryNavigation();
         }
 
         // Set loading state
@@ -358,6 +377,103 @@ class ChatInterface {
                 }
             }
         }
+    }
+
+    // Chat History Management System - Terminal-style command history
+    loadChatHistory() {
+        try {
+            const historyKey = `robobrain_chat_history_${this.chatId}`;
+            const stored = localStorage.getItem(historyKey);
+            if (stored) {
+                this.inputHistory = JSON.parse(stored);
+            }
+        } catch (error) {
+            console.warn('Failed to load chat history:', error);
+            this.inputHistory = [];
+        }
+    }
+
+    saveChatHistory() {
+        try {
+            const historyKey = `robobrain_chat_history_${this.chatId}`;
+            localStorage.setItem(historyKey, JSON.stringify(this.inputHistory));
+        } catch (error) {
+            console.warn('Failed to save chat history:', error);
+        }
+    }
+
+    addToHistory(message) {
+        // Don't add empty messages or duplicates
+        if (!message.trim() || this.inputHistory[this.inputHistory.length - 1] === message) {
+            return;
+        }
+
+        // Add to history
+        this.inputHistory.push(message);
+
+        // Limit history size
+        if (this.inputHistory.length > this.maxHistorySize) {
+            this.inputHistory.shift(); // Remove oldest entry
+        }
+
+        // Save to localStorage
+        this.saveChatHistory();
+    }
+
+    navigateHistory(direction) {
+        if (!this.messageInput) return;
+
+        const historyLength = this.inputHistory.length;
+        if (historyLength === 0) return;
+
+        // Save current input as draft when starting to navigate
+        if (this.historyIndex === -1) {
+            this.currentDraft = this.messageInput.value;
+        }
+
+        if (direction === 'up') {
+            // Go backwards through history (older messages)
+            if (this.historyIndex < historyLength - 1) {
+                this.historyIndex++;
+            }
+        } else if (direction === 'down') {
+            // Go forwards through history (newer messages)
+            if (this.historyIndex > -1) {
+                this.historyIndex--;
+            }
+        }
+
+        // Update input field
+        if (this.historyIndex === -1) {
+            // Back to current draft
+            this.messageInput.value = this.currentDraft;
+        } else {
+            // Show history entry (newest first, so reverse the index)
+            const historyEntry = this.inputHistory[historyLength - 1 - this.historyIndex];
+            this.messageInput.value = historyEntry || '';
+        }
+
+        // Trigger auto-resize
+        this.messageInput.style.height = 'auto';
+        this.messageInput.style.height = Math.min(this.messageInput.scrollHeight, 120) + 'px';
+        
+        // Update send button state
+        this.updateSendButtonState();
+
+        // Place cursor at end
+        this.messageInput.setSelectionRange(this.messageInput.value.length, this.messageInput.value.length);
+    }
+
+    resetHistoryNavigation() {
+        this.historyIndex = -1;
+        this.currentDraft = '';
+    }
+
+    // Method to change chat sessions (for future multi-chat support)
+    switchChat(newChatId) {
+        this.chatId = newChatId;
+        this.loadChatHistory();
+        this.resetHistoryNavigation();
     }
 }
 
