@@ -1,6 +1,6 @@
 #!/bin/bash
 
-# Agentic UI Server Start Script
+# Robobrain UI Server Start Script
 # Kills any process on port 9090 then starts the server
 
 PORT=9090
@@ -26,7 +26,7 @@ else
 fi
 
 echo ""
-echo "🚀 Starting Agentic UI Server..."
+echo "🚀 Starting Robobrain UI Server..."
 
 # Try uv run first, fallback to python3
 if command -v uv &> /dev/null; then

@@ -726,5 +726,5 @@ document.addEventListener('DOMContentLoaded', () => {
     window.integrationManager = new IntegrationManager();
     
     // Make integration manager available globally for future use
-    console.log('Agentic UI loaded and ready');
+    console.log('Robobrain loaded and ready');
 });

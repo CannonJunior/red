@@ -1,4 +1,4 @@
-# Agentic UI - Basic Web Application
+# Robobrain - Web Application: Red features
 
 A basic web application with Open WebUI's look and feel, designed to add agentic UI features for day-to-day work assistance.
 

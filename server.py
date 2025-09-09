@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 """
-Simple HTTP server for the Agentic UI web application.
+Simple HTTP server for the Robobrain UI web application.
 Serves static files on port 9090.
 """
 
@@ -455,7 +455,7 @@ def main():
         # Create and start the server
         httpd = HTTPServer(server_address, CustomHTTPRequestHandler)
         
-        print(f"🚀 Agentic UI Server starting...")
+        print(f"🚀 Robobrain UI Server starting...")
         print(f"📁 Serving files from: {web_dir}")
         print(f"🌐 Server running at: http://localhost:{port}")
         print(f"🔗 Open in browser: http://localhost:{port}")
