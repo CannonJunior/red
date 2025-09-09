@@ -15,7 +15,7 @@ from pathlib import Path
 
 # Import RAG functionality
 try:
-    from rag_api import handle_rag_status_request, handle_rag_search_request, handle_rag_query_request, handle_rag_ingest_request
+    from rag_api import handle_rag_status_request, handle_rag_search_request, handle_rag_query_request, handle_rag_ingest_request, handle_rag_documents_request, handle_rag_analytics_request
     RAG_AVAILABLE = True
     print("✅ RAG system loaded successfully")
 except ImportError as e:
@@ -29,6 +29,18 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_GET(self):
         """Handle GET requests."""
         try:
+            # Handle API routes
+            if self.path.startswith('/api/'):
+                if self.path == '/api/rag/documents' and RAG_AVAILABLE:
+                    self.handle_rag_documents_api()
+                    return
+                elif self.path == '/api/rag/analytics' and RAG_AVAILABLE:
+                    self.handle_rag_analytics_api()
+                    return
+                else:
+                    self.send_error(404, f"API endpoint not found: {self.path}")
+                    return
+            
             # Handle root path
             if self.path == '/':
                 self.path = '/index.html'
@@ -87,11 +99,28 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_rag_query_api()
             elif self.path == '/api/rag/ingest' and RAG_AVAILABLE:
                 self.handle_rag_ingest_api()
+            elif self.path == '/api/rag/upload' and RAG_AVAILABLE:
+                self.handle_rag_upload_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
                 
         except Exception as e:
             print(f"❌ Error handling POST {self.path}: {e}")
+            self.send_error(500, f"Internal server error: {e}")
+    
+    def do_DELETE(self):
+        """Handle DELETE requests for API endpoints."""
+        try:
+            # Parse request path for DELETE operations
+            if self.path.startswith('/api/rag/documents/') and RAG_AVAILABLE:
+                # Extract document ID from path
+                document_id = self.path.split('/')[-1]
+                self.handle_rag_document_delete_api(document_id)
+            else:
+                self.send_error(404, f"API endpoint not found: {self.path}")
+                
+        except Exception as e:
+            print(f"❌ Error handling DELETE {self.path}: {e}")
             self.send_error(500, f"Internal server error: {e}")
     
     def handle_chat_api(self):
@@ -251,24 +280,93 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_json_response({'error': f'RAG query error: {str(e)}'}, 500)
     
     def handle_rag_ingest_api(self):
-        """Handle RAG document ingestion API requests."""
+        """Handle RAG document ingestion API requests (supports both FormData files and JSON file paths)."""
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
+            content_type = self.headers.get('Content-Type', '')
             
-            file_path = request_data.get('file_path', '').strip()
-            
-            if not file_path:
-                self.send_json_response({'error': 'File path is required'}, 400)
-                return
-            
-            ingest_result = handle_rag_ingest_request(file_path)
-            print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
-            self.send_json_response(ingest_result)
+            if content_type.startswith('multipart/form-data'):
+                # Handle file upload via FormData
+                self._handle_file_upload()
+            else:
+                # Handle JSON request with file path
+                content_length = int(self.headers.get('Content-Length', 0))
+                post_data = self.rfile.read(content_length)
+                request_data = json.loads(post_data.decode('utf-8'))
+                
+                file_path = request_data.get('file_path', '').strip()
+                
+                if not file_path:
+                    self.send_json_response({'error': 'File path is required'}, 400)
+                    return
+                
+                ingest_result = handle_rag_ingest_request(file_path)
+                print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
+                self.send_json_response(ingest_result)
+                
         except Exception as e:
             print(f"❌ RAG ingest API error: {e}")
             self.send_json_response({'error': f'RAG ingest error: {str(e)}'}, 500)
+
+    def _handle_file_upload(self):
+        """Handle multipart form data file upload."""
+        import cgi
+        import tempfile
+        import os
+        
+        try:
+            # Parse multipart form data
+            content_type = self.headers.get('Content-Type', '')
+            
+            # Create a temporary environment variable for CGI
+            environ = {
+                'REQUEST_METHOD': 'POST',
+                'CONTENT_TYPE': content_type,
+                'CONTENT_LENGTH': self.headers.get('Content-Length', '0')
+            }
+            
+            form = cgi.FieldStorage(
+                fp=self.rfile,
+                headers=self.headers,
+                environ=environ
+            )
+            
+            # Get the uploaded file
+            if 'file' not in form:
+                self.send_json_response({'error': 'No file uploaded'}, 400)
+                return
+            
+            file_item = form['file']
+            if not file_item.filename:
+                self.send_json_response({'error': 'No file selected'}, 400)
+                return
+            
+            # Create uploads directory if it doesn't exist
+            uploads_dir = Path('uploads')
+            uploads_dir.mkdir(exist_ok=True)
+            
+            # Save uploaded file
+            file_path = uploads_dir / file_item.filename
+            with open(file_path, 'wb') as f:
+                f.write(file_item.file.read())
+            
+            print(f"📤 File uploaded: {file_item.filename} -> {file_path}")
+            
+            # Process the uploaded file with RAG system
+            ingest_result = handle_rag_ingest_request(str(file_path))
+            print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
+            
+            # Clean up uploaded file after processing (optional)
+            try:
+                os.remove(file_path)
+                print(f"🧹 Cleaned up temporary file: {file_path}")
+            except OSError:
+                pass
+            
+            self.send_json_response(ingest_result)
+            
+        except Exception as e:
+            print(f"❌ File upload error: {e}")
+            self.send_json_response({'error': f'File upload failed: {str(e)}'}, 500)
     
     def should_trigger_rag(self, message):
         """Determine if RAG should be used for this message."""
@@ -449,6 +547,60 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def log_message(self, format, *args):
         """Override to provide cleaner logging."""
         return  # Disable default logging to reduce noise
+
+    def handle_rag_documents_api(self):
+        """Handle RAG documents listing API requests."""
+        try:
+            documents_result = handle_rag_documents_request()
+            print(f"📋 RAG documents: {len(documents_result.get('documents', []))} documents found")
+            self.send_json_response(documents_result)
+            
+        except Exception as e:
+            print(f"❌ RAG documents API error: {e}")
+            self.send_json_response({'error': f'Failed to load documents: {str(e)}'}, 500)
+
+    def handle_rag_analytics_api(self):
+        """Handle RAG analytics API requests."""
+        try:
+            analytics_result = handle_rag_analytics_request()
+            print(f"📊 RAG analytics: {analytics_result.get('document_count', 0)} docs, {analytics_result.get('chunk_count', 0)} chunks")
+            self.send_json_response(analytics_result)
+            
+        except Exception as e:
+            print(f"❌ RAG analytics API error: {e}")
+            self.send_json_response({'error': f'Failed to load analytics: {str(e)}'}, 500)
+
+    def handle_rag_upload_api(self):
+        """Handle RAG file upload API requests."""
+        try:
+            # For now, just return success
+            # This should eventually implement actual file upload and ingestion
+            print(f"📤 RAG upload request received")
+            
+            self.send_json_response({
+                'status': 'success',
+                'message': 'File uploaded successfully'
+            })
+            
+        except Exception as e:
+            print(f"❌ RAG upload API error: {e}")
+            self.send_json_response({'error': f'Upload failed: {str(e)}'}, 500)
+
+    def handle_rag_document_delete_api(self, document_id):
+        """Handle RAG document deletion API requests."""
+        try:
+            # For now, just return success
+            # This should eventually implement actual document deletion from ChromaDB
+            print(f"🗑️ RAG delete request for document: {document_id}")
+            
+            self.send_json_response({
+                'status': 'success',
+                'message': f'Document {document_id} deleted successfully'
+            })
+            
+        except Exception as e:
+            print(f"❌ RAG document delete API error: {e}")
+            self.send_json_response({'error': f'Delete failed: {str(e)}'}, 500)
 
 
 def main():

@@ -271,6 +271,67 @@ Please provide a comprehensive answer based on the context provided."""
         except Exception as e:
             logger.warning(f"Failed to emit event: {e}")
     
+    def get_documents_metadata(self) -> List[Dict[str, Any]]:
+        """Get metadata for all ingested documents."""
+        try:
+            # Get all documents from ChromaDB
+            results = self.collection.get()
+            
+            documents = []
+            processed_sources = set()
+            
+            for i, metadata in enumerate(results.get('metadatas', [])):
+                if metadata and 'source' in metadata:
+                    source_path = metadata['source']
+                    
+                    # Skip if we've already processed this source file
+                    if source_path in processed_sources:
+                        continue
+                    processed_sources.add(source_path)
+                    
+                    # Extract filename from path
+                    import os
+                    filename = os.path.basename(source_path)
+                    
+                    # Count chunks for this document
+                    chunk_count = sum(1 for m in results.get('metadatas', []) 
+                                    if m and m.get('source') == source_path)
+                    
+                    # Determine file type
+                    file_ext = os.path.splitext(filename)[1].lower()
+                    file_type = {
+                        '.csv': 'CSV',
+                        '.txt': 'Text',
+                        '.pdf': 'PDF',
+                        '.docx': 'Word Document',
+                        '.md': 'Markdown'
+                    }.get(file_ext, 'Unknown')
+                    
+                    # Try to get file size (this is approximate)
+                    try:
+                        file_size = os.path.getsize(source_path) if os.path.exists(source_path) else None
+                    except:
+                        file_size = None
+                    
+                    doc_info = {
+                        'id': f"doc_{len(documents)}",
+                        'name': filename,
+                        'type': file_type,
+                        'size': file_size,
+                        'chunks': chunk_count,
+                        'uploadDate': metadata.get('ingestion_date', datetime.now().isoformat()),
+                        'status': 'processed',
+                        'source_path': source_path
+                    }
+                    
+                    documents.append(doc_info)
+            
+            return documents
+            
+        except Exception as e:
+            logger.error(f"Error getting documents metadata: {e}")
+            return []
+
     def get_system_status(self) -> Dict[str, Any]:
         """Get system status for monitoring (Agent-accessible via MCP)."""
         status = {

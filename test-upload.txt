@@ -1,0 +1,10 @@
+This is a test document for uploading to the Knowledge Base.
+
+It contains some sample information that should be processed by the RAG system.
+
+Key points:
+- File upload functionality test
+- Document processing verification
+- RAG ingestion validation
+
+The system should be able to extract and index this content for later retrieval.

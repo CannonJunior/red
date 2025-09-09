@@ -191,6 +191,74 @@ class RAGService:
                 "message": f"RAG query failed: {e}",
                 "answer": f"Sorry, I encountered an error: {e}"
             }
+    
+    def get_documents(self) -> Dict[str, Any]:
+        """
+        Get metadata for all ingested documents.
+        
+        Returns:
+            Documents metadata dictionary
+        """
+        if not self.available:
+            return {
+                "status": "error",
+                "message": "RAG system not available",
+                "documents": []
+            }
+        
+        try:
+            documents = self.rag_system.get_documents_metadata()
+            return {
+                "status": "success",
+                "documents": documents,
+                "total": len(documents)
+            }
+        except Exception as e:
+            logger.error(f"Failed to get documents: {e}")
+            return {
+                "status": "error",
+                "message": f"Failed to get documents: {e}",
+                "documents": []
+            }
+    
+    def get_analytics(self) -> Dict[str, Any]:
+        """
+        Get RAG system analytics.
+        
+        Returns:
+            Analytics dictionary
+        """
+        if not self.available:
+            return {
+                "status": "error",
+                "message": "RAG system not available",
+                "document_count": 0,
+                "chunk_count": 0,
+                "query_count": 0
+            }
+        
+        try:
+            status = self.rag_system.get_system_status()
+            documents = self.rag_system.get_documents_metadata()
+            
+            # Calculate total chunks
+            total_chunks = sum(doc.get('chunks', 0) for doc in documents)
+            
+            return {
+                "status": "success",
+                "document_count": status["vector_database"]["document_count"],
+                "chunk_count": total_chunks,
+                "query_count": getattr(self.rag_system, 'query_count', 0)  # Placeholder for now
+            }
+        except Exception as e:
+            logger.error(f"Failed to get analytics: {e}")
+            return {
+                "status": "error",
+                "message": f"Failed to get analytics: {e}",
+                "document_count": 0,
+                "chunk_count": 0,
+                "query_count": 0
+            }
 
 
 # Global RAG service instance
@@ -215,6 +283,16 @@ def handle_rag_query_request(query: str, max_context: int = 5):
 def handle_rag_ingest_request(file_path: str):
     """Handle RAG document ingestion request."""
     return rag_service.ingest_document(file_path)
+
+
+def handle_rag_documents_request():
+    """Handle RAG documents listing request."""
+    return rag_service.get_documents()
+
+
+def handle_rag_analytics_request():
+    """Handle RAG analytics request."""
+    return rag_service.get_analytics()
 
 
 # Test functionality
