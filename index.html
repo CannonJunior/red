@@ -97,8 +97,13 @@
                             <p class="text-sm font-medium text-gray-900 dark:text-white truncate">User</p>
                             <p class="text-xs text-gray-500 dark:text-gray-400 truncate">user@example.com</p>
                         </div>
-                        <button class="theme-toggle p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <svg class="w-4 h-4 text-gray-500 dark:text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <button class="theme-toggle p-1 rounded-md hover:bg-gray-100 dark:hover:bg-gray-700 transition-all duration-200">
+                            <!-- Light mode icon (sun) - shown when dark mode is active to switch to light -->
+                            <svg class="theme-icon-light w-4 h-4 text-gray-500 dark:text-gray-400 hidden" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 3v1m0 16v1m9-9h-1M4 12H3m15.364 6.364l-.707-.707M6.343 6.343l-.707-.707m12.728 0l-.707.707M6.343 17.657l-.707.707M16 12a4 4 0 11-8 0 4 4 0 018 0z"></path>
+                            </svg>
+                            <!-- Dark mode icon (moon) - shown when light mode is active to switch to dark -->
+                            <svg class="theme-icon-dark w-4 h-4 text-gray-500 dark:text-gray-400 block" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20.354 15.354A9 9 0 018.646 3.646 9.003 9.003 0 0012 21a9.003 9.003 0 008.354-5.646z"></path>
                             </svg>
                         </button>
@@ -111,17 +116,22 @@
                 <!-- Header -->
                 <header class="bg-white dark:bg-gray-900 border-b border-gray-200 dark:border-gray-700 px-6 py-4">
                     <div class="flex items-center justify-between">
-                        <h2 class="text-lg font-semibold text-gray-900 dark:text-white">Chat</h2>
+                        <h2 id="page-title" class="text-lg font-semibold text-gray-900 dark:text-white">Chat</h2>
                         <div class="flex items-center space-x-3">
-                            <button class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
-                                New Chat
+                            <button id="new-chat-btn" class="px-3 py-1.5 text-sm font-medium text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white rounded-md hover:bg-gray-100 dark:hover:bg-gray-700">
+                                <span class="flex items-center">
+                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6v6m0 0v6m0-6h6m-6 0H6"></path>
+                                    </svg>
+                                    New Chat
+                                </span>
                             </button>
                         </div>
                     </div>
                 </header>
 
                 <!-- Chat Area -->
-                <main class="flex-1 flex flex-col">
+                <main id="chat-area" class="flex-1 flex flex-col">
                     <!-- Messages -->
                     <div class="flex-1 overflow-y-auto px-6 py-4">
                         <div class="max-w-4xl mx-auto space-y-6">
@@ -150,6 +160,96 @@
                                         <path d="M10.894 2.553a1 1 0 00-1.788 0l-7 14a1 1 0 001.169 1.409l5-1.429A1 1 0 009 15.571V11a1 1 0 112 0v4.571a1 1 0 00.725.962l5 1.429a1 1 0 001.17-1.408l-7-14z"></path>
                                     </svg>
                                 </button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Models Area (hidden by default) -->
+                <main id="models-area" class="flex-1 flex flex-col hidden">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-6xl mx-auto">
+                            <div class="mb-6">
+                                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Available Models</h3>
+                                <p class="text-gray-600 dark:text-gray-400">Manage your AI models and their configurations</p>
+                            </div>
+
+                            <!-- Model Selection -->
+                            <div class="mb-6">
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                    Current Model
+                                </label>
+                                <select id="model-selector" class="w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    <option value="qwen2.5:3b">qwen2.5:3b (Recommended)</option>
+                                </select>
+                            </div>
+
+                            <!-- Models Grid -->
+                            <div id="models-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+                                <!-- Models will be populated here -->
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Settings Area (hidden by default) -->
+                <main id="settings-area" class="flex-1 flex flex-col hidden">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="mb-6">
+                                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Settings</h3>
+                                <p class="text-gray-600 dark:text-gray-400">Configure your application preferences</p>
+                            </div>
+
+                            <!-- Settings Sections -->
+                            <div class="space-y-6">
+                                <!-- Theme Settings -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Appearance</h4>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Theme
+                                            </label>
+                                            <select id="theme-selector" class="w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                <option value="system">System (Auto)</option>
+                                                <option value="light">Light</option>
+                                                <option value="dark">Dark</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Chat Settings -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Chat</h4>
+                                    <div class="space-y-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
+                                                Default Model
+                                            </label>
+                                            <select id="default-model-selector" class="w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                                <option value="qwen2.5:3b">qwen2.5:3b (Fast)</option>
+                                            </select>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- About Section -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">About</h4>
+                                    <div class="space-y-2">
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            <strong>Agentic UI</strong> - Your AI Assistant Interface
+                                        </p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            Powered by Ollama • Running on localhost:9090
+                                        </p>
+                                        <p class="text-sm text-gray-600 dark:text-gray-400">
+                                            Open source interface inspired by Open WebUI
+                                        </p>
+                                    </div>
+                                </div>
                             </div>
                         </div>
                     </div>

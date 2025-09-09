@@ -22,24 +22,66 @@ class ThemeManager {
             (this.theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches);
         
         document.documentElement.classList.toggle('dark', isDark);
+        
+        // Update theme toggle icons
+        this.updateThemeIcons(isDark);
+    }
+
+    updateThemeIcons(isDark) {
+        const lightIcon = document.querySelector('.theme-icon-light');
+        const darkIcon = document.querySelector('.theme-icon-dark');
+        
+        if (lightIcon && darkIcon) {
+            if (isDark) {
+                // In dark mode, show sun icon (to switch to light)
+                lightIcon.classList.remove('hidden');
+                lightIcon.classList.add('block');
+                darkIcon.classList.remove('block');
+                darkIcon.classList.add('hidden');
+            } else {
+                // In light mode, show moon icon (to switch to dark)
+                lightIcon.classList.remove('block');
+                lightIcon.classList.add('hidden');
+                darkIcon.classList.remove('hidden');
+                darkIcon.classList.add('block');
+            }
+        }
     }
 
     toggleTheme() {
-        const themes = ['light', 'dark', 'system'];
-        const currentIndex = themes.indexOf(this.theme);
-        const nextIndex = (currentIndex + 1) % themes.length;
-        
-        this.theme = themes[nextIndex];
+        // Simple toggle between light and dark (skip system for direct toggle)
+        if (this.theme === 'dark') {
+            this.setTheme('light');
+        } else {
+            this.setTheme('dark');
+        }
+    }
+
+    setTheme(newTheme) {
+        this.theme = newTheme;
         localStorage.setItem('theme', this.theme);
         this.applyTheme();
+        this.updateThemeSelectors();
         
         console.log(`Theme changed to: ${this.theme}`);
+    }
+
+    updateThemeSelectors() {
+        // Update theme selector in settings if it exists
+        const themeSelector = document.getElementById('theme-selector');
+        if (themeSelector) {
+            themeSelector.value = this.theme;
+        }
     }
 
     setupThemeToggle() {
         const toggleButton = document.querySelector('.theme-toggle');
         if (toggleButton) {
-            toggleButton.addEventListener('click', () => this.toggleTheme());
+            toggleButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                this.toggleTheme();
+            });
         }
     }
 }
@@ -191,8 +233,8 @@ class ChatInterface {
         if (type === 'user') {
             messageHtml = `
                 <div class="flex justify-end mb-4">
-                    <div class="message-user max-w-2xl px-4 py-2 bg-blue-500 text-white rounded-2xl rounded-br-md">
-                        <p class="text-sm">${this.escapeHtml(content)}</p>
+                    <div class="message-user max-w-2xl px-4 py-3">
+                        <p class="text-sm font-medium">${this.escapeHtml(content)}</p>
                     </div>
                 </div>
             `;
@@ -200,10 +242,10 @@ class ChatInterface {
             messageHtml = `
                 <div class="flex justify-start mb-4">
                     <div class="flex space-x-3 max-w-2xl">
-                        <img src="robobrain.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-1">
-                        <div class="message-assistant bg-gray-100 dark:bg-gray-800 px-4 py-2 rounded-2xl rounded-bl-md">
-                            <p class="text-sm text-gray-900 dark:text-gray-100 whitespace-pre-wrap">${this.escapeHtml(content)}</p>
-                            ${model ? `<p class="text-xs text-gray-500 dark:text-gray-400 mt-1">Model: ${model}</p>` : ''}
+                        <img src="robobrain.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-1 opacity-80">
+                        <div class="message-assistant px-4 py-3">
+                            <p class="text-sm whitespace-pre-wrap leading-relaxed">${this.escapeHtml(content)}</p>
+                            ${model ? `<p class="text-xs opacity-70 mt-2">Model: ${model}</p>` : ''}
                         </div>
                     </div>
                 </div>
@@ -295,31 +337,232 @@ class ChatInterface {
 // Navigation
 class Navigation {
     constructor() {
+        this.currentPage = 'chat';
         this.init();
     }
 
     init() {
         this.setupNavigation();
         this.setupMobileToggle();
+        this.setupNewChatButton();
     }
 
     setupNavigation() {
         const navItems = document.querySelectorAll('.nav-item');
         navItems.forEach(item => {
             item.addEventListener('click', (e) => {
-                // Remove active class from all items
-                navItems.forEach(nav => {
-                    nav.classList.remove('bg-blue-50', 'dark:bg-blue-900/50', 'text-blue-600', 'dark:text-blue-400');
-                    nav.classList.add('text-gray-700', 'dark:text-gray-300');
-                });
-
-                // Add active class to clicked item
-                item.classList.add('bg-blue-50', 'dark:bg-blue-900/50', 'text-blue-600', 'dark:text-blue-400');
-                item.classList.remove('text-gray-700', 'dark:text-gray-300');
-
-                console.log('Navigation item clicked:', item.textContent.trim());
+                const itemText = item.textContent.trim().toLowerCase();
+                this.navigateTo(itemText);
+                this.setActiveNavItem(item);
             });
         });
+    }
+
+    navigateTo(page) {
+        // Hide all areas
+        document.getElementById('chat-area')?.classList.add('hidden');
+        document.getElementById('models-area')?.classList.add('hidden');
+        document.getElementById('settings-area')?.classList.add('hidden');
+
+        // Show the selected area
+        const pageTitle = document.getElementById('page-title');
+        
+        switch(page) {
+            case 'chat':
+                document.getElementById('chat-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Chat';
+                this.currentPage = 'chat';
+                break;
+            case 'models':
+                document.getElementById('models-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Models';
+                this.currentPage = 'models';
+                this.loadModelsPage();
+                break;
+            case 'settings':
+                document.getElementById('settings-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Settings';
+                this.currentPage = 'settings';
+                this.loadSettingsPage();
+                break;
+        }
+    }
+
+    setActiveNavItem(activeItem) {
+        const navItems = document.querySelectorAll('.nav-item');
+        
+        // Remove active class from all items
+        navItems.forEach(nav => {
+            nav.classList.remove('bg-blue-50', 'dark:bg-blue-900/50', 'text-blue-600', 'dark:text-blue-400');
+            nav.classList.add('text-gray-700', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+        });
+
+        // Add active class to clicked item
+        activeItem.classList.add('bg-blue-50', 'dark:bg-blue-900/50', 'text-blue-600', 'dark:text-blue-400');
+        activeItem.classList.remove('text-gray-700', 'dark:text-gray-300', 'hover:bg-gray-100', 'dark:hover:bg-gray-700');
+    }
+
+    async loadModelsPage() {
+        const modelsGrid = document.getElementById('models-grid');
+        const modelSelector = document.getElementById('model-selector');
+        
+        if (!modelsGrid || !modelSelector) return;
+
+        try {
+            // Fetch available models
+            const response = await fetch('/api/models', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.populateModelsGrid(data.models);
+                this.populateModelSelector(data.models, modelSelector);
+            } else {
+                modelsGrid.innerHTML = '<p class="text-red-500 dark:text-red-400">Failed to load models</p>';
+            }
+        } catch (error) {
+            console.error('Error loading models:', error);
+            modelsGrid.innerHTML = '<p class="text-red-500 dark:text-red-400">Error connecting to model service</p>';
+        }
+    }
+
+    populateModelsGrid(models) {
+        const modelsGrid = document.getElementById('models-grid');
+        if (!modelsGrid) return;
+
+        modelsGrid.innerHTML = '';
+
+        models.forEach(model => {
+            const modelCard = document.createElement('div');
+            const isRecommended = model === 'qwen2.5:3b';
+            modelCard.className = `model-card p-6 ${isRecommended ? 'model-recommended' : ''}`;
+            
+            const modelSize = this.getModelSize(model);
+            
+            modelCard.innerHTML = `
+                <div class="flex items-center justify-between mb-4">
+                    <div class="flex items-center space-x-3">
+                        <div class="w-10 h-10 bg-blue-100 dark:bg-blue-900 rounded-full flex items-center justify-center">
+                            <svg class="w-5 h-5 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                            </svg>
+                        </div>
+                        <div>
+                            <h4 class="font-medium text-gray-900 dark:text-white">${model}</h4>
+                            <p class="text-sm text-gray-500 dark:text-gray-400">${modelSize}</p>
+                        </div>
+                    </div>
+                    ${isRecommended ? '<span class="px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 rounded-full">Recommended</span>' : ''}
+                </div>
+                
+                <div class="space-y-2 mb-4">
+                    <p class="text-sm text-gray-600 dark:text-gray-400">
+                        ${this.getModelDescription(model)}
+                    </p>
+                </div>
+                
+                <div class="flex space-x-2">
+                    <button onclick="window.app.navigation.selectModel('${model}')" class="flex-1 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/70 transition-colors">
+                        Select Model
+                    </button>
+                </div>
+            `;
+            
+            modelsGrid.appendChild(modelCard);
+        });
+    }
+
+    populateModelSelector(models, selector) {
+        selector.innerHTML = '';
+        models.forEach(model => {
+            const option = document.createElement('option');
+            option.value = model;
+            option.textContent = model + (model === 'qwen2.5:3b' ? ' (Recommended)' : '');
+            if (model === window.app?.chatInterface?.currentModel) {
+                option.selected = true;
+            }
+            selector.appendChild(option);
+        });
+
+        // Handle model selection changes
+        selector.addEventListener('change', (e) => {
+            this.selectModel(e.target.value);
+        });
+    }
+
+    selectModel(modelName) {
+        if (window.app?.chatInterface) {
+            window.app.chatInterface.currentModel = modelName;
+            console.log(`Selected model: ${modelName}`);
+            
+            // Update all model selectors
+            document.querySelectorAll('#model-selector, #default-model-selector').forEach(selector => {
+                selector.value = modelName;
+            });
+        }
+    }
+
+    getModelSize(model) {
+        if (model.includes('3b')) return '3B Parameters';
+        if (model.includes('7b') || model.includes('8b')) return '~8B Parameters';
+        if (model.includes('13b')) return '13B Parameters';
+        return 'Unknown Size';
+    }
+
+    getModelDescription(model) {
+        if (model === 'qwen2.5:3b') {
+            return 'Fast and efficient model, perfect for quick responses and general conversation. Recommended for most use cases.';
+        }
+        if (model.includes('llama3.1-claude')) {
+            return 'Advanced model with enhanced reasoning capabilities. Better for complex tasks but slower responses.';
+        }
+        return 'AI language model with general conversation capabilities.';
+    }
+
+    loadSettingsPage() {
+        const themeSelector = document.getElementById('theme-selector');
+        const defaultModelSelector = document.getElementById('default-model-selector');
+        
+        if (themeSelector && window.app?.themeManager) {
+            themeSelector.value = window.app.themeManager.theme;
+            themeSelector.addEventListener('change', (e) => {
+                window.app.themeManager.setTheme(e.target.value);
+            });
+        }
+
+        if (defaultModelSelector) {
+            this.populateModelSelector(['qwen2.5:3b', 'incept5/llama3.1-claude:latest'], defaultModelSelector);
+        }
+    }
+
+    setupNewChatButton() {
+        const newChatBtn = document.getElementById('new-chat-btn');
+        if (newChatBtn) {
+            newChatBtn.addEventListener('click', () => {
+                this.startNewChat();
+            });
+        }
+    }
+
+    startNewChat() {
+        // Clear chat messages
+        if (window.app?.chatInterface?.messagesContainer) {
+            window.app.chatInterface.messagesContainer.innerHTML = '';
+        }
+        
+        // Navigate to chat if not already there
+        if (this.currentPage !== 'chat') {
+            this.navigateTo('chat');
+            // Set chat nav item as active
+            const chatNavItem = document.querySelector('.nav-item');
+            if (chatNavItem) {
+                this.setActiveNavItem(chatNavItem);
+            }
+        }
+        
+        console.log('Started new chat');
     }
 
     setupMobileToggle() {
