@@ -6,10 +6,10 @@
 - **Use venv_linux** (the virtual environment) whenever executing Python commands, including for unit tests.
 
 ### 🌐 Port Management - CRITICAL
-- **ALWAYS run this web application on port 8000 ONLY.** Never change the port without explicit user permission.
+- **ALWAYS run this web application on port 9090 ONLY.** Never change the port without explicit user permission.
 - **If you need to run another service on a different port, ASK the user first.**
-- **The default server port is 8000** - maintain this consistency across all sessions.
-- **📋 MEMOIZATION RULE**: Every new directory MUST have a CLAUDE.md file that includes the port 8000 requirement. See `docs/CLAUDE-MEMOIZATION-RULES.md` for details.
+- **The default server port is 9090** - maintain this consistency across all sessions.
+- **📋 MEMOIZATION RULE**: Every new directory MUST have a CLAUDE.md file that includes the port 9090 requirement.
 
 ### 🧱 Code Structure & Modularity
 - **Never create a file longer than 500 lines of code.** If a file approaches this limit, refactor by splitting it into modules or helper files.
@@ -65,6 +65,21 @@
 - **Always confirm file paths and module names** exist before referencing them in code or tests.
 - **Never delete or overwrite existing code** unless explicitly instructed to or if part of a task from `TASK.md`.
 
+### 📦 Package Management - CRITICAL
+- **ALWAYS use `uv` instead of `pip`** for Python package management
+- Commands: `uv add <package>`, `uv run <script>`, `uv sync`
+- uv is faster, more reliable, and provides better dependency resolution
+- Use `uv run server.py` instead of `python3 server.py`
+
+### 🤖 RAG System Architecture
+- Zero-cost, locally-running RAG system for 5 users
+- Agent-native architecture with MCP (Model Context Protocol)
+- Mojo programming language integration for performance optimization
+- ChromaDB + DuckDB vector database (local, not PostgreSQL)
+- Ollama for local LLM integration (not API services)
+- Redis Streams for event processing (not Kafka)
+- Document processing: Docling + Unstract (not paid APIs)
+
 ### 📝 Memoization Instructions
 - **Memoize any input given in MEMOIZE.md file.**
-- **This project focuses on adding agentic UI features to help users with their day-to-day work.**
+- **This project focuses on agent-native RAG features to help users with document analysis and knowledge synthesis.**

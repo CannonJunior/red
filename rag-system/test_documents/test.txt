@@ -1,0 +1,8 @@
+
+    This is a test document for the RAG system.
+    
+    The system uses ChromaDB for vector storage and Ollama for local LLM integration.
+    This provides zero-cost, high-performance document processing and retrieval.
+    
+    The document processor can handle multiple file types including PDF, Word, and spreadsheets.
+    

@@ -13,6 +13,15 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import mimetypes
 from pathlib import Path
 
+# Import RAG functionality
+try:
+    from rag_api import handle_rag_status_request, handle_rag_search_request, handle_rag_query_request, handle_rag_ingest_request
+    RAG_AVAILABLE = True
+    print("✅ RAG system loaded successfully")
+except ImportError as e:
+    RAG_AVAILABLE = False
+    print(f"⚠️  RAG system not available: {e}")
+
 
 class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     """Custom handler to serve static files with proper MIME types."""
@@ -70,6 +79,14 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_chat_api()
             elif self.path == '/api/models':
                 self.handle_models_api()
+            elif self.path == '/api/rag/status' and RAG_AVAILABLE:
+                self.handle_rag_status_api()
+            elif self.path == '/api/rag/search' and RAG_AVAILABLE:
+                self.handle_rag_search_api()
+            elif self.path == '/api/rag/query' and RAG_AVAILABLE:
+                self.handle_rag_query_api()
+            elif self.path == '/api/rag/ingest' and RAG_AVAILABLE:
+                self.handle_rag_ingest_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
                 
@@ -162,6 +179,78 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"❌ Models API error: {e}")
             self.send_json_response({'error': f'Models API error: {str(e)}'}, 500)
+    
+    def handle_rag_status_api(self):
+        """Handle RAG status API requests."""
+        try:
+            status_result = handle_rag_status_request()
+            print(f"🔍 RAG status: {status_result.get('status', 'unknown')}")
+            self.send_json_response(status_result)
+        except Exception as e:
+            print(f"❌ RAG status API error: {e}")
+            self.send_json_response({'error': f'RAG status error: {str(e)}'}, 500)
+    
+    def handle_rag_search_api(self):
+        """Handle RAG search API requests."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            query = request_data.get('query', '').strip()
+            max_results = request_data.get('max_results', 5)
+            
+            if not query:
+                self.send_json_response({'error': 'Query is required'}, 400)
+                return
+            
+            search_result = handle_rag_search_request(query, max_results)
+            print(f"🔍 RAG search: '{query}' -> {search_result.get('results', []).__len__()} results")
+            self.send_json_response(search_result)
+        except Exception as e:
+            print(f"❌ RAG search API error: {e}")
+            self.send_json_response({'error': f'RAG search error: {str(e)}'}, 500)
+    
+    def handle_rag_query_api(self):
+        """Handle RAG query API requests."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            query = request_data.get('query', '').strip()
+            max_context = request_data.get('max_context', 5)
+            
+            if not query:
+                self.send_json_response({'error': 'Query is required'}, 400)
+                return
+            
+            query_result = handle_rag_query_request(query, max_context)
+            print(f"🤖 RAG query: '{query}' -> {query_result.get('status', 'unknown')}")
+            self.send_json_response(query_result)
+        except Exception as e:
+            print(f"❌ RAG query API error: {e}")
+            self.send_json_response({'error': f'RAG query error: {str(e)}'}, 500)
+    
+    def handle_rag_ingest_api(self):
+        """Handle RAG document ingestion API requests."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            file_path = request_data.get('file_path', '').strip()
+            
+            if not file_path:
+                self.send_json_response({'error': 'File path is required'}, 400)
+                return
+            
+            ingest_result = handle_rag_ingest_request(file_path)
+            print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
+            self.send_json_response(ingest_result)
+        except Exception as e:
+            print(f"❌ RAG ingest API error: {e}")
+            self.send_json_response({'error': f'RAG ingest error: {str(e)}'}, 500)
     
     def send_json_response(self, data, status_code=200):
         """Send a JSON response."""

@@ -1,0 +1,13 @@
+[project]
+name = "rag-system"
+version = "0.1.0"
+description = "Add your description here"
+requires-python = ">=3.12"
+dependencies = [
+    "chromadb>=1.0.20",
+    "docling>=2.51.0",
+    "mcp>=1.13.1",
+    "ollama>=0.5.3",
+    "redis>=6.4.0",
+    "sentence-transformers>=5.1.0",
+]
