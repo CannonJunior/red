@@ -15,12 +15,21 @@ from pathlib import Path
 
 # Import RAG functionality
 try:
-    from rag_api import handle_rag_status_request, handle_rag_search_request, handle_rag_query_request, handle_rag_ingest_request, handle_rag_documents_request, handle_rag_analytics_request
+    from rag_api import handle_rag_status_request, handle_rag_search_request, handle_rag_query_request, handle_rag_ingest_request, handle_rag_documents_request, handle_rag_analytics_request, handle_rag_document_delete_request
     RAG_AVAILABLE = True
     print("✅ RAG system loaded successfully")
 except ImportError as e:
     RAG_AVAILABLE = False
     print(f"⚠️  RAG system not available: {e}")
+
+# Import Search functionality
+try:
+    from search_api import handle_search_request, handle_folders_request, handle_create_folder_request, handle_tags_request, handle_add_object_request, handle_update_object_request, handle_delete_object_request
+    SEARCH_AVAILABLE = True
+    print("✅ Search system loaded successfully")
+except ImportError as e:
+    SEARCH_AVAILABLE = False
+    print(f"⚠️  Search system not available: {e}")
 
 
 class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
@@ -31,11 +40,19 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         try:
             # Handle API routes
             if self.path.startswith('/api/'):
+                # RAG API endpoints
                 if self.path == '/api/rag/documents' and RAG_AVAILABLE:
                     self.handle_rag_documents_api()
                     return
                 elif self.path == '/api/rag/analytics' and RAG_AVAILABLE:
                     self.handle_rag_analytics_api()
+                    return
+                # Search API endpoints
+                elif self.path == '/api/search/folders' and SEARCH_AVAILABLE:
+                    self.handle_search_folders_api()
+                    return
+                elif self.path == '/api/search/tags' and SEARCH_AVAILABLE:
+                    self.handle_search_tags_api()
                     return
                 else:
                     self.send_error(404, f"API endpoint not found: {self.path}")
@@ -101,6 +118,13 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_rag_ingest_api()
             elif self.path == '/api/rag/upload' and RAG_AVAILABLE:
                 self.handle_rag_upload_api()
+            # Search API endpoints
+            elif self.path == '/api/search' and SEARCH_AVAILABLE:
+                self.handle_search_api()
+            elif self.path == '/api/search/folders' and SEARCH_AVAILABLE:
+                self.handle_search_create_folder_api()
+            elif self.path == '/api/search/objects' and SEARCH_AVAILABLE:
+                self.handle_search_add_object_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
                 
@@ -352,15 +376,29 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             print(f"📤 File uploaded: {file_item.filename} -> {file_path}")
             
             # Process the uploaded file with RAG system
-            ingest_result = handle_rag_ingest_request(str(file_path))
-            print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
+            try:
+                print(f"🔄 Starting RAG ingestion for: {file_path}")
+                ingest_result = handle_rag_ingest_request(str(file_path))
+                print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
+                
+                if ingest_result.get('status') == 'error':
+                    print(f"❌ RAG ingestion failed: {ingest_result.get('message', 'Unknown error')}")
+                    
+            except Exception as ingest_error:
+                print(f"❌ RAG ingestion exception for '{file_path}': {ingest_error}")
+                import traceback
+                traceback.print_exc()
+                ingest_result = {
+                    'status': 'error',
+                    'message': f'RAG ingestion failed: {str(ingest_error)}'
+                }
             
             # Clean up uploaded file after processing (optional)
             try:
                 os.remove(file_path)
                 print(f"🧹 Cleaned up temporary file: {file_path}")
-            except OSError:
-                pass
+            except OSError as cleanup_error:
+                print(f"⚠️  Could not clean up file {file_path}: {cleanup_error}")
             
             self.send_json_response(ingest_result)
             
@@ -464,6 +502,85 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             print(f"❌ Standard Ollama request failed: {e}")
             return f"Sorry, I'm currently unable to process your request. Error: {str(e)}"
     
+    # Search API handlers
+    def handle_search_api(self):
+        """Handle universal search API requests."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            search_result = handle_search_request(request_data)
+            print(f"🔍 Search: '{request_data.get('query', '')}' -> {search_result.get('data', {}).get('total_count', 0)} results")
+            self.send_json_response(search_result)
+            
+        except Exception as e:
+            print(f"❌ Search API error: {e}")
+            self.send_json_response({'error': f'Search failed: {str(e)}'}, 500)
+    
+    def handle_search_folders_api(self):
+        """Handle folders listing API requests."""
+        try:
+            if self.command == 'GET':
+                # GET request - list folders
+                folders_result = handle_folders_request()
+                print(f"📁 Folders: {len(folders_result.get('folders', []))} folders")
+                self.send_json_response(folders_result)
+            else:
+                # POST request - create folder
+                content_length = int(self.headers.get('Content-Length', 0))
+                post_data = self.rfile.read(content_length)
+                request_data = json.loads(post_data.decode('utf-8'))
+                
+                create_result = handle_create_folder_request(request_data)
+                print(f"📁 Create folder: {request_data.get('name', 'Unknown')}")
+                self.send_json_response(create_result)
+            
+        except Exception as e:
+            print(f"❌ Folders API error: {e}")
+            self.send_json_response({'error': f'Folders operation failed: {str(e)}'}, 500)
+    
+    def handle_search_create_folder_api(self):
+        """Handle folder creation API requests."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            create_result = handle_create_folder_request(request_data)
+            print(f"📁 Create folder: {request_data.get('name', 'Unknown')}")
+            self.send_json_response(create_result)
+            
+        except Exception as e:
+            print(f"❌ Create folder API error: {e}")
+            self.send_json_response({'error': f'Create folder failed: {str(e)}'}, 500)
+    
+    def handle_search_tags_api(self):
+        """Handle tags listing API requests."""
+        try:
+            tags_result = handle_tags_request()
+            print(f"🏷️  Tags: {len(tags_result.get('tags', []))} tags")
+            self.send_json_response(tags_result)
+            
+        except Exception as e:
+            print(f"❌ Tags API error: {e}")
+            self.send_json_response({'error': f'Tags operation failed: {str(e)}'}, 500)
+    
+    def handle_search_add_object_api(self):
+        """Handle adding searchable objects API requests."""
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+            
+            add_result = handle_add_object_request(request_data)
+            print(f"➕ Add object: {request_data.get('title', 'Unknown')} ({request_data.get('type', 'unknown')})")
+            self.send_json_response(add_result)
+            
+        except Exception as e:
+            print(f"❌ Add object API error: {e}")
+            self.send_json_response({'error': f'Add object failed: {str(e)}'}, 500)
+
     def send_json_response(self, data, status_code=200):
         """Send a JSON response."""
         response_json = json.dumps(data)
@@ -589,14 +706,24 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def handle_rag_document_delete_api(self, document_id):
         """Handle RAG document deletion API requests."""
         try:
-            # For now, just return success
-            # This should eventually implement actual document deletion from ChromaDB
             print(f"🗑️ RAG delete request for document: {document_id}")
             
-            self.send_json_response({
-                'status': 'success',
-                'message': f'Document {document_id} deleted successfully'
-            })
+            # Call the actual delete function from RAG API
+            result = handle_rag_document_delete_request(document_id)
+            
+            if result.get("status") == "success":
+                self.send_json_response({
+                    'status': 'success',
+                    'message': result.get('message', f'Document {document_id} deleted successfully'),
+                    'document_id': document_id,
+                    'timestamp': result.get('timestamp')
+                })
+            else:
+                self.send_json_response({
+                    'status': 'error',
+                    'error': result.get('message', f'Failed to delete document {document_id}'),
+                    'document_id': document_id
+                }, 400)
             
         except Exception as e:
             print(f"❌ RAG document delete API error: {e}")

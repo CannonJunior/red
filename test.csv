@@ -1,0 +1,16 @@
+Name,Age,City,Occupation,Salary,Department,Years_Experience,Education,Skills,Projects
+Alice Johnson,28,New York,Software Engineer,85000,Engineering,5,Bachelor's,Python; JavaScript; React,Project Alpha; Project Beta; Project Gamma
+Bob Smith,34,San Francisco,Data Scientist,95000,Analytics,7,Master's,Python; R; Machine Learning; SQL,Data Pipeline; Predictive Model; Customer Segmentation
+Carol Williams,29,Seattle,UX Designer,75000,Design,4,Bachelor's,Figma; Sketch; User Research,Mobile App Redesign; Website Overhaul
+David Brown,31,Austin,Product Manager,90000,Product,6,Master's,Agile; Scrum; Market Analysis,Product Launch; Feature Development
+Eva Davis,26,Portland,Marketing Specialist,65000,Marketing,3,Bachelor's,SEO; Content Marketing; Social Media,Campaign Strategy; Brand Awareness
+Frank Miller,42,Denver,DevOps Engineer,100000,Engineering,12,Bachelor's,AWS; Docker; Kubernetes; CI/CD,Infrastructure Automation; Deployment Pipeline
+Grace Wilson,30,Boston,Business Analyst,70000,Operations,5,Bachelor's,SQL; Excel; Tableau; Process Improvement,Business Process Optimization; Data Analysis
+Henry Taylor,35,Chicago,Senior Developer,88000,Engineering,8,Bachelor's,Java; Spring; Microservices; API Design,Legacy System Migration; Architecture Redesign
+Ivy Anderson,27,Miami,Quality Assurance,62000,Engineering,4,Bachelor's,Manual Testing; Automation; Selenium,Test Framework Development; Bug Tracking
+Jack Thomas,33,Las Vegas,Sales Manager,82000,Sales,7,Bachelor's,CRM; Sales Strategy; Team Management,Territory Expansion; Revenue Growth
+Karen Jackson,29,Phoenix,HR Specialist,60000,Human Resources,4,Master's,Recruitment; Employee Relations; Training,Onboarding Process; Performance Reviews
+Leo White,38,San Diego,Technical Lead,105000,Engineering,11,Master's,Architecture; Code Review; Team Leadership,System Design; Technical Mentoring
+Maya Harris,32,Orlando,Financial Analyst,78000,Finance,6,Bachelor's,Financial Modeling; Excel; Budgeting,Budget Planning; Cost Analysis
+Noah Clark,28,Atlanta,Customer Success,68000,Customer Success,3,Bachelor's,Customer Relationship; Support; Training,Customer Onboarding; Retention Strategy
+Olivia Lewis,31,Dallas,Operations Manager,85000,Operations,7,Master's,Project Management; Process Optimization,Workflow Improvement; Team Coordination

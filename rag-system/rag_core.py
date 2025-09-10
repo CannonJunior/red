@@ -332,6 +332,100 @@ Please provide a comprehensive answer based on the context provided."""
             logger.error(f"Error getting documents metadata: {e}")
             return []
 
+    def delete_document(self, document_id: str) -> Dict[str, Any]:
+        """
+        Delete a document from the vector database.
+        
+        Args:
+            document_id: The unique identifier for the document to delete (e.g., "doc_0", "doc_1")
+            
+        Returns:
+            Dictionary with deletion status and details
+        """
+        try:
+            logger.info(f"Attempting to delete document: {document_id}")
+            
+            # First, get the list of documents to find the source path for this document ID
+            documents = self.get_documents_metadata()
+            
+            # Find the document that matches this ID
+            target_document = None
+            for doc in documents:
+                if doc['id'] == document_id:
+                    target_document = doc
+                    break
+            
+            if not target_document:
+                return {
+                    "success": False,
+                    "error": f"Document with ID '{document_id}' not found",
+                    "document_id": document_id
+                }
+            
+            # Get the source path for this document
+            source_path = target_document['source_path']
+            logger.info(f"Found document {document_id} with source path: {source_path}")
+            
+            # Now find all chunk IDs that belong to this source path
+            all_data = self.collection.get()
+            all_ids = all_data.get('ids', [])
+            all_metadatas = all_data.get('metadatas', [])
+            
+            matching_ids = []
+            
+            for i, chunk_id in enumerate(all_ids):
+                metadata = all_metadatas[i] if i < len(all_metadatas) else {}
+                
+                # Match based on source path in metadata
+                if metadata and metadata.get('source') == source_path:
+                    matching_ids.append(chunk_id)
+            
+            logger.info(f"Found {len(matching_ids)} matching chunk IDs for document '{document_id}' (source: {source_path}): {matching_ids}")
+            
+            if not matching_ids:
+                return {
+                    "success": False,
+                    "error": f"No chunks found for document '{document_id}' with source path '{source_path}'",
+                    "document_id": document_id
+                }
+            
+            # Delete all matching chunks
+            self.collection.delete(ids=matching_ids)
+            
+            # Log the deletion event
+            deleted_count = len(matching_ids)
+            logger.info(f"Deleted document '{document_id}' ({deleted_count} chunks): {matching_ids}")
+            
+            # Emit event if Redis is available
+            if self.redis_client:
+                try:
+                    event_data = {
+                        "event_type": "document_deleted",
+                        "document_id": document_id,
+                        "chunks_deleted": deleted_count,
+                        "chunk_ids": matching_ids,
+                        "timestamp": datetime.now().isoformat()
+                    }
+                    self.redis_client.xadd("rag_events", event_data)
+                except Exception as e:
+                    logger.warning(f"Failed to emit deletion event: {e}")
+            
+            return {
+                "success": True,
+                "message": f"Document '{document_id}' deleted successfully ({deleted_count} chunks)",
+                "document_id": document_id,
+                "chunks_deleted": deleted_count,
+                "timestamp": datetime.now().isoformat()
+            }
+            
+        except Exception as e:
+            logger.error(f"Error deleting document {document_id}: {e}")
+            return {
+                "success": False,
+                "error": f"Delete operation failed: {str(e)}",
+                "document_id": document_id
+            }
+
     def get_system_status(self) -> Dict[str, Any]:
         """Get system status for monitoring (Agent-accessible via MCP)."""
         status = {

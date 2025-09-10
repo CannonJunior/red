@@ -805,14 +805,19 @@ class KnowledgeManager {
 
     async loadKnowledgeData() {
         try {
+            console.log('🔄 Starting knowledge data reload...');
             // Load documents from RAG system
+            console.log('📄 Loading documents...');
             await this.loadDocuments();
+            console.log('📊 Loading analytics...');
             // Load analytics
             await this.loadAnalytics();
+            console.log('🎨 Updating UI...');
             // Update UI
             this.updateKnowledgeUI();
+            console.log('✅ Knowledge data reload completed');
         } catch (error) {
-            console.error('Failed to load knowledge data:', error);
+            console.error('❌ Failed to load knowledge data:', error);
             this.showError('Failed to load knowledge base data');
         }
     }
@@ -1135,8 +1140,8 @@ class KnowledgeManager {
             const fileInput = document.getElementById('file-input');
             if (fileInput) fileInput.value = '';
             
-            // Refresh documents list
-            await this.loadDocuments();
+            // Refresh documents list - use full knowledge data reload
+            await this.loadKnowledgeData();
             
             if (successCount > 0) {
                 this.showSuccess(`Successfully uploaded ${successCount} file${successCount !== 1 ? 's' : ''}`);
@@ -1208,7 +1213,9 @@ class KnowledgeManager {
         }
         
         // Reload knowledge data after uploads
+        console.log('Reloading knowledge data after upload...');
         await this.loadKnowledgeData();
+        console.log('Knowledge data reloaded successfully');
     }
 
     async uploadFile(file) {
@@ -1242,10 +1249,12 @@ class KnowledgeManager {
             });
 
             if (response.ok) {
-                console.log('Document deleted successfully');
-                this.showSuccess('Document deleted successfully');
+                console.log(`Document ${documentId} deleted successfully`);
+                this.showSuccess(`Document ${documentId} deleted successfully`);
                 // Reload knowledge data
+                console.log('Reloading knowledge data after delete...');
                 await this.loadKnowledgeData();
+                console.log('Knowledge data reloaded after delete');
             } else {
                 throw new Error(`Delete failed: ${response.statusText}`);
             }

@@ -246,7 +246,7 @@ class RAGService:
             
             return {
                 "status": "success",
-                "document_count": status["vector_database"]["document_count"],
+                "document_count": len(documents),  # Use actual document count, not chunk count
                 "chunk_count": total_chunks,
                 "query_count": getattr(self.rag_system, 'query_count', 0)  # Placeholder for now
             }
@@ -258,6 +258,49 @@ class RAGService:
                 "document_count": 0,
                 "chunk_count": 0,
                 "query_count": 0
+            }
+
+    def delete_document(self, document_id: str) -> Dict[str, Any]:
+        """
+        Delete a document from the RAG system.
+        
+        Args:
+            document_id: The unique identifier for the document to delete
+            
+        Returns:
+            Deletion result dictionary
+        """
+        if not self.available:
+            return {
+                "status": "error",
+                "message": "RAG system not available",
+                "document_id": document_id
+            }
+        
+        try:
+            # Call the delete_document method from the RAG core system
+            result = self.rag_system.delete_document(document_id)
+            
+            if result.get("success", False):
+                return {
+                    "status": "success",
+                    "message": result.get("message", f"Document {document_id} deleted successfully"),
+                    "document_id": document_id,
+                    "timestamp": result.get("timestamp")
+                }
+            else:
+                return {
+                    "status": "error",
+                    "message": result.get("error", f"Failed to delete document {document_id}"),
+                    "document_id": document_id
+                }
+                
+        except Exception as e:
+            logger.error(f"Failed to delete document {document_id}: {e}")
+            return {
+                "status": "error",
+                "message": f"Failed to delete document: {e}",
+                "document_id": document_id
             }
 
 
@@ -293,6 +336,11 @@ def handle_rag_documents_request():
 def handle_rag_analytics_request():
     """Handle RAG analytics request."""
     return rag_service.get_analytics()
+
+
+def handle_rag_document_delete_request(document_id: str):
+    """Handle RAG document deletion request."""
+    return rag_service.delete_document(document_id)
 
 
 # Test functionality
