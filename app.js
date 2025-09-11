@@ -232,7 +232,8 @@ class ChatInterface {
                 },
                 body: JSON.stringify({
                     message: message,
-                    model: this.currentModel
+                    model: this.currentModel,
+                    workspace: window.app.knowledgeManager.currentKnowledgeBase
                 })
             });
 
@@ -766,6 +767,7 @@ class Navigation {
                 if (window.app.knowledgeManager) {
                     window.app.knowledgeManager.currentKnowledgeBase = kb;
                     window.app.knowledgeManager.loadKnowledgeData();
+                    window.app.knowledgeManager.updateChatKnowledgeBaseIndicator();
                     this.populateKnowledgeBaseList(); // Refresh the list to show current selection
                 }
             });
@@ -801,6 +803,7 @@ class KnowledgeManager {
         this.setupDocumentSearch();
         this.setupActionButtons();
         this.loadKnowledgeBases();
+        this.updateChatKnowledgeBaseIndicator();
     }
 
     async loadKnowledgeData() {
@@ -825,8 +828,11 @@ class KnowledgeManager {
     async loadDocuments() {
         try {
             const response = await fetch('/api/rag/documents', {
-                method: 'GET',
-                headers: { 'Content-Type': 'application/json' }
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    workspace: this.currentKnowledgeBase
+                })
             });
 
             if (response.ok) {
@@ -1245,7 +1251,10 @@ class KnowledgeManager {
         try {
             const response = await fetch(`/api/rag/documents/${documentId}`, {
                 method: 'DELETE',
-                headers: { 'Content-Type': 'application/json' }
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    workspace: this.currentKnowledgeBase
+                })
             });
 
             if (response.ok) {
@@ -1271,7 +1280,15 @@ class KnowledgeManager {
         selector.addEventListener('change', (e) => {
             this.currentKnowledgeBase = e.target.value;
             this.loadKnowledgeData();
+            this.updateChatKnowledgeBaseIndicator();
         });
+    }
+
+    updateChatKnowledgeBaseIndicator() {
+        const indicator = document.getElementById('currentKnowledgeBase');
+        if (indicator) {
+            indicator.textContent = this.currentKnowledgeBase;
+        }
     }
 
     setupDocumentSearch() {
@@ -1332,6 +1349,7 @@ class KnowledgeManager {
                 this.updateKnowledgeBaseSelector();
                 this.currentKnowledgeBase = kbName;
                 this.loadKnowledgeData();
+                this.updateChatKnowledgeBaseIndicator();
                 this.showSuccess(`Knowledge Base "${name}" created successfully`);
                 
                 // Update sidebar list if Knowledge is currently selected

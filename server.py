@@ -118,6 +118,8 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_rag_ingest_api()
             elif self.path == '/api/rag/upload' and RAG_AVAILABLE:
                 self.handle_rag_upload_api()
+            elif self.path == '/api/rag/documents' and RAG_AVAILABLE:
+                self.handle_rag_documents_api()
             # Search API endpoints
             elif self.path == '/api/search' and SEARCH_AVAILABLE:
                 self.handle_search_api()
@@ -155,9 +157,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             request_data = json.loads(post_data.decode('utf-8'))
             
-            # Extract message and model
+            # Extract message, model, and workspace
             message = request_data.get('message', '').strip()
             model = request_data.get('model', 'qwen2.5:3b')  # Default to smaller model
+            workspace = request_data.get('workspace', 'default')  # Extract workspace
             
             if not message:
                 self.send_json_response({'error': 'Message is required'}, 400)
@@ -170,7 +173,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             
             if should_use_rag:
                 # Use RAG-enhanced response
-                response_text, model_used, sources = self.get_rag_enhanced_response(message, model)
+                response_text, model_used, sources = self.get_rag_enhanced_response(message, model, workspace)
                 print(f"🧠 RAG-enhanced response: {response_text[:50]}...")
                 
                 # Send RAG response back to client
@@ -364,6 +367,13 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.send_json_response({'error': 'No file selected'}, 400)
                 return
             
+            # Extract workspace/knowledge_base parameter
+            knowledge_base = 'default'
+            if 'knowledge_base' in form:
+                knowledge_base = form['knowledge_base'].value
+            
+            print(f"📤 File upload for workspace: {knowledge_base}")
+            
             # Create uploads directory if it doesn't exist
             uploads_dir = Path('uploads')
             uploads_dir.mkdir(exist_ok=True)
@@ -377,8 +387,8 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             
             # Process the uploaded file with RAG system
             try:
-                print(f"🔄 Starting RAG ingestion for: {file_path}")
-                ingest_result = handle_rag_ingest_request(str(file_path))
+                print(f"🔄 Starting RAG ingestion for: {file_path} (workspace: {knowledge_base})")
+                ingest_result = handle_rag_ingest_request(str(file_path), knowledge_base)
                 print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
                 
                 if ingest_result.get('status') == 'error':
@@ -437,11 +447,11 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         
         return False
     
-    def get_rag_enhanced_response(self, message, model):
+    def get_rag_enhanced_response(self, message, model, workspace='default'):
         """Get RAG-enhanced response using MCP-style tool integration."""
         try:
             # Use the RAG query endpoint
-            rag_result = handle_rag_query_request(message, max_context=5)
+            rag_result = handle_rag_query_request(message, max_context=5, workspace=workspace)
             
             if rag_result['status'] == 'success':
                 response_text = rag_result['answer']
@@ -668,8 +678,17 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def handle_rag_documents_api(self):
         """Handle RAG documents listing API requests."""
         try:
-            documents_result = handle_rag_documents_request()
-            print(f"📋 RAG documents: {len(documents_result.get('documents', []))} documents found")
+            # Extract workspace parameter from request
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 0:
+                post_data = self.rfile.read(content_length)
+                request_data = json.loads(post_data.decode('utf-8'))
+                workspace = request_data.get('workspace', 'default')
+            else:
+                workspace = 'default'
+            
+            documents_result = handle_rag_documents_request(workspace)
+            print(f"📋 RAG documents: {len(documents_result.get('documents', []))} documents found for workspace '{workspace}'")
             self.send_json_response(documents_result)
             
         except Exception as e:
@@ -706,10 +725,19 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def handle_rag_document_delete_api(self, document_id):
         """Handle RAG document deletion API requests."""
         try:
-            print(f"🗑️ RAG delete request for document: {document_id}")
+            # Extract workspace parameter from request
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length > 0:
+                post_data = self.rfile.read(content_length)
+                request_data = json.loads(post_data.decode('utf-8'))
+                workspace = request_data.get('workspace', 'default')
+            else:
+                workspace = 'default'
+            
+            print(f"🗑️ RAG delete request for document: {document_id} from workspace: {workspace}")
             
             # Call the actual delete function from RAG API
-            result = handle_rag_document_delete_request(document_id)
+            result = handle_rag_document_delete_request(document_id, workspace)
             
             if result.get("status") == "success":
                 self.send_json_response({

@@ -72,15 +72,19 @@ class MojoChromaRAG:
             logger.warning(f"Redis not available: {e}. Event streaming disabled.")
             self.redis_client = None
     
-    def _get_or_create_collection(self, name: str):
-        """Get or create a ChromaDB collection."""
+    def _get_or_create_collection(self, name: str, workspace: str = 'default'):
+        """Get or create a ChromaDB collection for a specific workspace."""
+        collection_name = f"{workspace}_{name}" if workspace != 'default' else name
         try:
-            return self.client.get_collection(name=name)
+            return self.client.get_collection(name=collection_name)
         except (ValueError, Exception):
             # Collection doesn't exist, create it
             return self.client.create_collection(
-                name=name,
-                metadata={"description": "Agent-native RAG document collection"}
+                name=collection_name,
+                metadata={
+                    "description": f"Agent-native RAG document collection for workspace: {workspace}",
+                    "workspace": workspace
+                }
             )
     
     def embed_texts(self, texts: List[str]) -> List[List[float]]:
@@ -96,12 +100,13 @@ class MojoChromaRAG:
         embeddings = self.embedding_model.encode(texts)
         return embeddings.tolist()
     
-    def add_documents(self, documents: List[Dict[str, Any]]) -> Dict[str, Any]:
+    def add_documents(self, documents: List[Dict[str, Any]], workspace: str = 'default') -> Dict[str, Any]:
         """
         Add documents to the vector database (Agent-accessible via MCP).
         
         Args:
             documents: List of document dictionaries with 'text', 'metadata', etc.
+            workspace: Workspace/Knowledge Base identifier
             
         Returns:
             Status dictionary for agent consumption
@@ -119,8 +124,11 @@ class MojoChromaRAG:
         # Generate embeddings locally (zero cost)
         embeddings = self.embed_texts(texts)
         
+        # Get workspace-specific collection
+        collection = self._get_or_create_collection("documents", workspace)
+        
         # Add to ChromaDB
-        self.collection.add(
+        collection.add(
             embeddings=embeddings,
             documents=texts,
             metadatas=metadatas,
@@ -137,16 +145,18 @@ class MojoChromaRAG:
         return {
             "status": "success",
             "documents_added": len(documents),
-            "total_documents": self.collection.count()
+            "total_documents": collection.count(),
+            "workspace": workspace
         }
     
-    def search_similar(self, query: str, n_results: int = 5) -> Dict[str, Any]:
+    def search_similar(self, query: str, n_results: int = 5, workspace: str = 'default') -> Dict[str, Any]:
         """
         Perform semantic similarity search (Agent-accessible via MCP).
         
         Args:
             query: Search query text
             n_results: Number of results to return
+            workspace: Workspace/Knowledge Base identifier
             
         Returns:
             Search results formatted for agent consumption
@@ -154,8 +164,11 @@ class MojoChromaRAG:
         # Generate query embedding locally
         query_embedding = self.embed_texts([query])[0]
         
+        # Get workspace-specific collection
+        collection = self._get_or_create_collection("documents", workspace)
+        
         # Search ChromaDB (optimized for sub-10ms latency)
-        results = self.collection.query(
+        results = collection.query(
             query_embeddings=[query_embedding],
             n_results=n_results,
             include=['documents', 'metadatas', 'distances']
@@ -224,19 +237,20 @@ Please provide a comprehensive answer based on the context provided."""
                 "status": "error"
             }
     
-    def query_rag(self, query: str, n_results: int = 5) -> Dict[str, Any]:
+    def query_rag(self, query: str, n_results: int = 5, workspace: str = 'default') -> Dict[str, Any]:
         """
         Complete RAG pipeline: search + generate (Agent-accessible via MCP).
         
         Args:
             query: User question
             n_results: Number of documents to retrieve for context
+            workspace: Workspace/Knowledge Base identifier
             
         Returns:
             Complete RAG response with sources
         """
         # Step 1: Semantic search
-        search_results = self.search_similar(query, n_results)
+        search_results = self.search_similar(query, n_results, workspace)
         
         # Step 2: Extract context documents
         context_docs = [result["document"] for result in search_results["results"]]
@@ -271,11 +285,13 @@ Please provide a comprehensive answer based on the context provided."""
         except Exception as e:
             logger.warning(f"Failed to emit event: {e}")
     
-    def get_documents_metadata(self) -> List[Dict[str, Any]]:
-        """Get metadata for all ingested documents."""
+    def get_documents_metadata(self, workspace: str = 'default') -> List[Dict[str, Any]]:
+        """Get metadata for all ingested documents in a specific workspace."""
         try:
+            # Get workspace-specific collection
+            collection = self._get_or_create_collection("documents", workspace)
             # Get all documents from ChromaDB
-            results = self.collection.get()
+            results = collection.get()
             
             documents = []
             processed_sources = set()
@@ -332,21 +348,22 @@ Please provide a comprehensive answer based on the context provided."""
             logger.error(f"Error getting documents metadata: {e}")
             return []
 
-    def delete_document(self, document_id: str) -> Dict[str, Any]:
+    def delete_document(self, document_id: str, workspace: str = 'default') -> Dict[str, Any]:
         """
         Delete a document from the vector database.
         
         Args:
             document_id: The unique identifier for the document to delete (e.g., "doc_0", "doc_1")
+            workspace: Workspace/Knowledge Base identifier
             
         Returns:
             Dictionary with deletion status and details
         """
         try:
-            logger.info(f"Attempting to delete document: {document_id}")
+            logger.info(f"Attempting to delete document: {document_id} from workspace: {workspace}")
             
             # First, get the list of documents to find the source path for this document ID
-            documents = self.get_documents_metadata()
+            documents = self.get_documents_metadata(workspace)
             
             # Find the document that matches this ID
             target_document = None
@@ -366,8 +383,11 @@ Please provide a comprehensive answer based on the context provided."""
             source_path = target_document['source_path']
             logger.info(f"Found document {document_id} with source path: {source_path}")
             
+            # Get workspace-specific collection
+            collection = self._get_or_create_collection("documents", workspace)
+            
             # Now find all chunk IDs that belong to this source path
-            all_data = self.collection.get()
+            all_data = collection.get()
             all_ids = all_data.get('ids', [])
             all_metadatas = all_data.get('metadatas', [])
             
@@ -389,8 +409,8 @@ Please provide a comprehensive answer based on the context provided."""
                     "document_id": document_id
                 }
             
-            # Delete all matching chunks
-            self.collection.delete(ids=matching_ids)
+            # Delete all matching chunks from workspace-specific collection
+            collection.delete(ids=matching_ids)
             
             # Log the deletion event
             deleted_count = len(matching_ids)

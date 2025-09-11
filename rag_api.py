@@ -73,12 +73,13 @@ class RAGService:
                 "features": []
             }
     
-    def ingest_document(self, file_path: str) -> Dict[str, Any]:
+    def ingest_document(self, file_path: str, workspace: str = 'default') -> Dict[str, Any]:
         """
         Process and ingest a document into the RAG system.
         
         Args:
             file_path: Path to document file
+            workspace: Workspace/Knowledge Base identifier
             
         Returns:
             Processing result dictionary
@@ -105,7 +106,7 @@ class RAGService:
                     "id": f"{Path(file_path).stem}_chunk_{chunk['metadata']['chunk_index']}"
                 })
             
-            storage_result = self.rag_system.add_documents(documents)
+            storage_result = self.rag_system.add_documents(documents, workspace)
             
             return {
                 "status": "success",
@@ -123,13 +124,14 @@ class RAGService:
                 "message": f"Document ingestion failed: {e}"
             }
     
-    def search_documents(self, query: str, max_results: int = 5) -> Dict[str, Any]:
+    def search_documents(self, query: str, max_results: int = 5, workspace: str = 'default') -> Dict[str, Any]:
         """
         Search documents using semantic similarity.
         
         Args:
             query: Search query
             max_results: Maximum results to return
+            workspace: Workspace/Knowledge Base identifier
             
         Returns:
             Search results dictionary
@@ -142,7 +144,7 @@ class RAGService:
             }
         
         try:
-            results = self.rag_system.search_similar(query, max_results)
+            results = self.rag_system.search_similar(query, max_results, workspace)
             return {
                 "status": "success",
                 "query": query,
@@ -157,13 +159,14 @@ class RAGService:
                 "results": []
             }
     
-    def query_rag(self, query: str, max_context: int = 5) -> Dict[str, Any]:
+    def query_rag(self, query: str, max_context: int = 5, workspace: str = 'default') -> Dict[str, Any]:
         """
         Complete RAG query with response generation.
         
         Args:
             query: User question
             max_context: Maximum context documents
+            workspace: Workspace/Knowledge Base identifier
             
         Returns:
             RAG response dictionary
@@ -176,7 +179,7 @@ class RAGService:
             }
         
         try:
-            result = self.rag_system.query_rag(query, max_context)
+            result = self.rag_system.query_rag(query, max_context, workspace)
             return {
                 "status": result["status"],
                 "query": query,
@@ -192,9 +195,12 @@ class RAGService:
                 "answer": f"Sorry, I encountered an error: {e}"
             }
     
-    def get_documents(self) -> Dict[str, Any]:
+    def get_documents(self, workspace: str = 'default') -> Dict[str, Any]:
         """
-        Get metadata for all ingested documents.
+        Get metadata for all ingested documents in a specific workspace.
+        
+        Args:
+            workspace: Workspace/Knowledge Base identifier
         
         Returns:
             Documents metadata dictionary
@@ -207,7 +213,7 @@ class RAGService:
             }
         
         try:
-            documents = self.rag_system.get_documents_metadata()
+            documents = self.rag_system.get_documents_metadata(workspace)
             return {
                 "status": "success",
                 "documents": documents,
@@ -260,12 +266,13 @@ class RAGService:
                 "query_count": 0
             }
 
-    def delete_document(self, document_id: str) -> Dict[str, Any]:
+    def delete_document(self, document_id: str, workspace: str = 'default') -> Dict[str, Any]:
         """
         Delete a document from the RAG system.
         
         Args:
             document_id: The unique identifier for the document to delete
+            workspace: Workspace/Knowledge Base identifier
             
         Returns:
             Deletion result dictionary
@@ -279,7 +286,7 @@ class RAGService:
         
         try:
             # Call the delete_document method from the RAG core system
-            result = self.rag_system.delete_document(document_id)
+            result = self.rag_system.delete_document(document_id, workspace)
             
             if result.get("success", False):
                 return {
@@ -313,24 +320,24 @@ def handle_rag_status_request():
     return rag_service.get_status()
 
 
-def handle_rag_search_request(query: str, max_results: int = 5):
+def handle_rag_search_request(query: str, max_results: int = 5, workspace: str = 'default'):
     """Handle RAG search API request."""
-    return rag_service.search_documents(query, max_results)
+    return rag_service.search_documents(query, max_results, workspace)
 
 
-def handle_rag_query_request(query: str, max_context: int = 5):
+def handle_rag_query_request(query: str, max_context: int = 5, workspace: str = 'default'):
     """Handle RAG query API request."""
-    return rag_service.query_rag(query, max_context)
+    return rag_service.query_rag(query, max_context, workspace)
 
 
-def handle_rag_ingest_request(file_path: str):
+def handle_rag_ingest_request(file_path: str, workspace: str = 'default'):
     """Handle RAG document ingestion request."""
-    return rag_service.ingest_document(file_path)
+    return rag_service.ingest_document(file_path, workspace)
 
 
-def handle_rag_documents_request():
+def handle_rag_documents_request(workspace: str = 'default'):
     """Handle RAG documents listing request."""
-    return rag_service.get_documents()
+    return rag_service.get_documents(workspace)
 
 
 def handle_rag_analytics_request():
@@ -338,9 +345,9 @@ def handle_rag_analytics_request():
     return rag_service.get_analytics()
 
 
-def handle_rag_document_delete_request(document_id: str):
+def handle_rag_document_delete_request(document_id: str, workspace: str = 'default'):
     """Handle RAG document deletion request."""
-    return rag_service.delete_document(document_id)
+    return rag_service.delete_document(document_id, workspace)
 
 
 # Test functionality
