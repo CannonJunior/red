@@ -249,6 +249,13 @@ class MojoChromaRAG:
                 "rank": i + 1
             })
         
+        # Debug: Log search results
+        logger.info(f"🔍 Search Debug - Query: '{query}' found {len(formatted_results)} results")
+        if formatted_results:
+            logger.info(f"🔍 Search Debug - First result metadata: {formatted_results[0].get('metadata', {})}")
+        else:
+            logger.warning(f"🔍 Search Debug - No results found for query: '{query}'")
+            
         return {
             "query": query,
             "results": formatted_results,
