@@ -224,20 +224,32 @@ class ChatInterface {
         const typingId = this.showTypingIndicator();
 
         try {
+            const requestBody = {
+                message: message,
+                model: this.currentModel,
+                workspace: window.app.knowledgeManager?.currentKnowledgeBase || 'default'
+            };
+            
+            console.log('Sending chat request:', requestBody);
+            
             // Send to Ollama via our API
             const response = await fetch('/api/chat', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
                 },
-                body: JSON.stringify({
-                    message: message,
-                    model: this.currentModel,
-                    workspace: window.app.knowledgeManager.currentKnowledgeBase
-                })
+                body: JSON.stringify(requestBody)
+            });
+
+            console.log('Received response:', {
+                status: response.status,
+                statusText: response.statusText,
+                ok: response.ok,
+                headers: Object.fromEntries(response.headers)
             });
 
             const data = await response.json();
+            console.log('Parsed response data:', data);
             
             // Remove typing indicator
             this.removeTypingIndicator(typingId);
@@ -251,9 +263,26 @@ class ChatInterface {
             }
 
         } catch (error) {
-            console.error('Chat error:', error);
+            console.error('Chat error details:', {
+                error: error,
+                message: error.message,
+                stack: error.stack,
+                currentModel: this.currentModel,
+                workspace: window.app.knowledgeManager?.currentKnowledgeBase
+            });
             this.removeTypingIndicator(typingId);
-            this.displayMessage('error', 'Failed to connect to the AI model. Please check your connection.');
+            
+            // More specific error messages
+            let errorMessage = 'Failed to connect to the AI model. Please check your connection.';
+            if (error.name === 'TypeError' && error.message.includes('fetch')) {
+                errorMessage = `Network error: Cannot connect to server. Please check if the server is running on port 9090.`;
+            } else if (error.name === 'SyntaxError' && error.message.includes('JSON')) {
+                errorMessage = `Server response error: Invalid JSON received from server.`;
+            } else if (error.message) {
+                errorMessage = `Connection error: ${error.message}`;
+            }
+            
+            this.displayMessage('error', errorMessage);
         } finally {
             this.isLoading = false;
             this.updateSendButtonState();
