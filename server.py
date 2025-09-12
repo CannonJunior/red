@@ -452,6 +452,14 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 sources = rag_result.get('sources', [])
                 model_used = rag_result.get('model_used', model)
                 
+                # Debug: Print sources information
+                print(f"🔍 RAG Debug - Sources count: {len(sources)}")
+                print(f"🔍 RAG Debug - Sources type: {type(sources)}")
+                if sources:
+                    print(f"🔍 RAG Debug - First source: {sources[0]}")
+                else:
+                    print(f"🔍 RAG Debug - RAG result keys: {rag_result.keys()}")
+                
                 # Add source attribution if sources exist
                 if sources:
                     # Extract unique document names from sources

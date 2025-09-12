@@ -47,6 +47,16 @@ def test_chat_with_rag(message="What is artificial intelligence?"):
             if sources_used is not None:
                 print(f"      sources_used type: {type(sources_used)}")
                 print(f"      sources_used > 0: {sources_used > 0}")
+                print(f"      sources_used == 0: {sources_used == 0}")
+            
+            # Check for sources in different keys
+            if 'sources' in result:
+                print(f"      'sources' key present: {len(result['sources'])} items")
+            
+            # Check if response contains source info in the text
+            response_text = result.get('response', '')
+            if 'Sources consulted:' in response_text:
+                print(f"      Response contains source info in text")
             
             return result
             
