@@ -128,7 +128,29 @@ class OllamaConfig:
                 # Make request with timeout
                 with urllib.request.urlopen(req, timeout=self.timeout) as response:
                     if response.status == 200:
-                        result = json.loads(response.read().decode('utf-8'))
+                        raw_response = response.read().decode('utf-8')
+                        
+                        # Handle multiple JSON objects or streaming responses
+                        try:
+                            # Try parsing as single JSON object first
+                            result = json.loads(raw_response)
+                        except json.JSONDecodeError:
+                            # Handle streaming responses (multiple JSON objects)
+                            lines = raw_response.strip().split('\n')
+                            result = None
+                            for line in lines:
+                                if line.strip():
+                                    try:
+                                        parsed_line = json.loads(line)
+                                        # Use the last valid JSON object (usually the final response)
+                                        if parsed_line:
+                                            result = parsed_line
+                                    except json.JSONDecodeError:
+                                        continue
+                            
+                            if result is None:
+                                raise json.JSONDecodeError("No valid JSON found in response", raw_response, 0)
+                        
                         logger.debug(f"Ollama request successful on attempt {attempt + 1}")
                         return {
                             'success': True,
