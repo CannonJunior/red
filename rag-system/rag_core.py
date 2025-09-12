@@ -62,10 +62,12 @@ class MojoChromaRAG:
         # Initialize Ollama client (local LLM, zero API costs)
         # Keep backward compatibility with existing ollama.Client() for internal methods
         self.ollama_client = ollama.Client()
-        self.default_model = "qwen2.5:3b"  # Fast, efficient model
         
         # Use robust configuration for external-facing methods
         self.robust_ollama_config = ollama_config
+        
+        # Dynamically select the best available model
+        self.default_model = self._get_best_available_model()
         
         # Initialize Redis for event streaming (lightweight vs Kafka)
         try:
@@ -81,6 +83,59 @@ class MojoChromaRAG:
         except (redis.ConnectionError, redis.TimeoutError) as e:
             logger.warning(f"Redis not available: {e}. Event streaming disabled.")
             self.redis_client = None
+    
+    def _get_best_available_model(self):
+        """
+        Dynamically select the best available model from Ollama.
+        
+        Priority order:
+        1. qwen2.5:3b (preferred - fast and efficient)
+        2. llama3.1:8b or similar llama models
+        3. Any other available model
+        4. Fallback to "qwen2.5:3b" with warning
+        """
+        preferred_models = [
+            "qwen2.5:3b",
+            "qwen2.5:1.5b", 
+            "qwen2.5:7b",
+            "llama3.1:8b",
+            "llama3.1:7b", 
+            "llama3:8b",
+            "llama3:7b",
+            "llama2:7b",
+            "mistral:7b",
+            "gemma:7b"
+        ]
+        
+        try:
+            # Get available models using robust configuration
+            connection_test = self.robust_ollama_config.test_connection()
+            
+            if connection_test['connected'] and connection_test['models']:
+                available_models = connection_test['models']
+                logger.info(f"Available Ollama models: {available_models}")
+                
+                # Try to find preferred models in order
+                for preferred in preferred_models:
+                    if preferred in available_models:
+                        logger.info(f"Selected model: {preferred}")
+                        return preferred
+                
+                # If no preferred model found, use the first available
+                first_model = available_models[0]
+                logger.info(f"No preferred model found, using first available: {first_model}")
+                return first_model
+            else:
+                logger.warning(f"Cannot connect to Ollama: {connection_test.get('error', 'Unknown error')}")
+                
+        except Exception as e:
+            logger.error(f"Error getting available models: {e}")
+        
+        # Fallback to default with warning
+        fallback_model = "qwen2.5:3b"
+        logger.warning(f"Could not detect available models, falling back to: {fallback_model}")
+        logger.warning("Please ensure Ollama is running and has models installed")
+        return fallback_model
     
     def _get_or_create_collection(self, name: str, workspace: str = 'default'):
         """Get or create a ChromaDB collection for a specific workspace."""

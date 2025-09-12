@@ -110,7 +110,7 @@ class ChatInterface {
         this.messageInput = document.getElementById('messageInput');
         this.sendButton = document.getElementById('sendButton');
         this.messagesContainer = null;
-        this.currentModel = 'qwen2.5:3b'; // Default model
+        this.currentModel = null; // Will be set dynamically from available models
         this.isLoading = false;
         
         // Chat history system - terminal-style command history
@@ -156,10 +156,20 @@ class ChatInterface {
             if (response.ok) {
                 const data = await response.json();
                 console.log('Available models:', data.models);
-                // Could add model selector UI here
+                
+                // Automatically select the first available model if we don't have one
+                if (data.models && data.models.length > 0 && !this.currentModel) {
+                    this.currentModel = data.models[0];
+                    console.log('Auto-selected model:', this.currentModel);
+                }
             }
         } catch (error) {
             console.error('Failed to load models:', error);
+            // Fallback to a default model if no model is selected
+            if (!this.currentModel) {
+                this.currentModel = 'qwen2.5:3b';
+                console.log('Using fallback model:', this.currentModel);
+            }
         }
     }
 
@@ -255,6 +265,13 @@ class ChatInterface {
             this.removeTypingIndicator(typingId);
 
             if (response.ok) {
+                // Debug RAG information
+                console.log('RAG Debug Info:', {
+                    rag_enabled: data.rag_enabled,
+                    sources_used: data.sources_used,
+                    sources_used_type: typeof data.sources_used
+                });
+                
                 // Display AI response with RAG information
                 this.displayMessage('assistant', data.response, data.model, data.rag_enabled, data.sources_used);
             } else {
