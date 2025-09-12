@@ -13,6 +13,9 @@ from http.server import HTTPServer, BaseHTTPRequestHandler
 import mimetypes
 from pathlib import Path
 
+# Import Ollama configuration
+from ollama_config import ollama_config
+
 # Import RAG functionality
 try:
     from rag_api import handle_rag_status_request, handle_rag_search_request, handle_rag_query_request, handle_rag_ingest_request, handle_rag_documents_request, handle_rag_analytics_request, handle_rag_document_delete_request
@@ -185,42 +188,28 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     'timestamp': ''
                 })
             else:
-                # Use standard Ollama response
-                # Prepare Ollama API request
-                ollama_data = {
-                    'model': model,
-                    'prompt': message,
-                    'stream': False
-                }
+                # Use robust Ollama configuration for standard response
+                print(f"📤 Making standard Ollama request with model: {model}")
+                result = ollama_config.generate_response(model, message)
                 
-                # Make request to Ollama
-                ollama_url = 'http://localhost:11434/api/generate'
-                req = urllib.request.Request(
-                    ollama_url,
-                    data=json.dumps(ollama_data).encode('utf-8'),
-                    headers={'Content-Type': 'application/json'}
-                )
-                
-                with urllib.request.urlopen(req, timeout=30) as response:
-                    ollama_response = json.loads(response.read().decode('utf-8'))
-                
-                # Extract response text
-                response_text = ollama_response.get('response', 'Sorry, I could not generate a response.')
-                print(f"🤖 Standard Ollama response: {response_text[:50]}...")
-                
-                # Send response back to client
-                self.send_json_response({
-                    'response': response_text,
-                    'model': model,
-                    'rag_enabled': False,
-                    'timestamp': ollama_response.get('created_at', '')
-                })
-            
-        except urllib.error.URLError as e:
-            print(f"❌ Ollama connection error: {e}")
-            self.send_json_response({
-                'error': 'Unable to connect to Ollama. Please ensure Ollama is running on localhost:11434'
-            }, 503)
+                if result['success']:
+                    response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
+                    print(f"🤖 Standard Ollama response: {response_text[:50]}...")
+                    
+                    # Send response back to client
+                    self.send_json_response({
+                        'response': response_text,
+                        'model': model,
+                        'rag_enabled': False,
+                        'timestamp': result['data'].get('created_at', ''),
+                        'connection_attempt': result['attempt']
+                    })
+                else:
+                    print(f"❌ Ollama request failed: {result['error']}")
+                    self.send_json_response({
+                        'error': f"Ollama request failed: {result['error']}",
+                        'connection_attempt': result['attempt']
+                    }, 503)
             
         except json.JSONDecodeError as e:
             print(f"❌ JSON decode error: {e}")
@@ -233,22 +222,27 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def handle_models_api(self):
         """Handle models API requests to get available Ollama models."""
         try:
-            # Make request to Ollama tags endpoint
-            ollama_url = 'http://localhost:11434/api/tags'
-            req = urllib.request.Request(ollama_url)
+            # Use robust Ollama configuration to get models
+            print("📋 Requesting available Ollama models...")
+            result = ollama_config.get_available_models()
             
-            with urllib.request.urlopen(req, timeout=10) as response:
-                ollama_response = json.loads(response.read().decode('utf-8'))
-            
-            # Extract model names
-            models = [model['name'] for model in ollama_response.get('models', [])]
-            
-            print(f"📋 Available models: {models}")
-            
-            self.send_json_response({
-                'models': models,
-                'count': len(models)
-            })
+            if result['success']:
+                models = [model['name'] for model in result['data'].get('models', [])]
+                print(f"📋 Available models: {models}")
+                
+                self.send_json_response({
+                    'models': models,
+                    'count': len(models),
+                    'connection_attempt': result['attempt']
+                })
+            else:
+                print(f"❌ Failed to get models: {result['error']}")
+                self.send_json_response({
+                    'error': f"Failed to get models: {result['error']}",
+                    'models': [],
+                    'count': 0,
+                    'connection_attempt': result['attempt']
+                }, 503)
             
         except Exception as e:
             print(f"❌ Models API error: {e}")
@@ -488,29 +482,18 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             return self.get_standard_ollama_response(message, model), model, []
     
     def get_standard_ollama_response(self, message, model):
-        """Get standard Ollama response without RAG."""
-        try:
-            ollama_data = {
-                'model': model,
-                'prompt': message,
-                'stream': False
-            }
-            
-            ollama_url = 'http://localhost:11434/api/generate'
-            req = urllib.request.Request(
-                ollama_url,
-                data=json.dumps(ollama_data).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-            
-            with urllib.request.urlopen(req, timeout=30) as response:
-                ollama_response = json.loads(response.read().decode('utf-8'))
-            
-            return ollama_response.get('response', 'Sorry, I could not generate a response.')
-            
-        except Exception as e:
-            print(f"❌ Standard Ollama request failed: {e}")
-            return f"Sorry, I'm currently unable to process your request. Error: {str(e)}"
+        """Get standard Ollama response without RAG using robust configuration."""
+        print(f"📤 Making fallback Ollama request with model: {model}")
+        result = ollama_config.generate_response(model, message)
+        
+        if result['success']:
+            response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
+            print(f"🤖 Fallback Ollama response: {response_text[:50]}...")
+            return response_text
+        else:
+            error_msg = f"Ollama connection failed after {result['attempt']} attempts: {result['error']}"
+            print(f"❌ Standard Ollama request failed: {error_msg}")
+            return f"Sorry, I'm currently unable to process your request. {error_msg}"
     
     # Search API handlers
     def handle_search_api(self):

@@ -18,6 +18,12 @@ import ollama
 import redis
 from sentence_transformers import SentenceTransformer
 
+# Import parent directory for ollama_config
+import sys
+from pathlib import Path
+sys.path.append(str(Path(__file__).parent.parent))
+from ollama_config import ollama_config
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -54,8 +60,12 @@ class MojoChromaRAG:
         self.embedding_model = SentenceTransformer('all-MiniLM-L6-v2')
         
         # Initialize Ollama client (local LLM, zero API costs)
+        # Keep backward compatibility with existing ollama.Client() for internal methods
         self.ollama_client = ollama.Client()
         self.default_model = "qwen2.5:3b"  # Fast, efficient model
+        
+        # Use robust configuration for external-facing methods
+        self.robust_ollama_config = ollama_config
         
         # Initialize Redis for event streaming (lightweight vs Kafka)
         try:
@@ -214,25 +224,36 @@ Question: {query}
 Please provide a comprehensive answer based on the context provided."""
 
         try:
-            # Generate response with local Ollama (zero API costs)
-            response = self.ollama_client.chat(
-                model=self.default_model,
-                messages=[{"role": "user", "content": prompt}]
-            )
+            # Use robust Ollama configuration for chat response
+            logger.debug(f"Generating response using robust Ollama config with model: {self.default_model}")
+            messages = [{"role": "user", "content": prompt}]
+            result = self.robust_ollama_config.chat_response(self.default_model, messages)
             
-            return {
-                "query": query,
-                "response": response['message']['content'],
-                "model_used": self.default_model,
-                "context_docs_count": len(context_docs),
-                "status": "success"
-            }
+            if result['success']:
+                response_content = result['data']['message']['content']
+                return {
+                    "query": query,
+                    "response": response_content,
+                    "model_used": self.default_model,
+                    "context_docs_count": len(context_docs),
+                    "status": "success",
+                    "connection_attempt": result['attempt']
+                }
+            else:
+                logger.error(f"Robust Ollama request failed: {result['error']}")
+                return {
+                    "query": query,
+                    "response": f"Error: Unable to generate response after {result['attempt']} attempts. {result['error']}",
+                    "error": result['error'],
+                    "status": "error",
+                    "connection_attempt": result['attempt']
+                }
             
         except Exception as e:
             logger.error(f"Error generating response: {e}")
             return {
                 "query": query,
-                "response": f"Error: Unable to generate response. Please ensure Ollama is running with model '{self.default_model}'.",
+                "response": f"Error: Unexpected error during response generation. Please ensure Ollama is running with model '{self.default_model}'.",
                 "error": str(e),
                 "status": "error"
             }
@@ -468,13 +489,21 @@ Please provide a comprehensive answer based on the context provided."""
             "architecture": "local-first"
         }
         
-        # Check Ollama status
+        # Check Ollama status using robust configuration
         try:
-            models = self.ollama_client.list()
-            status["llm"]["status"] = "healthy"
-            status["llm"]["available_models"] = [model['name'] for model in models['models']]
+            # Use robust connection test
+            connection_test = self.robust_ollama_config.test_connection()
+            if connection_test['connected']:
+                status["llm"]["status"] = "healthy"
+                status["llm"]["available_models"] = connection_test.get('models', [])
+                status["llm"]["response_time"] = connection_test.get('response_time')
+                status["llm"]["config"] = self.robust_ollama_config.get_config_info()
+            else:
+                status["llm"]["status"] = "unavailable"
+                status["llm"]["error"] = connection_test.get('error', 'Connection failed')
+                status["llm"]["config"] = self.robust_ollama_config.get_config_info()
         except Exception as e:
-            status["llm"]["status"] = "unavailable"
+            status["llm"]["status"] = "error"
             status["llm"]["error"] = str(e)
         
         return status
