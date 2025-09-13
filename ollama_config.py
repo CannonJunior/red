@@ -138,16 +138,28 @@ class OllamaConfig:
                             # Handle streaming responses (multiple JSON objects)
                             lines = raw_response.strip().split('\n')
                             result = None
+                            accumulated_content = ""
+
                             for line in lines:
                                 if line.strip():
                                     try:
                                         parsed_line = json.loads(line)
-                                        # Use the last valid JSON object (usually the final response)
                                         if parsed_line:
+                                            # For chat responses, accumulate content from streaming
+                                            if 'message' in parsed_line and 'content' in parsed_line['message']:
+                                                content = parsed_line['message']['content']
+                                                if content:  # Only accumulate non-empty content
+                                                    accumulated_content += content
+
+                                            # Keep updating result with latest response
                                             result = parsed_line
                                     except json.JSONDecodeError:
                                         continue
-                            
+
+                            # If we accumulated content, update the final result
+                            if result and accumulated_content and 'message' in result:
+                                result['message']['content'] = accumulated_content
+
                             if result is None:
                                 raise json.JSONDecodeError("No valid JSON found in response", raw_response, 0)
                         

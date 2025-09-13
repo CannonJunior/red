@@ -273,17 +273,17 @@ class MojoChromaRAG:
         Returns:
             Generated response with metadata
         """
-        # Build context-aware prompt
-        context = "\\n\\n".join([f"Document {i+1}: {doc}" for i, doc in enumerate(context_docs)])
-        
-        prompt = f"""Based on the following context documents, please answer the question.
-        
+        # Build context-aware prompt without numbered document references
+        context = "\\n\\n".join(context_docs)
+
+        prompt = f"""Answer the following question using only the information provided in the context below. Do not reference document numbers or make up information not present in the context.
+
 Context:
 {context}
 
 Question: {query}
 
-Please provide a comprehensive answer based on the context provided."""
+Answer based solely on the provided context:"""
 
         try:
             # Use robust Ollama configuration for chat response

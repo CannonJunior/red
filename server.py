@@ -178,13 +178,22 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Use RAG-enhanced response
                 response_text, model_used, sources = self.get_rag_enhanced_response(message, model, workspace)
                 print(f"🧠 RAG-enhanced response: {response_text[:50]}...")
-                
+
+                # Count unique source files instead of chunks
+                unique_sources = set()
+                if sources:
+                    for source in sources:
+                        if 'metadata' in source and 'source' in source['metadata']:
+                            file_path = source['metadata']['source']
+                            document_name = os.path.basename(file_path)
+                            unique_sources.add(document_name)
+
                 # Send RAG response back to client
                 self.send_json_response({
                     'response': response_text,
                     'model': model_used,
                     'rag_enabled': True,
-                    'sources_used': len(sources) if sources else 0,
+                    'sources_used': len(unique_sources),
                     'timestamp': ''
                 })
             else:
