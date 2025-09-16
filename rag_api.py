@@ -266,14 +266,48 @@ class RAGService:
                 "query_count": 0
             }
 
+    def get_vector_chunks_for_knowledge_graph(self, workspace: str = 'default') -> Dict[str, Any]:
+        """
+        Get vector chunks with embeddings for knowledge graph creation.
+
+        Args:
+            workspace: Workspace/Knowledge Base identifier
+
+        Returns:
+            Vector chunks data dictionary
+        """
+        if not self.available:
+            return {
+                "status": "error",
+                "message": "RAG system not available",
+                "chunks": [],
+                "total_chunks": 0
+            }
+
+        try:
+            result = self.rag_system.get_vector_chunks_for_knowledge_graph(workspace)
+            return {
+                "status": "success",
+                **result
+            }
+
+        except Exception as e:
+            logger.error(f"Vector chunks retrieval failed: {e}")
+            return {
+                "status": "error",
+                "message": f"Vector chunks retrieval failed: {e}",
+                "chunks": [],
+                "total_chunks": 0
+            }
+
     def delete_document(self, document_id: str, workspace: str = 'default') -> Dict[str, Any]:
         """
         Delete a document from the RAG system.
-        
+
         Args:
             document_id: The unique identifier for the document to delete
             workspace: Workspace/Knowledge Base identifier
-            
+
         Returns:
             Deletion result dictionary
         """
@@ -283,11 +317,11 @@ class RAGService:
                 "message": "RAG system not available",
                 "document_id": document_id
             }
-        
+
         try:
             # Call the delete_document method from the RAG core system
             result = self.rag_system.delete_document(document_id, workspace)
-            
+
             if result.get("success", False):
                 return {
                     "status": "success",
@@ -301,7 +335,7 @@ class RAGService:
                     "message": result.get("error", f"Failed to delete document {document_id}"),
                     "document_id": document_id
                 }
-                
+
         except Exception as e:
             logger.error(f"Failed to delete document {document_id}: {e}")
             return {
@@ -348,6 +382,11 @@ def handle_rag_analytics_request():
 def handle_rag_document_delete_request(document_id: str, workspace: str = 'default'):
     """Handle RAG document deletion request."""
     return rag_service.delete_document(document_id, workspace)
+
+
+def handle_rag_vector_chunks_request(workspace: str = 'default'):
+    """Handle RAG vector chunks request for knowledge graph."""
+    return rag_service.get_vector_chunks_for_knowledge_graph(workspace)
 
 
 # Test functionality

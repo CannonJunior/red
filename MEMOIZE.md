@@ -56,6 +56,29 @@ This project will add agentic UI features to help any user with their day-to-day
 - Color scheme: Neutral grays with blue accents
 - PWA with mobile-responsive design
 
+## Critical Project Guidelines (MEMOIZED)
+
+### Data Management Rules
+- **NEVER use hardcoded data** - Always read from configuration files or existing data stores
+- **NEVER use mock data** - All data must come from actual user uploads or existing documented data stores
+- **Always use existing data stores** - ChromaDB, search_system.db, etc. - never create disconnected data
+- **Data provenance requirement** - All data must have the exact same provenance as other project data (user uploads to Knowledge Base)
+
+### Web Application Architecture Rules
+- **NEVER create separate web applications** - All features must be accessible from the main index.html
+- **All visualizations must be integrated** - No standalone pages that aren't reachable from main interface
+- **Maintain consistent navigation** - Use existing sidebar and navigation patterns
+
+### Configuration Management Rules
+- **Always use configuration files** - Preferably existing ones like settings.py or dedicated config files
+- **Read data programmatically** - Never hardcode values that could be configured
+- **Environment variable support** - Follow existing patterns for configuration
+
+### Integration Requirements
+- **Build on existing infrastructure** - Use RAG system, search system, ChromaDB as data sources
+- **Maintain data consistency** - All features must work with the same user-uploaded documents
+- **Follow existing patterns** - API structure, file organization, naming conventions
+
 ## Instructions
 - Memoize any input given in this MEMOIZE.md file
 - Memoize instructions in CLAUDE.md file

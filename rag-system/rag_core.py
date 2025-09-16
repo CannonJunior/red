@@ -368,6 +368,45 @@ Answer based solely on the provided context:"""
         except Exception as e:
             logger.warning(f"Failed to emit event: {e}")
     
+    def get_vector_chunks_for_knowledge_graph(self, workspace: str = 'default') -> Dict[str, Any]:
+        """Get all vector chunks with embeddings and content for knowledge graph creation."""
+        try:
+            # Get workspace-specific collection
+            collection = self._get_or_create_collection("documents", workspace)
+
+            # Get all chunks with embeddings and metadata
+            results = collection.get(include=['documents', 'metadatas', 'embeddings'])
+
+            chunks = []
+            documents = results.get('documents', [])
+            metadatas = results.get('metadatas', [])
+            embeddings = results.get('embeddings', [])
+            ids = results.get('ids', [])
+
+            for i, (doc_text, metadata, embedding, chunk_id) in enumerate(zip(documents, metadatas, embeddings, ids)):
+                if doc_text and metadata:
+                    chunk_info = {
+                        'id': chunk_id,
+                        'text': doc_text,
+                        'metadata': metadata,
+                        'embedding': embedding,
+                        'source': metadata.get('source', 'unknown'),
+                        'file_type': metadata.get('file_type', 'unknown'),
+                        'chunk_index': metadata.get('chunk_index', i),
+                        'chunk_type': metadata.get('chunk_type', 'content')
+                    }
+                    chunks.append(chunk_info)
+
+            return {
+                'chunks': chunks,
+                'total_chunks': len(chunks),
+                'workspace': workspace
+            }
+
+        except Exception as e:
+            logger.error(f"Error getting vector chunks: {e}")
+            return {'chunks': [], 'total_chunks': 0, 'workspace': workspace}
+
     def get_documents_metadata(self, workspace: str = 'default') -> List[Dict[str, Any]]:
         """Get metadata for all ingested documents in a specific workspace."""
         try:
