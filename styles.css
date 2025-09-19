@@ -463,7 +463,13 @@ input::placeholder, textarea::placeholder {
 }
 
 .model-recommended {
+  /* Recommended models should not have blue border by default */
+  /* Only selected models get blue border */
+}
+
+.model-selected {
   border-color: var(--border-accent);
+  border-width: 2px;
 }
 
 .model-recommended::after {

@@ -648,10 +648,13 @@ class Navigation {
         models.forEach(model => {
             const modelCard = document.createElement('div');
             const isRecommended = model === 'qwen2.5:3b';
-            modelCard.className = `model-card p-6 ${isRecommended ? 'model-recommended' : ''}`;
-            
+            const isSelected = model === window.app?.chatInterface?.currentModel;
+
+            modelCard.className = `model-card p-6 ${isRecommended ? 'model-recommended' : ''} ${isSelected ? 'model-selected' : ''}`;
+            modelCard.setAttribute('data-model', model);
+
             const modelSize = this.getModelSize(model);
-            
+
             modelCard.innerHTML = `
                 <div class="flex items-center justify-between mb-4">
                     <div class="flex items-center space-x-3">
@@ -665,22 +668,25 @@ class Navigation {
                             <p class="text-sm text-gray-500 dark:text-gray-400">${modelSize}</p>
                         </div>
                     </div>
-                    ${isRecommended ? '<span class="px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 rounded-full">Recommended</span>' : ''}
+                    <div class="flex items-center space-x-2">
+                        ${isSelected ? '<span class="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded-full">Selected</span>' : ''}
+                        ${isRecommended ? '<span class="px-2 py-1 text-xs font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 rounded-full">Recommended</span>' : ''}
+                    </div>
                 </div>
-                
+
                 <div class="space-y-2 mb-4">
                     <p class="text-sm text-gray-600 dark:text-gray-400">
                         ${this.getModelDescription(model)}
                     </p>
                 </div>
-                
+
                 <div class="flex space-x-2">
                     <button onclick="window.app.navigation.selectModel('${model}')" class="flex-1 px-3 py-1.5 text-sm font-medium text-blue-600 dark:text-blue-400 bg-blue-50 dark:bg-blue-900/50 rounded-md hover:bg-blue-100 dark:hover:bg-blue-900/70 transition-colors">
-                        Select Model
+                        ${isSelected ? 'Selected' : 'Select Model'}
                     </button>
                 </div>
             `;
-            
+
             modelsGrid.appendChild(modelCard);
         });
     }
@@ -707,10 +713,39 @@ class Navigation {
         if (window.app?.chatInterface) {
             window.app.chatInterface.currentModel = modelName;
             console.log(`Selected model: ${modelName}`);
-            
+
             // Update all model selectors
             document.querySelectorAll('#model-selector, #default-model-selector').forEach(selector => {
                 selector.value = modelName;
+            });
+
+            // Update visual selection state for model cards
+            document.querySelectorAll('.model-card').forEach(card => {
+                const cardModel = card.getAttribute('data-model');
+                const selectButton = card.querySelector('button');
+                const selectLabel = card.querySelector('.flex.items-center.space-x-2');
+
+                if (cardModel === modelName) {
+                    // Add selected class and update UI
+                    card.classList.add('model-selected');
+                    if (selectButton) {
+                        selectButton.textContent = 'Selected';
+                    }
+                    // Add selected badge if not already present
+                    if (selectLabel && !selectLabel.innerHTML.includes('Selected')) {
+                        selectLabel.innerHTML = `<span class="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded-full">Selected</span>${selectLabel.innerHTML}`;
+                    }
+                } else {
+                    // Remove selected class and update UI
+                    card.classList.remove('model-selected');
+                    if (selectButton) {
+                        selectButton.textContent = 'Select Model';
+                    }
+                    // Remove selected badge
+                    if (selectLabel) {
+                        selectLabel.innerHTML = selectLabel.innerHTML.replace(/<span class="px-2 py-1 text-xs font-medium text-white bg-blue-600 rounded-full">Selected<\/span>/, '');
+                    }
+                }
             });
         }
     }
