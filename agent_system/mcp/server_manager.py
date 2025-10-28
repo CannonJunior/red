@@ -19,6 +19,11 @@ from pathlib import Path
 from typing import Dict, List, Optional, Any
 import redis
 
+# Import path utilities for dynamic project root resolution
+import sys
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.paths import get_project_root, expand_path_variables
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -114,8 +119,12 @@ class ZeroCostMCPServerManager:
     - SIMPLE-SCALE: Optimized for 5 users
     """
 
-    def __init__(self, config_dir: str = "/home/junior/src/red/agent-system/config"):
+    def __init__(self, config_dir: Optional[str] = None):
         """Initialize the zero-cost MCP server manager."""
+        if config_dir is None:
+            # Use dynamic project root
+            project_root = get_project_root()
+            config_dir = str(project_root / "agent-system" / "config")
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
 
@@ -145,6 +154,24 @@ class ZeroCostMCPServerManager:
             try:
                 with open(config_file, 'r') as f:
                     config_data = json.load(f)
+
+                # Expand path variables in configuration
+                if 'connection' in config_data:
+                    if 'working_directory' in config_data['connection']:
+                        config_data['connection']['working_directory'] = expand_path_variables(
+                            config_data['connection']['working_directory']
+                        )
+                    if 'environment' in config_data['connection']:
+                        for key, value in config_data['connection']['environment'].items():
+                            if isinstance(value, str) and ('/' in value or '${' in value):
+                                config_data['connection']['environment'][key] = expand_path_variables(value)
+
+                if 'permissions' in config_data:
+                    if 'local_directory_access' in config_data['permissions']:
+                        config_data['permissions']['local_directory_access'] = [
+                            expand_path_variables(path)
+                            for path in config_data['permissions']['local_directory_access']
+                        ]
 
                 server_config = MCPServerConfig(**config_data)
                 self.servers[server_config.server_id] = server_config

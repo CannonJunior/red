@@ -2,8 +2,8 @@
   "policy_id": "vector_analysis_agent_policy",
   "agent_id": "*_vector_*",
   "allowed_paths": [
-    "/home/junior/src/red/chromadb_data",
-    "/home/junior/src/red/agent-system/config"
+    "${PROJECT_ROOT}/chromadb_data",
+    "${PROJECT_ROOT}/agent-system/config"
   ],
   "denied_paths": [],
   "allowed_operations": [

@@ -16,9 +16,14 @@ import logging
 import json
 import hashlib
 import time
+import sys
 from pathlib import Path
 from typing import Dict, List, Set, Optional, Any
 from dataclasses import dataclass, asdict
+
+# Import path utilities for dynamic project root resolution
+sys.path.insert(0, str(Path(__file__).parent.parent))
+from utils.paths import get_project_root, expand_path_variables
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -67,8 +72,13 @@ class ZeroCostLocalSecurity:
     - AGENT-NATIVE: MCP-accessible security validation
     """
 
-    def __init__(self, config_dir: str = "/home/junior/src/red/agent-system/config"):
+    def __init__(self, config_dir: Optional[str] = None):
         """Initialize zero-cost local security system."""
+        if config_dir is None:
+            # Use dynamic project root
+            project_root = get_project_root()
+            config_dir = str(project_root / "agent-system" / "config")
+
         self.config_dir = Path(config_dir)
         self.security_dir = self.config_dir / "security"
         self.security_dir.mkdir(parents=True, exist_ok=True)
@@ -76,12 +86,13 @@ class ZeroCostLocalSecurity:
         self.policies: Dict[str, LocalAccessPolicy] = {}
         self.audit_log: List[SecurityAuditEntry] = []
 
-        # Define safe base paths for agent operations
+        # Define safe base paths for agent operations (using dynamic project root)
+        project_root = get_project_root()
         self.safe_base_paths = {
-            "/home/junior/src/red/uploads",
-            "/home/junior/src/red/web_rag_data",
-            "/home/junior/src/red/agent-system/config",
-            "/home/junior/src/red/chromadb_data"
+            str(project_root / "uploads"),
+            str(project_root / "web_rag_data"),
+            str(project_root / "agent-system" / "config"),
+            str(project_root / "chromadb_data")
         }
 
         # Define forbidden paths (system critical)
@@ -114,6 +125,16 @@ class ZeroCostLocalSecurity:
                 with open(policy_file, 'r') as f:
                     policy_data = json.load(f)
 
+                # Expand path variables in policy data
+                if 'allowed_paths' in policy_data:
+                    policy_data['allowed_paths'] = [
+                        expand_path_variables(path) for path in policy_data['allowed_paths']
+                    ]
+                if 'denied_paths' in policy_data:
+                    policy_data['denied_paths'] = [
+                        expand_path_variables(path) for path in policy_data['denied_paths']
+                    ]
+
                 policy = LocalAccessPolicy(**policy_data)
                 self.policies[policy.policy_id] = policy
 
@@ -125,18 +146,22 @@ class ZeroCostLocalSecurity:
     def _initialize_default_policies(self):
         """Initialize default security policies for RED-aligned agents."""
 
+        # Get dynamic project root
+        project_root = get_project_root()
+        home_dir = Path.home()
+
         # Default policy for RAG research agents
         rag_policy = LocalAccessPolicy(
             policy_id="rag_research_agent_policy",
             agent_id="*_research_*",  # Pattern matching
             allowed_paths=[
-                "/home/junior/src/red/uploads",
-                "/home/junior/src/red/web_rag_data",
-                "/home/junior/src/red/chromadb_data"
+                str(project_root / "uploads"),
+                str(project_root / "web_rag_data"),
+                str(project_root / "chromadb_data")
             ],
             denied_paths=[
-                "/home/junior/.ssh",
-                "/home/junior/.aws",
+                str(home_dir / ".ssh"),
+                str(home_dir / ".aws"),
                 "/etc"
             ],
             allowed_operations=["read", "list"],
@@ -149,15 +174,15 @@ class ZeroCostLocalSecurity:
             policy_id="code_review_agent_policy",
             agent_id="*_code_*",  # Pattern matching
             allowed_paths=[
-                "/home/junior/src/red",
-                "/home/junior/src/red/agent-system",
-                "/home/junior/src/red/rag-system",
-                "/home/junior/src/red/multi-index-system"
+                str(project_root),
+                str(project_root / "agent-system"),
+                str(project_root / "rag-system"),
+                str(project_root / "multi-index-system")
             ],
             denied_paths=[
-                "/home/junior/src/red/.venv",
-                "/home/junior/.ssh",
-                "/home/junior/.aws"
+                str(project_root / ".venv"),
+                str(home_dir / ".ssh"),
+                str(home_dir / ".aws")
             ],
             allowed_operations=["read", "list"],
             max_file_size_mb=5,
@@ -169,8 +194,8 @@ class ZeroCostLocalSecurity:
             policy_id="vector_analysis_agent_policy",
             agent_id="*_vector_*",  # Pattern matching
             allowed_paths=[
-                "/home/junior/src/red/chromadb_data",
-                "/home/junior/src/red/agent-system/config"
+                str(project_root / "chromadb_data"),
+                str(project_root / "agent-system" / "config")
             ],
             denied_paths=[],
             allowed_operations=["read", "list"],
