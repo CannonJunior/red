@@ -14,6 +14,9 @@ import time
 from flask import Blueprint, request, jsonify
 from pathlib import Path
 
+# Import path utilities
+from project_paths import get_project_root, resolve_path
+
 # Import our agent system components
 from agent_system.mcp.server_manager import ZeroCostMCPServerManager, initialize_default_servers
 from agent_system.agents.agent_config import MojoOptimizedAgentManager
@@ -88,7 +91,7 @@ def start_mcp_server(server_id):
         access_result = security_mgr.validate_access(
             agent_id="web_interface",
             operation="execute",
-            path="/home/junior/src/red/agent-system"
+            path=resolve_path("agent-system")
         )
 
         if not access_result['allowed']:
@@ -130,7 +133,7 @@ def stop_mcp_server(server_id):
         access_result = security_mgr.validate_access(
             agent_id="web_interface",
             operation="execute",
-            path="/home/junior/src/red/agent-system"
+            path=resolve_path("agent-system")
         )
 
         if not access_result['allowed']:
@@ -295,7 +298,7 @@ def create_agent():
         access_result = security_mgr.validate_access(
             agent_id="web_interface",
             operation="write",
-            path="/home/junior/src/red/agent-system/config"
+            path=resolve_path("agent-system/config")
         )
 
         if not access_result['allowed']:
@@ -365,7 +368,7 @@ def delete_agent(agent_id):
         access_result = security_mgr.validate_access(
             agent_id="web_interface",
             operation="write",
-            path="/home/junior/src/red/agent-system/config"
+            path=resolve_path("agent-system/config")
         )
 
         if not access_result['allowed']:

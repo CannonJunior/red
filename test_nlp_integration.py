@@ -7,10 +7,14 @@ Tests the zero-cost NLP task parser and MCP interface.
 
 import sys
 import os
-sys.path.insert(0, '/home/junior/src/red')
+from pathlib import Path
+
+# Add project root to path dynamically
+project_root = Path(__file__).resolve().parent
+sys.path.insert(0, str(project_root))
 
 # Fix import path for dash-separated directory
-sys.path.insert(0, '/home/junior/src/red/agent-system')
+sys.path.insert(0, str(project_root / 'agent-system'))
 
 from nlp.task_parser import ZeroCostNLPTaskParser, MCPTaskInterface, NLPTaskContext
 import json

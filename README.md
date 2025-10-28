@@ -51,7 +51,7 @@ A basic web application with Open WebUI's look and feel, designed to add agentic
 
 ### File Structure
 ```
-/home/junior/src/red/
+<project-root>/
 ├── index.html          # Main HTML file
 ├── styles.css          # Custom CSS styles
 ├── app.js             # JavaScript application

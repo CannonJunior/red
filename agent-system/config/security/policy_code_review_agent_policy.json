@@ -1,0 +1,30 @@
+{
+  "policy_id": "code_review_agent_policy",
+  "agent_id": "*_code_*",
+  "allowed_paths": [
+    "${PROJECT_ROOT}",
+    "${PROJECT_ROOT}/agent-system",
+    "${PROJECT_ROOT}/rag-system",
+    "${PROJECT_ROOT}/multi-index-system"
+  ],
+  "denied_paths": [
+    "${PROJECT_ROOT}/.venv",
+    "${HOME}/.ssh",
+    "${HOME}/.aws"
+  ],
+  "allowed_operations": [
+    "read",
+    "list"
+  ],
+  "max_file_size_mb": 5,
+  "allowed_extensions": [
+    ".py",
+    ".mojo",
+    ".js",
+    ".ts",
+    ".json",
+    ".md",
+    ".txt"
+  ],
+  "created_timestamp": 1761655275.3768585
+}

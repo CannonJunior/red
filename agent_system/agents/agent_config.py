@@ -12,10 +12,15 @@ This module implements agent configuration with:
 import json
 import logging
 import time
+import sys
 from dataclasses import dataclass, asdict
 from pathlib import Path
 from typing import Dict, List, Optional, Any, Union
 import redis
+
+# Import path utilities for dynamic project root resolution
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from project_paths import get_project_root
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -150,8 +155,12 @@ class MojoOptimizedAgentManager:
     Mojo SIMD-optimized performance critical operations.
     """
 
-    def __init__(self, config_dir: str = "/home/junior/src/red/agent-system/config"):
+    def __init__(self, config_dir: Optional[str] = None):
         """Initialize the agent manager with RED-compliant configuration."""
+        if config_dir is None:
+            # Use dynamic project root
+            project_root = get_project_root()
+            config_dir = str(project_root / "agent-system" / "config")
         self.config_dir = Path(config_dir)
         self.config_dir.mkdir(parents=True, exist_ok=True)
 

@@ -21,8 +21,8 @@ import redis
 
 # Import path utilities for dynamic project root resolution
 import sys
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from utils.paths import get_project_root, expand_path_variables
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from project_paths import get_project_root, expand_path_variables
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -43,11 +43,12 @@ class MCPServerConfig:
     def __post_init__(self):
         """Initialize default RED-compliant configuration."""
         if self.connection is None:
+            project_root = str(get_project_root())
             self.connection = {
                 "protocol": "stdio",
-                "working_directory": "/home/junior/src/red",
+                "working_directory": project_root,
                 "environment": {
-                    "PYTHONPATH": "/home/junior/src/red",
+                    "PYTHONPATH": project_root,
                     "OLLAMA_HOST": "localhost:11434",
                     "REDIS_URL": "redis://localhost:6379",
                     "CHROMA_DB_PATH": "./chromadb_data"
@@ -55,8 +56,9 @@ class MCPServerConfig:
             }
 
         if self.permissions is None:
+            project_root = str(get_project_root())
             self.permissions = {
-                "local_directory_access": ["/home/junior/src/red"],
+                "local_directory_access": [project_root],
                 "chromadb_access": True,
                 "ollama_access": True,
                 "redis_streams_access": True
@@ -241,7 +243,7 @@ class ZeroCostMCPServerManager:
             # Prepare command
             command = config.connection.get("command")
             args = config.connection.get("args", [])
-            working_dir = config.connection.get("working_directory", "/home/junior/src/red")
+            working_dir = config.connection.get("working_directory", str(get_project_root()))
             env = os.environ.copy()
             env.update(config.connection.get("environment", {}))
 
@@ -404,7 +406,7 @@ class ZeroCostMCPServerManager:
 
             elif service == "chromadb":
                 # Check ChromaDB (basic filesystem check)
-                chromadb_path = Path("/home/junior/src/red/chromadb_data")
+                chromadb_path = get_project_root() / "chromadb_data"
                 if chromadb_path.exists():
                     return {"status": "healthy", "response_time": 0.001}
                 else:
@@ -482,35 +484,40 @@ class ZeroCostMCPServerManager:
 
 
 # Default server configurations for RED-aligned services
-DEFAULT_SERVERS = [
-    MCPServerConfig(
-        server_id="local_rag_server",
-        connection={
-            "protocol": "stdio",
-            "command": "uv run rag-system/mcp_rag_server.py",
-            "working_directory": "/home/junior/src/red",
-            "environment": {
-                "PYTHONPATH": "/home/junior/src/red",
-                "OLLAMA_HOST": "localhost:11434",
-                "REDIS_URL": "redis://localhost:6379",
-                "CHROMA_DB_PATH": "./chromadb_data"
+def _get_default_servers():
+    """Get default server configurations with dynamic paths."""
+    project_root = str(get_project_root())
+    return [
+        MCPServerConfig(
+            server_id="local_rag_server",
+            connection={
+                "protocol": "stdio",
+                "command": "uv run rag-system/mcp_rag_server.py",
+                "working_directory": project_root,
+                "environment": {
+                    "PYTHONPATH": project_root,
+                    "OLLAMA_HOST": "localhost:11434",
+                    "REDIS_URL": "redis://localhost:6379",
+                    "CHROMA_DB_PATH": "./chromadb_data"
+                }
             }
-        }
-    ),
-    MCPServerConfig(
-        server_id="multi_index_server",
-        connection={
-            "protocol": "stdio",
-            "command": "uv run multi-index-system/mcp/protocol_handler.py",
-            "working_directory": "/home/junior/src/red",
-            "environment": {
-                "PYTHONPATH": "/home/junior/src/red",
-                "OLLAMA_HOST": "localhost:11434",
-                "REDIS_URL": "redis://localhost:6379"
+        ),
+        MCPServerConfig(
+            server_id="multi_index_server",
+            connection={
+                "protocol": "stdio",
+                "command": "uv run multi-index-system/mcp/protocol_handler.py",
+                "working_directory": project_root,
+                "environment": {
+                    "PYTHONPATH": project_root,
+                    "OLLAMA_HOST": "localhost:11434",
+                    "REDIS_URL": "redis://localhost:6379"
+                }
             }
-        }
-    )
-]
+        )
+    ]
+
+DEFAULT_SERVERS = _get_default_servers()
 
 
 def initialize_default_servers():

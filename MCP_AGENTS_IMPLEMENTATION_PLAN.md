@@ -76,9 +76,9 @@ This plan aligns with **RED-CONTEXT-ENGINEERING-PROMPT.md** guidance and researc
   "connection": {
     "protocol": "stdio",
     "command": "uv run rag-system/mcp_rag_server.py",
-    "working_directory": "/home/junior/src/red",
+    "working_directory": "${PROJECT_ROOT}",
     "environment": {
-      "PYTHONPATH": "/home/junior/src/red",
+      "PYTHONPATH": "${PROJECT_ROOT}",
       "OLLAMA_HOST": "localhost:11434",
       "REDIS_URL": "redis://localhost:6379",
       "CHROMA_DB_PATH": "./chromadb_data"
@@ -89,7 +89,7 @@ This plan aligns with **RED-CONTEXT-ENGINEERING-PROMPT.md** guidance and researc
     "credentials": null
   },
   "permissions": {
-    "local_directory_access": ["/home/junior/src/red"],
+    "local_directory_access": ["${PROJECT_ROOT}"],
     "chromadb_access": true,
     "ollama_access": true,
     "redis_streams_access": true

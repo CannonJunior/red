@@ -22,8 +22,8 @@ from typing import Dict, List, Set, Optional, Any
 from dataclasses import dataclass, asdict
 
 # Import path utilities for dynamic project root resolution
-sys.path.insert(0, str(Path(__file__).parent.parent))
-from utils.paths import get_project_root, expand_path_variables
+sys.path.insert(0, str(Path(__file__).parent.parent.parent))
+from project_paths import get_project_root, expand_path_variables
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -89,9 +89,12 @@ class ZeroCostLocalSecurity:
         # Define safe base paths for agent operations (using dynamic project root)
         project_root = get_project_root()
         self.safe_base_paths = {
+            str(project_root),  # Include project root for code review agents
             str(project_root / "uploads"),
             str(project_root / "web_rag_data"),
-            str(project_root / "agent-system" / "config"),
+            str(project_root / "agent-system"),
+            str(project_root / "rag-system"),
+            str(project_root / "multi-index-system"),
             str(project_root / "chromadb_data")
         }
 
@@ -521,7 +524,8 @@ class ZeroCostLocalSecurity:
         """Create a secure workspace directory for an agent."""
         try:
             # Create agent-specific workspace
-            workspace_dir = Path(f"/home/junior/src/red/agent-system/workspaces/{agent_id}")
+            project_root = get_project_root()
+            workspace_dir = project_root / "agent-system" / "workspaces" / agent_id
             workspace_dir.mkdir(parents=True, exist_ok=True)
 
             # Set appropriate permissions (user read/write only)
@@ -540,11 +544,12 @@ if __name__ == "__main__":
     security = ZeroCostLocalSecurity()
 
     # Test access validation
+    project_root = get_project_root()
     test_cases = [
-        ("rag_research_assistant", "read", "/home/junior/src/red/uploads/test.txt"),
-        ("code_review_agent", "read", "/home/junior/src/red/app.js"),
+        ("rag_research_assistant", "read", str(project_root / "uploads" / "test.txt")),
+        ("code_review_agent", "read", str(project_root / "app.js")),
         ("malicious_agent", "read", "/etc/passwd"),
-        ("vector_analyst", "read", "/home/junior/src/red/chromadb_data/index.db")
+        ("vector_analyst", "read", str(project_root / "chromadb_data" / "index.db"))
     ]
 
     for agent_id, operation, path in test_cases:
