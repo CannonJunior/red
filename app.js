@@ -571,6 +571,7 @@ class Navigation {
         document.getElementById('models-area')?.classList.add('hidden');
         document.getElementById('settings-area')?.classList.add('hidden');
         document.getElementById('knowledge-area')?.classList.add('hidden');
+        document.getElementById('cag-knowledge-area')?.classList.add('hidden');
         document.getElementById('visualizations-area')?.classList.add('hidden');
         document.getElementById('mcp-area')?.classList.add('hidden');
         document.getElementById('agents-area')?.classList.add('hidden');
