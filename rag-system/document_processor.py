@@ -115,13 +115,13 @@ class DocumentProcessor:
         try:
             # Convert PDF using Docling
             result = self.converter.convert(str(file_path))
-            
-            # Extract text content
-            content = result.document.text
-            
+
+            # Extract text content using export_to_markdown()
+            content = result.document.export_to_markdown()
+
             # Create chunks
             chunks = self._chunk_text(content)
-            
+
             return {
                 "status": "success",
                 "file_path": str(file_path),
@@ -138,7 +138,7 @@ class DocumentProcessor:
                     }
                 } for i, chunk in enumerate(chunks)]
             }
-            
+
         except Exception as e:
             logger.error(f"Docling PDF processing failed: {e}")
             return {
@@ -152,13 +152,13 @@ class DocumentProcessor:
         try:
             # Convert Word document using Docling
             result = self.converter.convert(str(file_path))
-            
-            # Extract text content
-            content = result.document.text
-            
+
+            # Extract text content using export_to_markdown()
+            content = result.document.export_to_markdown()
+
             # Create chunks
             chunks = self._chunk_text(content)
-            
+
             return {
                 "status": "success",
                 "file_path": str(file_path),
@@ -175,7 +175,7 @@ class DocumentProcessor:
                     }
                 } for i, chunk in enumerate(chunks)]
             }
-            
+
         except Exception as e:
             logger.error(f"Docling Word processing failed: {e}")
             return {

@@ -1,0 +1,30 @@
+{
+  "policy_id": "rag_research_agent_policy",
+  "agent_id": "*_research_*",
+  "allowed_paths": [
+    "/home/junior/src/red/uploads",
+    "/home/junior/src/red/web_rag_data",
+    "/home/junior/src/red/chromadb_data"
+  ],
+  "denied_paths": [
+    "/home/junior/.ssh",
+    "/home/junior/.aws",
+    "/etc"
+  ],
+  "allowed_operations": [
+    "read",
+    "list"
+  ],
+  "max_file_size_mb": 50,
+  "allowed_extensions": [
+    ".txt",
+    ".pdf",
+    ".doc",
+    ".docx",
+    ".md",
+    ".csv",
+    ".xls",
+    ".xlsx"
+  ],
+  "created_timestamp": 1758328713.7953265
+}

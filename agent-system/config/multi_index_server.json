@@ -1,0 +1,44 @@
+{
+  "server_id": "multi_index_server",
+  "server_type": "mcp",
+  "connection": {
+    "protocol": "stdio",
+    "command": "uv run multi-index-system/mcp/protocol_handler.py",
+    "working_directory": "/home/junior/src/red",
+    "environment": {
+      "PYTHONPATH": "/home/junior/src/red",
+      "OLLAMA_HOST": "localhost:11434",
+      "REDIS_URL": "redis://localhost:6379"
+    }
+  },
+  "permissions": {
+    "local_directory_access": [
+      "/home/junior/src/red"
+    ],
+    "chromadb_access": true,
+    "ollama_access": true,
+    "redis_streams_access": true
+  },
+  "performance": {
+    "mojo_optimization": true,
+    "simd_acceleration": true,
+    "max_concurrent_operations": 5
+  },
+  "health_check": {
+    "enabled": true,
+    "interval": 10,
+    "timeout": 2,
+    "local_services": [
+      "ollama",
+      "redis",
+      "chromadb"
+    ]
+  },
+  "red_compliance": {
+    "cost_first": true,
+    "agent_native": true,
+    "mojo_optimized": true,
+    "local_first": true,
+    "simple_scale": true
+  }
+}

@@ -100,6 +100,22 @@
                         <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
                             <span class="flex items-center">
                                 <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                </svg>
+                                MCP
+                            </span>
+                        </button>
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <span class="flex items-center">
+                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
+                                </svg>
+                                Agents
+                            </span>
+                        </button>
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                            <span class="flex items-center">
+                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
                                 </svg>
                                 Settings
@@ -422,6 +438,127 @@
                     </div>
                 </main>
 
+                <!-- MCP Area (hidden by default) -->
+                <main id="mcp-area" class="flex-1 flex flex-col hidden">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-6xl mx-auto">
+                            <div class="mb-6">
+                                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Model Context Protocol (MCP)</h3>
+                                <p class="text-gray-600 dark:text-gray-400">Manage MCP servers and tool integrations for zero-cost agent orchestration</p>
+                            </div>
+
+                            <!-- MCP Server Status Dashboard -->
+                            <div class="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                                <div class="lg:col-span-2">
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">MCP Servers</h4>
+                                        <div id="mcp-servers-grid" class="space-y-4">
+                                            <!-- MCP servers will be populated here -->
+                                        </div>
+                                        <button id="add-mcp-server-btn" class="mt-4 w-full flex items-center justify-center px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                            </svg>
+                                            Add MCP Server
+                                        </button>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">System Metrics</h4>
+                                        <div id="mcp-metrics" class="space-y-4">
+                                            <!-- Metrics will be populated here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- MCP Tool Registry -->
+                            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Available Tools</h4>
+                                <div id="mcp-tools-grid" class="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                    <!-- Tools will be populated here -->
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Agents Area (hidden by default) -->
+                <main id="agents-area" class="flex-1 flex flex-col hidden">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-6xl mx-auto">
+                            <div class="mb-6">
+                                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">AI Agents</h3>
+                                <p class="text-gray-600 dark:text-gray-400">Configure and manage zero-cost AI agents with Mojo optimization</p>
+                            </div>
+
+                            <!-- Agent Dashboard -->
+                            <div class="grid grid-cols-1 lg:grid-cols-4 gap-6 mb-6">
+                                <div class="lg:col-span-3">
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                        <div class="flex items-center justify-between mb-4">
+                                            <h4 class="text-lg font-medium text-gray-900 dark:text-white">Active Agents</h4>
+                                            <button id="create-agent-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                                <span class="flex items-center">
+                                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                                    </svg>
+                                                    Create Agent
+                                                </span>
+                                            </button>
+                                        </div>
+                                        <div id="agents-grid" class="space-y-4">
+                                            <!-- Agents will be populated here -->
+                                        </div>
+                                    </div>
+                                </div>
+                                <div>
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Agent Templates</h4>
+                                        <div id="agent-templates" class="space-y-3">
+                                            <!-- Templates will be populated here -->
+                                        </div>
+                                    </div>
+                                    <div class="mt-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                        <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Performance</h4>
+                                        <div id="agent-metrics" class="space-y-3">
+                                            <!-- Performance metrics will be populated here -->
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- Agent Configuration Panel -->
+                            <div id="agent-config-panel" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 hidden">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Agent Configuration</h4>
+                                <div class="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Agent Name</label>
+                                        <input type="text" id="agent-name" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Template</label>
+                                        <select id="agent-template" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white">
+                                            <option value="rag_research_assistant">RAG Research Assistant</option>
+                                            <option value="local_code_reviewer">Code Reviewer</option>
+                                            <option value="vector_data_analyst">Vector Data Analyst</option>
+                                        </select>
+                                    </div>
+                                    <div class="lg:col-span-2">
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">Mission Statement</label>
+                                        <textarea rows="3" id="agent-mission" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white" placeholder="Describe the agent's primary objectives and capabilities..."></textarea>
+                                    </div>
+                                </div>
+                                <div class="mt-6 flex justify-end space-x-3">
+                                    <button id="cancel-agent-config" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">Cancel</button>
+                                    <button id="save-agent-config" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700">Save Agent</button>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
                 <!-- Settings Area (hidden by default) -->
                 <main id="settings-area" class="flex-1 flex flex-col hidden">
                     <div class="flex-1 overflow-y-auto p-6">
@@ -489,5 +626,6 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="mcp_agents.js"></script>
 </body>
 </html>
