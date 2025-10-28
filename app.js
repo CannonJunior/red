@@ -234,16 +234,26 @@ class ChatInterface {
         const typingId = this.showTypingIndicator();
 
         try {
+            // Check knowledge mode
+            const knowledgeMode = document.getElementById('knowledge-mode-selector')?.value || 'none';
+
+            let apiEndpoint = '/api/chat';
             const requestBody = {
                 message: message,
                 model: this.currentModel,
                 workspace: window.app.knowledgeManager?.currentKnowledgeBase || 'default'
             };
-            
-            console.log('Sending chat request:', requestBody);
-            
-            // Send to Ollama via our API
-            const response = await fetch('/api/chat', {
+
+            // Route to CAG if CAG mode is selected
+            if (knowledgeMode === 'cag') {
+                apiEndpoint = '/api/cag/query';
+                requestBody.query = message;
+            }
+
+            console.log('Sending chat request:', { endpoint: apiEndpoint, body: requestBody, mode: knowledgeMode });
+
+            // Send to appropriate API
+            const response = await fetch(apiEndpoint, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -592,11 +602,20 @@ class Navigation {
                 this.currentPage = 'settings';
                 this.loadSettingsPage();
                 break;
+            case 'rag knowledge':
             case 'knowledge':
                 document.getElementById('knowledge-area')?.classList.remove('hidden');
-                pageTitle.textContent = 'Knowledge';
+                pageTitle.textContent = 'RAG Knowledge';
                 this.currentPage = 'knowledge';
                 this.loadKnowledgePage();
+                break;
+            case 'cag knowledge':
+                document.getElementById('cag-knowledge-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'CAG Knowledge';
+                this.currentPage = 'cag-knowledge';
+                if (this.cagManager) {
+                    this.cagManager.loadCAGStatus();
+                }
                 break;
             case 'mcp':
                 document.getElementById('mcp-area')?.classList.remove('hidden');
@@ -1934,6 +1953,12 @@ class IntegrationManager {
 document.addEventListener('DOMContentLoaded', () => {
     window.app = new App();
     window.integrationManager = new IntegrationManager();
+
+    // Initialize CAG Manager
+    if (typeof CAGManager !== 'undefined') {
+        window.app.cagManager = new CAGManager();
+        console.log('✅ CAG Manager initialized');
+    }
 
     // Initialize MCP Agent System integration
     initializeMCPAgentIntegration();

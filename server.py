@@ -30,6 +30,17 @@ except ImportError as e:
     KNOWLEDGE_GRAPH_AVAILABLE = False
     print(f"⚠️  RAG system not available: {e}")
 
+# Import CAG (Cache-Augmented Generation) functionality
+try:
+    from cag_api import get_cag_manager
+    CAG_AVAILABLE = True
+    cag_manager = get_cag_manager()
+    print("✅ CAG system loaded successfully")
+except ImportError as e:
+    CAG_AVAILABLE = False
+    cag_manager = None
+    print(f"⚠️  CAG system not available: {e}")
+
 # Import Agent system functionality
 try:
     import sys
@@ -182,6 +193,15 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_rag_upload_api()
             elif self.path == '/api/rag/documents' and RAG_AVAILABLE:
                 self.handle_rag_documents_api()
+            # CAG API endpoints
+            elif self.path == '/api/cag/status' and CAG_AVAILABLE:
+                self.handle_cag_status_api()
+            elif self.path == '/api/cag/load' and CAG_AVAILABLE:
+                self.handle_cag_load_api()
+            elif self.path == '/api/cag/clear' and CAG_AVAILABLE:
+                self.handle_cag_clear_api()
+            elif self.path == '/api/cag/query' and CAG_AVAILABLE:
+                self.handle_cag_query_api()
             # Agent API endpoints
             elif self.path == '/api/agents' and AGENT_SYSTEM_AVAILABLE:
                 self.handle_agents_api()
@@ -215,6 +235,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract document ID from path
                 document_id = self.path.split('/')[-1]
                 self.handle_rag_document_delete_api(document_id)
+            elif self.path.startswith('/api/cag/documents/') and CAG_AVAILABLE:
+                # Extract document ID from path
+                document_id = self.path.split('/')[-1]
+                self.handle_cag_document_delete_api(document_id)
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
                 
@@ -826,6 +850,186 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"❌ RAG document delete API error: {e}")
             self.send_json_response({'error': f'Delete failed: {str(e)}'}, 500)
+
+    # ========== CAG API Handlers ==========
+
+    def handle_cag_status_api(self):
+        """Handle CAG cache status API requests."""
+        try:
+            if not CAG_AVAILABLE or cag_manager is None:
+                self.send_json_response({
+                    'error': 'CAG system not available',
+                    'total_tokens': 0,
+                    'available_tokens': 0,
+                    'max_tokens': 128000,
+                    'usage_percent': 0,
+                    'document_count': 0,
+                    'documents': []
+                }, 503)
+                return
+
+            status = cag_manager.get_cache_status()
+            self.send_json_response(status)
+
+        except Exception as e:
+            print(f"❌ CAG status API error: {e}")
+            self.send_json_response({'error': f'CAG status error: {str(e)}'}, 500)
+
+    def handle_cag_load_api(self):
+        """Handle CAG document loading API requests."""
+        try:
+            if not CAG_AVAILABLE or cag_manager is None:
+                self.send_json_response({'error': 'CAG system not available'}, 503)
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length == 0:
+                self.send_json_response({'error': 'No data received'}, 400)
+                return
+
+            # Check if this is multipart form data (file upload)
+            content_type = self.headers.get('Content-Type', '')
+
+            if content_type.startswith('multipart/form-data'):
+                # Handle file upload
+                boundary = content_type.split('boundary=')[1].encode()
+                post_data = self.rfile.read(content_length)
+
+                # Parse multipart form data
+                import cgi
+                import io
+                environ = {
+                    'REQUEST_METHOD': 'POST',
+                    'CONTENT_TYPE': content_type,
+                    'CONTENT_LENGTH': str(content_length),
+                }
+
+                fields = cgi.FieldStorage(
+                    fp=io.BytesIO(post_data),
+                    environ=environ,
+                    keep_blank_values=True
+                )
+
+                if 'file' not in fields:
+                    self.send_json_response({'error': 'No file uploaded'}, 400)
+                    return
+
+                file_item = fields['file']
+                filename = file_item.filename
+                file_data = file_item.file.read()
+
+                # Save to temp file
+                temp_path = Path(f'/tmp/cag_{uuid.uuid4()}_{filename}')
+                temp_path.write_bytes(file_data)
+
+                # Load into CAG
+                result = cag_manager.load_document(str(temp_path))
+
+                # Clean up temp file
+                temp_path.unlink()
+
+                self.send_json_response(result)
+
+            else:
+                # Handle JSON request with file path
+                post_data = self.rfile.read(content_length)
+                request_data = json.loads(post_data.decode('utf-8'))
+                file_path = request_data.get('file_path')
+
+                if not file_path:
+                    self.send_json_response({'error': 'file_path required'}, 400)
+                    return
+
+                result = cag_manager.load_document(file_path)
+                self.send_json_response(result)
+
+        except Exception as e:
+            print(f"❌ CAG load API error: {e}")
+            import traceback
+            traceback.print_exc()
+            self.send_json_response({'error': f'CAG load failed: {str(e)}'}, 500)
+
+    def handle_cag_clear_api(self):
+        """Handle CAG cache clear API requests."""
+        try:
+            if not CAG_AVAILABLE or cag_manager is None:
+                self.send_json_response({'error': 'CAG system not available'}, 503)
+                return
+
+            result = cag_manager.clear_cache()
+            self.send_json_response(result)
+
+        except Exception as e:
+            print(f"❌ CAG clear API error: {e}")
+            self.send_json_response({'error': f'CAG clear failed: {str(e)}'}, 500)
+
+    def handle_cag_document_delete_api(self, document_id):
+        """Handle CAG document deletion API requests."""
+        try:
+            if not CAG_AVAILABLE or cag_manager is None:
+                self.send_json_response({'error': 'CAG system not available'}, 503)
+                return
+
+            result = cag_manager.remove_document(document_id)
+            self.send_json_response(result)
+
+        except Exception as e:
+            print(f"❌ CAG document delete API error: {e}")
+            self.send_json_response({'error': f'Delete failed: {str(e)}'}, 500)
+
+    def handle_cag_query_api(self):
+        """Handle CAG-enhanced query API requests."""
+        try:
+            if not CAG_AVAILABLE or cag_manager is None:
+                self.send_json_response({'error': 'CAG system not available'}, 503)
+                return
+
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+
+            query = request_data.get('query', '')
+            model = request_data.get('model', 'qwen2.5:3b')
+
+            if not query:
+                self.send_json_response({'error': 'query required'}, 400)
+                return
+
+            # Build full context with cached documents
+            full_context = cag_manager.get_context_for_query(query)
+
+            # Send to LLM
+            ollama_url = f"{ollama_config.base_url}/api/generate"
+            payload = {
+                'model': model,
+                'prompt': full_context,
+                'stream': False
+            }
+
+            req = urllib.request.Request(
+                ollama_url,
+                data=json.dumps(payload).encode('utf-8'),
+                headers={'Content-Type': 'application/json'}
+            )
+
+            with urllib.request.urlopen(req) as response:
+                result = json.loads(response.read().decode('utf-8'))
+
+            self.send_json_response({
+                'status': 'success',
+                'response': result.get('response', ''),
+                'model': model,
+                'context_tokens': cag_manager.total_tokens,
+                'mode': 'cag'
+            })
+
+        except Exception as e:
+            print(f"❌ CAG query API error: {e}")
+            import traceback
+            traceback.print_exc()
+            self.send_json_response({'error': f'CAG query failed: {str(e)}'}, 500)
+
+    # ========== End CAG API Handlers ==========
 
     def handle_knowledge_graph_api(self):
         """Handle knowledge graph visualization API requests using vector embeddings."""
