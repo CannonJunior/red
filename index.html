@@ -428,7 +428,7 @@
                                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
                                         </svg>
                                         <div>
-                                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="cag-available-tokens">128000</p>
+                                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="cag-available-tokens">---</p>
                                             <p class="text-sm text-gray-600 dark:text-gray-400">Available Capacity</p>
                                         </div>
                                     </div>
@@ -451,10 +451,10 @@
                                 <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Context Window Utilization</h4>
                                 <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-6 overflow-hidden">
                                     <div id="cag-memory-bar" class="bg-gradient-to-r from-blue-500 to-purple-500 h-6 rounded-full transition-all duration-500 flex items-center justify-center text-white text-xs font-medium" style="width: 0%">
-                                        <span id="cag-memory-bar-text">0 / 128K tokens</span>
+                                        <span id="cag-memory-bar-text">Loading...</span>
                                     </div>
                                 </div>
-                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2">Maximum context window: ~128,000 tokens (~100,000 words)</p>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-2" id="cag-max-capacity-text">Maximum context window determined by available system memory</p>
                             </div>
 
                             <!-- Upload Area -->
@@ -487,13 +487,18 @@
                                             </button>
                                         </div>
                                     </div>
-                                    <div id="cag-load-progress" class="hidden mt-4">
+                                    <div id="cag-load-progress" class="hidden mt-4 bg-gray-50 dark:bg-gray-900 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
                                         <div class="flex items-center justify-between mb-2">
-                                            <span class="text-sm text-gray-600 dark:text-gray-400">Loading to cache...</span>
-                                            <span class="text-sm text-gray-600 dark:text-gray-400" id="cag-load-percent">0%</span>
+                                            <span class="text-sm text-gray-700 dark:text-gray-300 font-medium">Loading to cache...</span>
+                                            <span class="text-sm text-purple-600 dark:text-purple-400 font-bold" id="cag-load-percent">0%</span>
                                         </div>
-                                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-2">
-                                            <div class="bg-purple-600 h-2 rounded-full transition-all duration-300" id="cag-load-bar" style="width: 0%"></div>
+                                        <div class="w-full bg-gray-200 dark:bg-gray-700 rounded-full h-3 overflow-hidden shadow-inner">
+                                            <div class="bg-gradient-to-r from-purple-500 to-blue-500 h-3 rounded-full transition-all duration-200 flex items-center justify-center" id="cag-load-bar" style="width: 0%">
+                                                <div class="h-full w-full bg-white/20 animate-pulse"></div>
+                                            </div>
+                                        </div>
+                                        <div class="mt-2 text-xs text-gray-500 dark:text-gray-400" id="cag-load-details">
+                                            Initializing upload...
                                         </div>
                                     </div>
                                 </div>

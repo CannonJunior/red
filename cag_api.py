@@ -22,6 +22,7 @@ from pathlib import Path
 import json
 from datetime import datetime
 import tiktoken  # For accurate token counting
+import psutil  # For system memory detection
 
 # Document processing - import from rag-system directory
 import sys
@@ -32,6 +33,59 @@ from document_processor import DocumentProcessor
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+
+def calculate_optimal_cag_capacity() -> int:
+    """
+    Calculate optimal CAG token capacity based on available system memory.
+
+    Strategy:
+    - Get available system RAM
+    - Reserve 2GB minimum for OS and other processes
+    - Estimate 6 bytes per token (text + metadata + overhead)
+    - Cap at model context window limits (200K tokens for modern LLMs)
+    - Minimum of 32K tokens for usability
+
+    Returns:
+        Optimal token capacity for CAG system
+    """
+    try:
+        # Get system memory info
+        memory = psutil.virtual_memory()
+        total_ram_gb = memory.total / (1024 ** 3)
+        available_ram_gb = memory.available / (1024 ** 3)
+
+        # Calculate usable RAM for CAG (reserve 2GB minimum for system)
+        reserved_ram_gb = max(2.0, total_ram_gb * 0.25)  # Reserve 25% or 2GB, whichever is larger
+        usable_ram_gb = max(0.5, available_ram_gb - reserved_ram_gb)
+
+        # Convert to bytes
+        usable_ram_bytes = usable_ram_gb * (1024 ** 3)
+
+        # Estimate tokens: ~6 bytes per token (text storage + metadata + Python overhead)
+        bytes_per_token = 6
+        estimated_tokens = int(usable_ram_bytes / bytes_per_token)
+
+        # Apply constraints
+        min_tokens = 32_000   # Minimum 32K for usability
+        max_tokens = 200_000  # Modern LLM limit (e.g., Claude 3, GPT-4)
+
+        optimal_tokens = max(min_tokens, min(estimated_tokens, max_tokens))
+
+        logger.info(
+            f"CAG Capacity Calculation:\n"
+            f"  Total RAM: {total_ram_gb:.2f} GB\n"
+            f"  Available RAM: {available_ram_gb:.2f} GB\n"
+            f"  Usable for CAG: {usable_ram_gb:.2f} GB\n"
+            f"  Estimated tokens: {estimated_tokens:,}\n"
+            f"  Optimal capacity: {optimal_tokens:,} tokens"
+        )
+
+        return optimal_tokens
+
+    except Exception as e:
+        logger.warning(f"Failed to calculate optimal CAG capacity: {e}. Using default 128K.")
+        return 128_000
 
 
 class CAGManager:
@@ -45,14 +99,18 @@ class CAGManager:
     - Zero retrieval latency
     """
 
-    def __init__(self, max_context_tokens: int = 128000):
+    def __init__(self, max_context_tokens: Optional[int] = None):
         """
         Initialize CAG manager.
 
         Args:
-            max_context_tokens: Maximum tokens for context window (default 128K)
+            max_context_tokens: Maximum tokens for context window. If None, calculates
+                              optimal capacity based on available system memory.
         """
-        self.max_context_tokens = max_context_tokens
+        if max_context_tokens is None:
+            self.max_context_tokens = calculate_optimal_cag_capacity()
+        else:
+            self.max_context_tokens = max_context_tokens
         self.cached_documents: Dict[str, Dict[str, Any]] = {}
         self.total_tokens = 0
 
@@ -66,7 +124,7 @@ class CAGManager:
             # Fallback to cl100k_base encoding
             self.tokenizer = tiktoken.get_encoding("cl100k_base")
 
-        logger.info(f"CAG Manager initialized with {max_context_tokens} token capacity")
+        logger.info(f"CAG Manager initialized with {self.max_context_tokens:,} token capacity")
 
     def load_document(self, file_path: str) -> Dict[str, Any]:
         """

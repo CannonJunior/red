@@ -156,30 +156,31 @@ class CAGManager {
         const progressDiv = document.getElementById('cag-load-progress');
         const loadBar = document.getElementById('cag-load-bar');
         const loadPercent = document.getElementById('cag-load-percent');
+        const progressText = progressDiv.querySelector('span.text-sm');
 
         try {
             progressDiv.classList.remove('hidden');
 
             for (let i = 0; i < this.selectedFiles.length; i++) {
                 const file = this.selectedFiles[i];
-                const progress = ((i + 1) / this.selectedFiles.length) * 100;
+                const fileNum = i + 1;
+                const totalFiles = this.selectedFiles.length;
 
-                loadBar.style.width = `${progress}%`;
-                loadPercent.textContent = `${Math.round(progress)}%`;
+                // Calculate base progress for this file
+                const baseProgress = (i / totalFiles) * 100;
+                const fileProgressRange = 100 / totalFiles;
 
-                const formData = new FormData();
-                formData.append('file', file);
+                // Update text to show current file
+                progressText.textContent = `Processing file ${fileNum} of ${totalFiles}: ${file.name}`;
 
-                const response = await fetch('/api/cag/load', {
-                    method: 'POST',
-                    body: formData
-                });
-
-                const result = await response.json();
-
-                if (result.status !== 'success') {
-                    throw new Error(result.error || 'Load failed');
-                }
+                // Load file with detailed progress tracking
+                await this.loadSingleFileWithProgress(
+                    file,
+                    baseProgress,
+                    fileProgressRange,
+                    loadBar,
+                    loadPercent
+                );
             }
 
             this.showSuccess(`Loaded ${this.selectedFiles.length} file(s) to cache`);
@@ -200,7 +201,128 @@ class CAGManager {
             progressDiv.classList.add('hidden');
             loadBar.style.width = '0%';
             loadPercent.textContent = '0%';
+            progressText.textContent = 'Loading to cache...';
+
+            const detailsText = document.getElementById('cag-load-details');
+            if (detailsText) {
+                detailsText.textContent = 'Initializing upload...';
+            }
         }
+    }
+
+    loadSingleFileWithProgress(file, baseProgress, fileProgressRange, loadBar, loadPercent) {
+        return new Promise((resolve, reject) => {
+            const xhr = new XMLHttpRequest();
+            const formData = new FormData();
+            formData.append('file', file);
+
+            const detailsText = document.getElementById('cag-load-details');
+            const formatSize = (bytes) => {
+                if (bytes < 1024) return bytes + ' B';
+                if (bytes < 1024 * 1024) return (bytes / 1024).toFixed(1) + ' KB';
+                return (bytes / (1024 * 1024)).toFixed(1) + ' MB';
+            };
+
+            // Track upload progress (0-40% of file progress)
+            xhr.upload.addEventListener('progress', (e) => {
+                if (e.lengthComputable) {
+                    const uploadPercent = (e.loaded / e.total) * 40; // Upload is 40% of file progress
+                    const totalProgress = baseProgress + (uploadPercent / 100) * fileProgressRange;
+                    loadBar.style.width = `${totalProgress}%`;
+                    loadPercent.textContent = `${Math.round(totalProgress)}%`;
+
+                    if (detailsText) {
+                        detailsText.textContent = `📤 Uploading: ${formatSize(e.loaded)} / ${formatSize(e.total)}`;
+                    }
+                }
+            });
+
+            // Track overall progress stages
+            xhr.addEventListener('loadstart', () => {
+                // Starting upload (0% of file range)
+                const totalProgress = baseProgress;
+                loadBar.style.width = `${totalProgress}%`;
+                loadPercent.textContent = `${Math.round(totalProgress)}%`;
+
+                if (detailsText) {
+                    detailsText.textContent = `📂 Preparing upload: ${file.name} (${formatSize(file.size)})`;
+                }
+            });
+
+            xhr.addEventListener('load', () => {
+                if (xhr.status === 200) {
+                    // Upload complete, now processing (40-100% of file progress)
+                    const processingProgress = baseProgress + 0.4 * fileProgressRange;
+                    loadBar.style.width = `${processingProgress}%`;
+                    loadPercent.textContent = `${Math.round(processingProgress)}%`;
+
+                    if (detailsText) {
+                        detailsText.textContent = `📄 Processing document with Docling...`;
+                    }
+
+                    // Simulate processing phases
+                    setTimeout(() => {
+                        // Tokenizing (70% of file progress)
+                        const tokenizingProgress = baseProgress + 0.7 * fileProgressRange;
+                        loadBar.style.width = `${tokenizingProgress}%`;
+                        loadPercent.textContent = `${Math.round(tokenizingProgress)}%`;
+
+                        if (detailsText) {
+                            detailsText.textContent = `🔢 Counting tokens and analyzing content...`;
+                        }
+
+                        setTimeout(() => {
+                            // Caching (90% of file progress)
+                            const cachingProgress = baseProgress + 0.9 * fileProgressRange;
+                            loadBar.style.width = `${cachingProgress}%`;
+                            loadPercent.textContent = `${Math.round(cachingProgress)}%`;
+
+                            if (detailsText) {
+                                detailsText.textContent = `💾 Storing in context cache...`;
+                            }
+
+                            setTimeout(() => {
+                                // Complete (100% of file progress)
+                                const completeProgress = baseProgress + fileProgressRange;
+                                loadBar.style.width = `${completeProgress}%`;
+                                loadPercent.textContent = `${Math.round(completeProgress)}%`;
+
+                                const result = JSON.parse(xhr.responseText);
+
+                                if (detailsText && result.status === 'success') {
+                                    detailsText.textContent = `✅ Cached ${result.tokens?.toLocaleString() || 0} tokens from ${result.filename}`;
+                                }
+
+                                if (result.status === 'success') {
+                                    resolve(result);
+                                } else {
+                                    reject(new Error(result.error || 'Load failed'));
+                                }
+                            }, 200);
+                        }, 200);
+                    }, 200);
+                } else {
+                    reject(new Error(`HTTP ${xhr.status}: ${xhr.statusText}`));
+                }
+            });
+
+            xhr.addEventListener('error', () => {
+                if (detailsText) {
+                    detailsText.textContent = `❌ Network error during upload`;
+                }
+                reject(new Error('Network error during upload'));
+            });
+
+            xhr.addEventListener('abort', () => {
+                if (detailsText) {
+                    detailsText.textContent = `⚠️ Upload aborted`;
+                }
+                reject(new Error('Upload aborted'));
+            });
+
+            xhr.open('POST', '/api/cag/load');
+            xhr.send(formData);
+        });
     }
 
     async clearCache() {
@@ -244,6 +366,14 @@ class CAGManager {
             const memoryBarText = document.getElementById('cag-memory-bar-text');
             memoryBar.style.width = `${status.usage_percent}%`;
             memoryBarText.textContent = `${status.total_tokens.toLocaleString()} / ${(status.max_tokens / 1000).toFixed(0)}K tokens`;
+
+            // Update max capacity description
+            const maxCapacityText = document.getElementById('cag-max-capacity-text');
+            if (maxCapacityText) {
+                const maxTokensFormatted = status.max_tokens.toLocaleString();
+                const approxWords = Math.round(status.max_tokens * 0.75).toLocaleString();
+                maxCapacityText.textContent = `Maximum context window: ${maxTokensFormatted} tokens (~${approxWords} words)`;
+            }
 
             // Update table
             this.updateDocumentsTable(status.documents);

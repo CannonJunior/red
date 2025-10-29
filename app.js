@@ -1878,8 +1878,13 @@ class App {
 // Integration Functions (Placeholders for future implementation)
 class IntegrationManager {
     constructor() {
-        this.apiEndpoint = 'http://localhost:9090/api';
-        this.wsEndpoint = 'ws://localhost:9090/ws';
+        // Use dynamic URLs based on current window location for distributed deployment
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const port = window.location.port || '9090';
+
+        this.apiEndpoint = `${protocol}//${hostname}:${port}/api`;
+        this.wsEndpoint = `${protocol === 'https:' ? 'wss:' : 'ws:'}//${hostname}:${port}/ws`;
         this.socket = null;
     }
 

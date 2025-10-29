@@ -10,7 +10,12 @@
 
 class MCPAgentManager {
     constructor() {
-        this.baseUrl = 'http://localhost:9090';
+        // Use dynamic URLs based on current window location for distributed deployment
+        const protocol = window.location.protocol;
+        const hostname = window.location.hostname;
+        const port = window.location.port || '9090';
+
+        this.baseUrl = `${protocol}//${hostname}:${port}`;
         this.ws = null;
         this.agents = new Map();
         this.mcpServers = new Map();
@@ -72,7 +77,11 @@ class MCPAgentManager {
 
         try {
             // Check if WebSocket monitoring is available
-            const wsUrl = `ws://localhost:9090/ws/monitoring`;
+            // Use dynamic WebSocket URL based on current window location
+            const protocol = window.location.protocol === 'https:' ? 'wss:' : 'ws:';
+            const hostname = window.location.hostname;
+            const port = window.location.port || '9090';
+            const wsUrl = `${protocol}//${hostname}:${port}/ws/monitoring`;
 
             this.ws = new WebSocket(wsUrl);
 
