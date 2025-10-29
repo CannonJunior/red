@@ -92,9 +92,29 @@ class DocumentProcessor:
         """Process plain text files."""
         with open(file_path, 'r', encoding='utf-8') as f:
             content = f.read()
-        
+
+        # Check if content is empty
+        if not content or not content.strip():
+            return {
+                "status": "error",
+                "error": "Text file is empty or contains only whitespace",
+                "file_path": str(file_path),
+                "file_type": "text",
+                "chunks": []
+            }
+
         chunks = self._chunk_text(content)
-        
+
+        # Check if chunking produced any results
+        if not chunks:
+            return {
+                "status": "error",
+                "error": "Text file processing produced no usable chunks",
+                "file_path": str(file_path),
+                "file_type": "text",
+                "chunks": []
+            }
+
         return {
             "status": "success",
             "file_path": str(file_path),
@@ -119,8 +139,28 @@ class DocumentProcessor:
             # Extract text content using export_to_markdown()
             content = result.document.export_to_markdown()
 
+            # Check if content is empty
+            if not content or not content.strip():
+                return {
+                    "status": "error",
+                    "error": "PDF contains no extractable text content",
+                    "file_path": str(file_path),
+                    "file_type": "pdf",
+                    "chunks": []
+                }
+
             # Create chunks
             chunks = self._chunk_text(content)
+
+            # Check if chunking produced any results
+            if not chunks:
+                return {
+                    "status": "error",
+                    "error": "PDF processing produced no usable chunks",
+                    "file_path": str(file_path),
+                    "file_type": "pdf",
+                    "chunks": []
+                }
 
             return {
                 "status": "success",
@@ -359,13 +399,16 @@ class DocumentProcessor:
             # Try to break at sentence boundaries
             if end < len(text):
                 # Look for sentence endings
-                sentence_ends = [text.rfind('.', start, end), 
-                               text.rfind('!', start, end), 
+                sentence_ends = [text.rfind('.', start, end),
+                               text.rfind('!', start, end),
                                text.rfind('?', start, end)]
-                sentence_end = max([pos for pos in sentence_ends if pos > start + self.chunk_size // 2])
-                
-                if sentence_end > 0:
-                    end = sentence_end + 1
+                valid_sentence_ends = [pos for pos in sentence_ends if pos > start + self.chunk_size // 2]
+
+                # Only use sentence boundary if we found one
+                if valid_sentence_ends:
+                    sentence_end = max(valid_sentence_ends)
+                    if sentence_end > 0:
+                        end = sentence_end + 1
             
             chunk = text[start:end].strip()
             if chunk:

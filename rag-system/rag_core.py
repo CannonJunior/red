@@ -293,13 +293,22 @@ Answer based solely on the provided context:"""
             
             if result['success']:
                 response_content = result['data']['message']['content']
+
+                # Extract token usage from Ollama response
+                prompt_tokens = result['data'].get('prompt_eval_count', 0)
+                completion_tokens = result['data'].get('eval_count', 0)
+                total_tokens = prompt_tokens + completion_tokens
+
                 return {
                     "query": query,
                     "response": response_content,
                     "model_used": self.default_model,
                     "context_docs_count": len(context_docs),
                     "status": "success",
-                    "connection_attempt": result['attempt']
+                    "connection_attempt": result['attempt'],
+                    "prompt_tokens": prompt_tokens,
+                    "completion_tokens": completion_tokens,
+                    "total_tokens": total_tokens
                 }
             else:
                 logger.error(f"Robust Ollama request failed: {result['error']}")
@@ -323,32 +332,35 @@ Answer based solely on the provided context:"""
     def query_rag(self, query: str, n_results: int = 5, workspace: str = 'default') -> Dict[str, Any]:
         """
         Complete RAG pipeline: search + generate (Agent-accessible via MCP).
-        
+
         Args:
             query: User question
             n_results: Number of documents to retrieve for context
             workspace: Workspace/Knowledge Base identifier
-            
+
         Returns:
-            Complete RAG response with sources
+            Complete RAG response with sources and token usage
         """
         # Step 1: Semantic search
         search_results = self.search_similar(query, n_results, workspace)
-        
+
         # Step 2: Extract context documents
         context_docs = [result["document"] for result in search_results["results"]]
-        
+
         # Step 3: Generate response with context
         generation_result = self.generate_response(query, context_docs)
-        
-        # Step 4: Combine results
+
+        # Step 4: Combine results with token usage
         return {
             "query": query,
             "answer": generation_result["response"],
             "sources": search_results["results"],
             "model_used": generation_result.get("model_used", self.default_model),
             "retrieval_count": len(context_docs),
-            "status": generation_result["status"]
+            "status": generation_result["status"],
+            "prompt_tokens": generation_result.get("prompt_tokens", 0),
+            "completion_tokens": generation_result.get("completion_tokens", 0),
+            "total_tokens": generation_result.get("total_tokens", 0)
         }
     
     def _emit_event(self, event_type: str, payload: Dict[str, Any]):

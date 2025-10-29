@@ -211,13 +211,17 @@ class ChatInterface {
         if (!message || this.isLoading) return;
 
         console.log('Sending message:', message);
-        
+
+        // Capture start time
+        const startTime = Date.now();
+        const startTimeFormatted = new Date(startTime).toLocaleTimeString();
+
         // Add message to history before sending
         this.addToHistory(message);
-        
+
         // Display user message
         this.displayMessage('user', message);
-        
+
         // Clear input and reset history navigation
         if (this.messageInput) {
             this.messageInput.value = '';
@@ -229,7 +233,7 @@ class ChatInterface {
         // Set loading state
         this.isLoading = true;
         this.updateSendButtonState();
-        
+
         // Show typing indicator
         const typingId = this.showTypingIndicator();
 
@@ -270,7 +274,18 @@ class ChatInterface {
 
             const data = await response.json();
             console.log('Parsed response data:', data);
-            
+
+            // Capture end time and calculate elapsed
+            const endTime = Date.now();
+            const endTimeFormatted = new Date(endTime).toLocaleTimeString();
+            const elapsedMs = endTime - startTime;
+            const elapsedSeconds = Math.floor(elapsedMs / 1000);
+            const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+            const remainingSeconds = elapsedSeconds % 60;
+            const elapsedFormatted = elapsedMinutes > 0 ?
+                `${elapsedMinutes}m ${remainingSeconds}s` :
+                `${remainingSeconds}s`;
+
             // Remove typing indicator
             this.removeTypingIndicator(typingId);
 
@@ -281,9 +296,24 @@ class ChatInterface {
                     sources_used: data.sources_used,
                     sources_used_type: typeof data.sources_used
                 });
-                
-                // Display AI response with RAG information
-                this.displayMessage('assistant', data.response, data.model, data.rag_enabled, data.sources_used);
+
+                // Prepare metadata
+                const metadata = {
+                    model: data.model,
+                    knowledgeBase: knowledgeMode === 'none' ? 'None' :
+                                   knowledgeMode === 'rag' ? 'RAG' : 'CAG',
+                    ragEnabled: data.rag_enabled,
+                    sourcesUsed: data.sources_used || 0,
+                    startTime: startTimeFormatted,
+                    endTime: endTimeFormatted,
+                    elapsed: elapsedFormatted,
+                    tokensUsed: data.tokens_used,
+                    promptTokens: data.prompt_tokens,
+                    completionTokens: data.completion_tokens
+                };
+
+                // Display AI response with complete metadata
+                this.displayMessage('assistant', data.response, metadata);
             } else {
                 // Display error
                 this.displayMessage('error', data.error || 'An error occurred');
@@ -316,14 +346,14 @@ class ChatInterface {
         }
     }
 
-    displayMessage(type, content, model = null, ragEnabled = false, sourcesUsed = 0) {
+    displayMessage(type, content, metadata = null) {
         if (!this.messagesContainer) return;
 
         const messageDiv = document.createElement('div');
         messageDiv.className = 'message animate-fade-in';
-        
+
         let messageHtml = '';
-        
+
         if (type === 'user') {
             messageHtml = `
                 <div class="flex justify-end mb-4">
@@ -333,22 +363,88 @@ class ChatInterface {
                 </div>
             `;
         } else if (type === 'assistant') {
-            const ragIndicator = ragEnabled ? 
+            // Build RAG/CAG indicator
+            const knowledgeIndicator = metadata?.ragEnabled && metadata?.knowledgeBase !== 'None' ?
                 `<div class="flex items-center text-xs text-blue-600 dark:text-blue-400 mb-2">
                     <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
                     </svg>
-                    RAG Enhanced${sourcesUsed > 0 ? ` • ${sourcesUsed} sources` : ''}
+                    ${metadata.knowledgeBase} Enhanced${metadata.sourcesUsed > 0 ? ` • ${metadata.sourcesUsed} sources` : ''}
                 </div>` : '';
-                
+
+            // Build metadata footer
+            let metadataHtml = '';
+            if (metadata) {
+                const metadataParts = [];
+
+                // Knowledge base used
+                metadataParts.push(`<span class="inline-flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M5 8h14M5 8a2 2 0 110-4h14a2 2 0 110 4M5 8v10a2 2 0 002 2h10a2 2 0 002-2V8m-9 4h4"/>
+                    </svg>
+                    KB: ${metadata.knowledgeBase}
+                </span>`);
+
+                // Model used
+                if (metadata.model) {
+                    metadataParts.push(`<span class="inline-flex items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"/>
+                        </svg>
+                        ${metadata.model}
+                    </span>`);
+                }
+
+                // Timing information
+                metadataParts.push(`<span class="inline-flex items-center">
+                    <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"/>
+                    </svg>
+                    ${metadata.elapsed}
+                </span>`);
+
+                // Token usage (if available)
+                if (metadata.tokensUsed) {
+                    metadataParts.push(`<span class="inline-flex items-center">
+                        <svg class="w-3 h-3 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 20l4-16m2 16l4-16M6 9h14M4 15h14"/>
+                        </svg>
+                        ${metadata.tokensUsed.toLocaleString()} tokens
+                    </span>`);
+                }
+
+                // Detailed timing (collapsible)
+                const timingDetails = `
+                    <details class="mt-2 text-xs">
+                        <summary class="cursor-pointer opacity-60 hover:opacity-100">Detailed Timing</summary>
+                        <div class="mt-1 pl-4 space-y-1 opacity-70">
+                            <div>• Prompt entered: ${metadata.startTime}</div>
+                            <div>• Response returned: ${metadata.endTime}</div>
+                            <div>• Elapsed: ${metadata.elapsed}</div>
+                            ${metadata.promptTokens ? `<div>• Prompt tokens: ${metadata.promptTokens.toLocaleString()}</div>` : ''}
+                            ${metadata.completionTokens ? `<div>• Completion tokens: ${metadata.completionTokens.toLocaleString()}</div>` : ''}
+                        </div>
+                    </details>
+                `;
+
+                metadataHtml = `
+                    <div class="mt-3 pt-3 border-t border-gray-200 dark:border-gray-700">
+                        <div class="flex flex-wrap gap-x-4 gap-y-1 text-xs opacity-70">
+                            ${metadataParts.join('')}
+                        </div>
+                        ${timingDetails}
+                    </div>
+                `;
+            }
+
             messageHtml = `
                 <div class="flex justify-start mb-4">
                     <div class="flex space-x-3 max-w-2xl">
                         <img src="robobrain.svg" alt="AI" class="w-8 h-8 rounded-full flex-shrink-0 mt-1 opacity-80">
                         <div class="message-assistant px-4 py-3">
-                            ${ragIndicator}
+                            ${knowledgeIndicator}
                             <p class="text-sm whitespace-pre-wrap leading-relaxed">${this.escapeHtml(content)}</p>
-                            ${model ? `<p class="text-xs opacity-70 mt-2">Model: ${model}</p>` : ''}
+                            ${metadataHtml}
                         </div>
                     </div>
                 </div>

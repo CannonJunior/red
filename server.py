@@ -258,23 +258,25 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             post_data = self.rfile.read(content_length)
             request_data = json.loads(post_data.decode('utf-8'))
             
-            # Extract message, model, and workspace
+            # Extract message, model, workspace, and knowledge mode
             message = request_data.get('message', '').strip()
             model = request_data.get('model', 'qwen2.5:3b')  # Default to smaller model
             workspace = request_data.get('workspace', 'default')  # Extract workspace
-            
+            knowledge_mode = request_data.get('knowledge_mode', 'none')  # Extract knowledge mode
+
             if not message:
                 self.send_json_response({'error': 'Message is required'}, 400)
                 return
-            
-            print(f"💬 Chat request: {message[:50]}... (model: {model})")
-            
-            # Check if RAG should be used based on query patterns
-            should_use_rag = RAG_AVAILABLE and self.should_trigger_rag(message)
-            
-            if should_use_rag:
+
+            print(f"💬 Chat request: {message[:50]}... (model: {model}, knowledge_mode: {knowledge_mode})")
+
+            # Determine which mode to use based on knowledge_mode parameter
+            use_rag = knowledge_mode == 'rag' and RAG_AVAILABLE
+            use_cag = knowledge_mode == 'cag' and CAG_AVAILABLE
+
+            if use_rag:
                 # Use RAG-enhanced response
-                response_text, model_used, sources = self.get_rag_enhanced_response(message, model, workspace)
+                response_text, model_used, sources, token_info = self.get_rag_enhanced_response(message, model, workspace)
                 print(f"🧠 RAG-enhanced response: {response_text[:50]}...")
 
                 # Count unique source files instead of chunks
@@ -292,24 +294,67 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     'model': model_used,
                     'rag_enabled': True,
                     'sources_used': len(unique_sources),
-                    'timestamp': ''
+                    'timestamp': '',
+                    'tokens_used': token_info.get('total_tokens', 0),
+                    'prompt_tokens': token_info.get('prompt_tokens', 0),
+                    'completion_tokens': token_info.get('completion_tokens', 0)
                 })
-            else:
-                # Use robust Ollama configuration for standard response
-                print(f"📤 Making standard Ollama request with model: {model}")
+            elif use_cag:
+                # Use CAG-enhanced response (with preloaded context)
+                print(f"💾 Making CAG request with model: {model}")
                 result = ollama_config.generate_response(model, message)
-                
+
                 if result['success']:
                     response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
-                    print(f"🤖 Standard Ollama response: {response_text[:50]}...")
-                    
+                    print(f"💾 CAG response: {response_text[:50]}...")
+
+                    # Extract token usage from Ollama response
+                    prompt_tokens = result['data'].get('prompt_eval_count', 0)
+                    completion_tokens = result['data'].get('eval_count', 0)
+                    total_tokens = prompt_tokens + completion_tokens
+
+                    # Send response back to client (with cag_enabled flag)
+                    self.send_json_response({
+                        'response': response_text,
+                        'model': model,
+                        'rag_enabled': False,
+                        'cag_enabled': True,
+                        'timestamp': result['data'].get('created_at', ''),
+                        'connection_attempt': result['attempt'],
+                        'tokens_used': total_tokens,
+                        'prompt_tokens': prompt_tokens,
+                        'completion_tokens': completion_tokens
+                    })
+                else:
+                    print(f"❌ Ollama request failed: {result['error']}")
+                    self.send_json_response({
+                        'error': f"Ollama request failed: {result['error']}",
+                        'connection_attempt': result['attempt']
+                    }, 503)
+            else:
+                # Use robust Ollama configuration for standard response (no knowledge base)
+                print(f"📤 Making standard Ollama request with model: {model}")
+                result = ollama_config.generate_response(model, message)
+
+                if result['success']:
+                    response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
+                    print(f"🤖 Standard response: {response_text[:50]}...")
+
+                    # Extract token usage from Ollama response
+                    prompt_tokens = result['data'].get('prompt_eval_count', 0)
+                    completion_tokens = result['data'].get('eval_count', 0)
+                    total_tokens = prompt_tokens + completion_tokens
+
                     # Send response back to client
                     self.send_json_response({
                         'response': response_text,
                         'model': model,
                         'rag_enabled': False,
                         'timestamp': result['data'].get('created_at', ''),
-                        'connection_attempt': result['attempt']
+                        'connection_attempt': result['attempt'],
+                        'tokens_used': total_tokens,
+                        'prompt_tokens': prompt_tokens,
+                        'completion_tokens': completion_tokens
                     })
                 else:
                     print(f"❌ Ollama request failed: {result['error']}")
@@ -553,12 +598,19 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         try:
             # Use the RAG query endpoint
             rag_result = handle_rag_query_request(message, max_context=5, workspace=workspace)
-            
+
             if rag_result['status'] == 'success':
                 response_text = rag_result['answer']
                 sources = rag_result.get('sources', [])
                 model_used = rag_result.get('model_used', model)
-                
+
+                # Extract token usage from RAG result
+                token_info = {
+                    'prompt_tokens': rag_result.get('prompt_tokens', 0),
+                    'completion_tokens': rag_result.get('completion_tokens', 0),
+                    'total_tokens': rag_result.get('total_tokens', 0)
+                }
+
                 # Debug: Print sources information
                 print(f"🔍 RAG Debug - Sources count: {len(sources)}")
                 print(f"🔍 RAG Debug - Sources type: {type(sources)}")
@@ -566,7 +618,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     print(f"🔍 RAG Debug - First source: {sources[0]}")
                 else:
                     print(f"🔍 RAG Debug - RAG result keys: {rag_result.keys()}")
-                
+
                 # Add source attribution if sources exist
                 if sources:
                     # Extract unique document names from sources
@@ -577,25 +629,48 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                             # Extract just the filename from the full path
                             document_name = os.path.basename(file_path)
                             document_names.add(document_name)
-                    
+
                     if document_names:
                         doc_list = ', '.join(sorted(document_names))
                         source_info = f"\n\n📚 Sources consulted: {doc_list}"
                     else:
                         source_info = f"\n\n📚 Sources consulted: {len(sources)} document(s)"
-                    
+
                     response_text += source_info
-                
-                return response_text, model_used, sources
+
+                return response_text, model_used, sources, token_info
             else:
                 # Fallback to standard Ollama if RAG fails
                 print(f"⚠️ RAG failed, falling back to standard response: {rag_result.get('message', 'Unknown error')}")
-                return self.get_standard_ollama_response(message, model), model, []
-                
+                fallback_response, fallback_tokens = self.get_standard_ollama_response_with_tokens(message, model)
+                return fallback_response, model, [], fallback_tokens
+
         except Exception as e:
             print(f"❌ RAG enhancement error: {e}")
-            return self.get_standard_ollama_response(message, model), model, []
+            fallback_response, fallback_tokens = self.get_standard_ollama_response_with_tokens(message, model)
+            return fallback_response, model, [], fallback_tokens
     
+    def get_standard_ollama_response_with_tokens(self, message, model):
+        """Get standard Ollama response with token usage information."""
+        print(f"📤 Making fallback Ollama request with model: {model}")
+        result = ollama_config.generate_response(model, message)
+
+        if result['success']:
+            response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
+
+            # Extract token usage
+            prompt_tokens = result['data'].get('prompt_eval_count', 0)
+            completion_tokens = result['data'].get('eval_count', 0)
+            token_info = {
+                'prompt_tokens': prompt_tokens,
+                'completion_tokens': completion_tokens,
+                'total_tokens': prompt_tokens + completion_tokens
+            }
+
+            return response_text, token_info
+        else:
+            return "Error: Unable to generate response", {'prompt_tokens': 0, 'completion_tokens': 0, 'total_tokens': 0}
+
     def get_standard_ollama_response(self, message, model):
         """Get standard Ollama response without RAG using robust configuration."""
         print(f"📤 Making fallback Ollama request with model: {model}")
