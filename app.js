@@ -671,6 +671,7 @@ class Navigation {
         document.getElementById('visualizations-area')?.classList.add('hidden');
         document.getElementById('mcp-area')?.classList.add('hidden');
         document.getElementById('agents-area')?.classList.add('hidden');
+        document.getElementById('prompts-area')?.classList.add('hidden');
 
         // Show the selected area
         const pageTitle = document.getElementById('page-title');
@@ -686,6 +687,15 @@ class Navigation {
                 pageTitle.textContent = 'Models';
                 this.currentPage = 'models';
                 this.loadModelsPage();
+                break;
+            case 'prompts':
+                document.getElementById('prompts-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Prompts';
+                this.currentPage = 'prompts';
+                // Reload prompts when navigating to the page
+                if (window.promptsManager) {
+                    window.promptsManager.loadPrompts();
+                }
                 break;
             case 'visualizations':
                 document.getElementById('visualizations-area')?.classList.remove('hidden');

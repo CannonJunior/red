@@ -76,6 +76,20 @@ except ImportError as e:
     SEARCH_AVAILABLE = False
     print(f"⚠️  Search system not available: {e}")
 
+# Import Prompts functionality
+try:
+    from prompts_api import (
+        handle_prompts_list_request, handle_prompts_create_request,
+        handle_prompts_get_request, handle_prompts_update_request,
+        handle_prompts_delete_request, handle_prompts_use_request,
+        handle_prompts_search_request
+    )
+    PROMPTS_AVAILABLE = True
+    print("✅ Prompts system loaded successfully")
+except ImportError as e:
+    PROMPTS_AVAILABLE = False
+    print(f"⚠️  Prompts system not available: {e}")
+
 
 class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     """Custom handler to serve static files with proper MIME types."""
@@ -130,6 +144,13 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     return
                 elif self.path == '/api/nlp/capabilities' and AGENT_SYSTEM_AVAILABLE:
                     self.handle_nlp_capabilities_api()
+                    return
+                # Prompts API endpoints
+                elif self.path == '/api/prompts' and PROMPTS_AVAILABLE:
+                    self.handle_prompts_list_api()
+                    return
+                elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
+                    self.handle_prompts_detail_api()
                     return
                 else:
                     self.send_error(404, f"API endpoint not found: {self.path}")
@@ -224,6 +245,15 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_search_create_folder_api()
             elif self.path == '/api/search/objects' and SEARCH_AVAILABLE:
                 self.handle_search_add_object_api()
+            # Prompts API endpoints
+            elif self.path == '/api/prompts' and PROMPTS_AVAILABLE:
+                self.handle_prompts_create_api()
+            elif self.path == '/api/prompts/use' and PROMPTS_AVAILABLE:
+                self.handle_prompts_use_api()
+            elif self.path == '/api/prompts/search' and PROMPTS_AVAILABLE:
+                self.handle_prompts_search_api()
+            elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
+                self.handle_prompts_update_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
                 
@@ -243,6 +273,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract document ID from path
                 document_id = self.path.split('/')[-1]
                 self.handle_cag_document_delete_api(document_id)
+            elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
+                # Extract prompt ID from path
+                prompt_id = self.path.split('/')[-1]
+                self.handle_prompts_delete_api(prompt_id)
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
                 
@@ -1813,6 +1847,187 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         except Exception as e:
             print(f"❌ MCP metrics API error: {e}")
             self.send_json_response({'error': f'MCP metrics failed: {str(e)}'}, 500)
+
+    # ========== Prompts API Handlers ==========
+
+    def handle_prompts_list_api(self):
+        """Handle GET /api/prompts - List all prompts."""
+        try:
+            if not PROMPTS_AVAILABLE:
+                self.send_json_response({
+                    'status': 'error',
+                    'message': 'Prompts system not available'
+                }, 503)
+                return
+
+            # Parse query parameters
+            query_params = {}
+            # For now, just list all prompts
+            result = handle_prompts_list_request(query_params)
+
+            print(f"📋 Prompts list: {result.get('count', 0)} prompts")
+            self.send_json_response(result)
+
+        except Exception as e:
+            print(f"❌ Prompts list API error: {e}")
+            self.send_json_response({'error': f'Prompts list failed: {str(e)}'}, 500)
+
+    def handle_prompts_create_api(self):
+        """Handle POST /api/prompts - Create new prompt."""
+        try:
+            if not PROMPTS_AVAILABLE:
+                self.send_json_response({
+                    'status': 'error',
+                    'message': 'Prompts system not available'
+                }, 503)
+                return
+
+            # Read request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+
+            result = handle_prompts_create_request(request_data)
+
+            if result.get('status') == 'success':
+                print(f"✅ Created prompt: {request_data.get('name', 'Unknown')}")
+                self.send_json_response(result, 201)
+            else:
+                print(f"❌ Failed to create prompt: {result.get('message', 'Unknown error')}")
+                self.send_json_response(result, 400)
+
+        except Exception as e:
+            print(f"❌ Prompts create API error: {e}")
+            self.send_json_response({'error': f'Prompts create failed: {str(e)}'}, 500)
+
+    def handle_prompts_detail_api(self):
+        """Handle GET /api/prompts/{prompt_id} - Get prompt by ID."""
+        try:
+            if not PROMPTS_AVAILABLE:
+                self.send_json_response({
+                    'status': 'error',
+                    'message': 'Prompts system not available'
+                }, 503)
+                return
+
+            # Extract prompt ID from path
+            prompt_id = self.path.split('/')[-1]
+
+            result = handle_prompts_get_request(prompt_id)
+
+            if result.get('status') == 'success':
+                self.send_json_response(result)
+            else:
+                self.send_json_response(result, 404)
+
+        except Exception as e:
+            print(f"❌ Prompts detail API error: {e}")
+            self.send_json_response({'error': f'Prompts detail failed: {str(e)}'}, 500)
+
+    def handle_prompts_update_api(self):
+        """Handle PUT/POST /api/prompts/{prompt_id} - Update prompt."""
+        try:
+            if not PROMPTS_AVAILABLE:
+                self.send_json_response({
+                    'status': 'error',
+                    'message': 'Prompts system not available'
+                }, 503)
+                return
+
+            # Extract prompt ID from path
+            prompt_id = self.path.split('/')[-1]
+
+            # Read request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+
+            result = handle_prompts_update_request(prompt_id, request_data)
+
+            if result.get('status') == 'success':
+                print(f"✅ Updated prompt: {prompt_id}")
+                self.send_json_response(result)
+            else:
+                print(f"❌ Failed to update prompt: {result.get('message', 'Unknown error')}")
+                self.send_json_response(result, 400)
+
+        except Exception as e:
+            print(f"❌ Prompts update API error: {e}")
+            self.send_json_response({'error': f'Prompts update failed: {str(e)}'}, 500)
+
+    def handle_prompts_delete_api(self, prompt_id):
+        """Handle DELETE /api/prompts/{prompt_id} - Delete prompt."""
+        try:
+            if not PROMPTS_AVAILABLE:
+                self.send_json_response({
+                    'status': 'error',
+                    'message': 'Prompts system not available'
+                }, 503)
+                return
+
+            result = handle_prompts_delete_request(prompt_id)
+
+            if result.get('status') == 'success':
+                print(f"🗑️  Deleted prompt: {prompt_id}")
+                self.send_json_response(result)
+            else:
+                self.send_json_response(result, 404)
+
+        except Exception as e:
+            print(f"❌ Prompts delete API error: {e}")
+            self.send_json_response({'error': f'Prompts delete failed: {str(e)}'}, 500)
+
+    def handle_prompts_use_api(self):
+        """Handle POST /api/prompts/use - Use a prompt (get content)."""
+        try:
+            if not PROMPTS_AVAILABLE:
+                self.send_json_response({
+                    'status': 'error',
+                    'message': 'Prompts system not available'
+                }, 503)
+                return
+
+            # Read request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+
+            result = handle_prompts_use_request(request_data)
+
+            if result.get('status') == 'success':
+                self.send_json_response(result)
+            else:
+                self.send_json_response(result, 404)
+
+        except Exception as e:
+            print(f"❌ Prompts use API error: {e}")
+            self.send_json_response({'error': f'Prompts use failed: {str(e)}'}, 500)
+
+    def handle_prompts_search_api(self):
+        """Handle POST /api/prompts/search - Search prompts."""
+        try:
+            if not PROMPTS_AVAILABLE:
+                self.send_json_response({
+                    'status': 'error',
+                    'message': 'Prompts system not available'
+                }, 503)
+                return
+
+            # Read request body
+            content_length = int(self.headers.get('Content-Length', 0))
+            post_data = self.rfile.read(content_length)
+            request_data = json.loads(post_data.decode('utf-8'))
+
+            result = handle_prompts_search_request(request_data)
+
+            print(f"🔍 Prompts search: {result.get('count', 0)} results")
+            self.send_json_response(result)
+
+        except Exception as e:
+            print(f"❌ Prompts search API error: {e}")
+            self.send_json_response({'error': f'Prompts search failed: {str(e)}'}, 500)
+
+    # ========== End Prompts API Handlers ==========
 
 
 def main():
