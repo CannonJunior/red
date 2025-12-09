@@ -801,6 +801,14 @@ class MCPAgentManager {
 
         document.body.appendChild(modal);
 
+        // Prevent clicks on modal content from closing the modal
+        const modalContent = modal.querySelector('div.bg-white');
+        if (modalContent) {
+            modalContent.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
         // Handle form submission
         const form = modal.querySelector('#create-agent-form');
         form.addEventListener('submit', async (e) => {
@@ -811,21 +819,35 @@ class MCPAgentManager {
 
             try {
                 await this.createAgent({ name, description, capabilities });
-                document.body.removeChild(modal);
+                if (modal && modal.parentNode) {
+                    modal.parentNode.removeChild(modal);
+                }
             } catch (error) {
                 console.error('Failed to create agent:', error);
             }
         });
 
         // Handle cancel
-        modal.querySelector('#cancel-agent').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
+        const cancelButton = modal.querySelector('#cancel-agent');
+        if (cancelButton) {
+            cancelButton.addEventListener('click', (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+                console.log('Cancel agent button clicked');
+                if (modal && modal.parentNode) {
+                    modal.parentNode.removeChild(modal);
+                }
+            });
+        } else {
+            console.error('Cancel agent button not found in modal');
+        }
 
         // Close on background click
         modal.addEventListener('click', (e) => {
             if (e.target === modal) {
-                document.body.removeChild(modal);
+                if (modal && modal.parentNode) {
+                    modal.parentNode.removeChild(modal);
+                }
             }
         });
     }
@@ -839,6 +861,21 @@ class MCPAgentManager {
                 <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Add MCP Server</h3>
                 <form id="add-mcp-server-form">
                     <div class="space-y-6">
+                        <!-- Project MCP Tools Dropdown -->
+                        <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
+                            <h4 class="text-md font-medium text-gray-900 dark:text-white mb-3">Quick Start</h4>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Project MCP Tools</label>
+                                <select id="project-mcp-tool-selector"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                                    <option value="">-- Select a project tool or configure manually --</option>
+                                </select>
+                                <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                                    Select a pre-configured project tool to auto-populate fields below
+                                </p>
+                            </div>
+                        </div>
+
                         <!-- Basic Configuration -->
                         <div class="border-b border-gray-200 dark:border-gray-700 pb-4">
                             <h4 class="text-md font-medium text-gray-900 dark:text-white mb-3">Basic Configuration</h4>
@@ -1021,14 +1058,17 @@ class MCPAgentManager {
                     </div>
 
                     <div class="flex gap-3 mt-8 pt-4 border-t border-gray-200 dark:border-gray-700">
-                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
-                            Add MCP Server
+                        <button type="button" id="back-button" class="bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors flex items-center">
+                            <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 19l-7-7m0 0l7-7m-7 7h18"></path>
+                            </svg>
+                            Back
                         </button>
                         <button type="button" id="test-connection" class="bg-green-600 text-white py-2 px-4 rounded-md hover:bg-green-700 transition-colors">
                             Test Connection
                         </button>
-                        <button type="button" id="cancel-server" class="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors">
-                            Cancel
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                            Add MCP Server
                         </button>
                     </div>
                 </form>
@@ -1036,6 +1076,17 @@ class MCPAgentManager {
         `;
 
         document.body.appendChild(modal);
+
+        // Prevent clicks on modal content from closing the modal
+        const modalContent = modal.querySelector('div.bg-white, div.bg-gray-800');
+        if (modalContent) {
+            modalContent.addEventListener('click', function(e) {
+                e.stopPropagation();
+            });
+        }
+
+        // Load and populate project MCP tools
+        await this.loadProjectMCPTools(modal);
 
         // Setup dynamic form behavior
         this.setupMCPFormHandlers(modal);
@@ -1056,7 +1107,9 @@ class MCPAgentManager {
         });
 
         // Handle test connection
-        modal.querySelector('#test-connection').addEventListener('click', async () => {
+        modal.querySelector('#test-connection').addEventListener('click', async (e) => {
+            e.preventDefault();
+            e.stopPropagation();
             try {
                 const serverConfig = this.collectMCPServerConfig(modal);
                 await this.testMCPConnection(serverConfig);
@@ -1067,17 +1120,111 @@ class MCPAgentManager {
             }
         });
 
-        // Handle cancel
-        modal.querySelector('#cancel-server').addEventListener('click', () => {
-            document.body.removeChild(modal);
-        });
+        // Handle back button
+        const backButton = modal.querySelector('#back-button');
+        if (backButton) {
+            backButton.addEventListener('click', function() {
+                console.log('Back button clicked - closing modal');
+                try {
+                    if (modal && document.body.contains(modal)) {
+                        document.body.removeChild(modal);
+                    }
+                } catch (error) {
+                    console.error('Error removing modal:', error);
+                }
+            });
+        }
 
         // Close on background click
-        modal.addEventListener('click', (e) => {
+        modal.addEventListener('click', function(e) {
             if (e.target === modal) {
-                document.body.removeChild(modal);
+                console.log('Background clicked - closing modal');
+                try {
+                    if (modal && document.body.contains(modal)) {
+                        document.body.removeChild(modal);
+                    }
+                } catch (error) {
+                    console.error('Error removing modal on background click:', error);
+                }
             }
         });
+    }
+
+    async loadProjectMCPTools(modal) {
+        try {
+            // Fetch project MCP tools configuration
+            const response = await fetch(`${this.baseUrl}/mcp-tools/project_tools_config.json`);
+            if (!response.ok) {
+                console.log('No project MCP tools configuration found');
+                return;
+            }
+
+            const config = await response.json();
+            const projectTools = config.project_mcp_tools || [];
+
+            if (projectTools.length === 0) {
+                console.log('No project MCP tools defined');
+                return;
+            }
+
+            // Populate dropdown
+            const selector = modal.querySelector('#project-mcp-tool-selector');
+            projectTools.forEach(tool => {
+                const option = document.createElement('option');
+                option.value = tool.id;
+                option.textContent = `${tool.name} - ${tool.description}`;
+                option.dataset.toolConfig = JSON.stringify(tool);
+                selector.appendChild(option);
+            });
+
+            // Add change event handler
+            selector.addEventListener('change', (e) => {
+                if (!e.target.value) return;
+
+                const toolConfig = JSON.parse(e.target.selectedOptions[0].dataset.toolConfig);
+                this.populateFormFromProjectTool(modal, toolConfig);
+            });
+
+            console.log(`✅ Loaded ${projectTools.length} project MCP tools`);
+
+        } catch (error) {
+            console.error('Failed to load project MCP tools:', error);
+        }
+    }
+
+    populateFormFromProjectTool(modal, toolConfig) {
+        // Populate basic configuration
+        modal.querySelector('#server-name').value = toolConfig.name;
+        modal.querySelector('#transport-type').value = toolConfig.transport;
+        modal.querySelector('#server-description').value = toolConfig.description || '';
+
+        // Trigger transport type change to show correct config section
+        modal.querySelector('#transport-type').dispatchEvent(new Event('change'));
+
+        // Populate transport-specific configuration
+        if (toolConfig.transport === 'stdio') {
+            modal.querySelector('#stdio-command').value = toolConfig.command;
+            modal.querySelector('#stdio-args').value = (toolConfig.args || []).join(' ');
+            modal.querySelector('#stdio-cwd').value = toolConfig.cwd || '';
+
+            // Populate environment variables if present
+            if (toolConfig.environment && Object.keys(toolConfig.environment).length > 0) {
+                modal.querySelector('#enable-env-vars').checked = true;
+                modal.querySelector('#enable-env-vars').dispatchEvent(new Event('change'));
+                modal.querySelector('#env-vars').value = JSON.stringify(toolConfig.environment, null, 2);
+            }
+        } else if (toolConfig.url) {
+            modal.querySelector('#remote-url').value = toolConfig.url;
+            modal.querySelector('#remote-timeout').value = toolConfig.timeout || 30;
+        }
+
+        // Populate advanced options
+        modal.querySelector('#install-scope').value = toolConfig.scope || 'local';
+        modal.querySelector('#max-tokens').value = toolConfig.maxTokens || 10000;
+        modal.querySelector('#auto-start').checked = toolConfig.autoStart || false;
+        modal.querySelector('#enable-debug').checked = toolConfig.debug || false;
+
+        console.log(`✅ Populated form with ${toolConfig.name} configuration`);
     }
 
     setupMCPFormHandlers(modal) {
@@ -1278,18 +1425,51 @@ class MCPAgentManager {
     async testMCPConnection(config) {
         // Test connection based on transport type
         if (config.transport === 'stdio') {
-            // For stdio, we can test if the command exists
-            throw new Error('Connection testing for stdio transport not yet implemented');
+            // For stdio, validate the configuration
+            if (!config.command) {
+                throw new Error('Command is required for stdio transport');
+            }
+
+            // Basic validation - check if command looks valid
+            const command = config.command.trim();
+            if (command.length === 0) {
+                throw new Error('Invalid command: cannot be empty');
+            }
+
+            // For stdio, we can't easily test without spawning a process
+            // So we just validate the configuration is complete
+            console.log(`✓ Stdio configuration validated: ${command} ${(config.args || []).join(' ')}`);
+            return {
+                status: 'validated',
+                message: `Configuration validated for stdio transport (${command})`
+            };
         } else {
             // For remote transports, test the URL
-            const response = await fetch(config.url, {
-                method: 'HEAD',
-                headers: this.buildAuthHeaders(config.auth),
-                signal: AbortSignal.timeout(config.timeout * 1000)
-            });
+            try {
+                const controller = new AbortController();
+                const timeoutId = setTimeout(() => controller.abort(), config.timeout * 1000);
 
-            if (!response.ok) {
-                throw new Error(`Server responded with status: ${response.status}`);
+                const response = await fetch(config.url, {
+                    method: 'HEAD',
+                    headers: this.buildAuthHeaders(config.auth),
+                    signal: controller.signal
+                });
+
+                clearTimeout(timeoutId);
+
+                if (!response.ok) {
+                    throw new Error(`Server responded with status: ${response.status}`);
+                }
+
+                return {
+                    status: 'success',
+                    message: `Successfully connected to ${config.url}`
+                };
+            } catch (error) {
+                if (error.name === 'AbortError') {
+                    throw new Error(`Connection timeout after ${config.timeout} seconds`);
+                }
+                throw error;
             }
         }
     }

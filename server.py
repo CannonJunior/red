@@ -291,15 +291,22 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             content_length = int(self.headers.get('Content-Length', 0))
             post_data = self.rfile.read(content_length)
             request_data = json.loads(post_data.decode('utf-8'))
-            
+
             # Extract message, model, workspace, and knowledge mode
             message = request_data.get('message', '').strip()
             model = request_data.get('model', 'qwen2.5:3b')  # Default to smaller model
             workspace = request_data.get('workspace', 'default')  # Extract workspace
             knowledge_mode = request_data.get('knowledge_mode', 'none')  # Extract knowledge mode
+            mcp_tool_call = request_data.get('mcp_tool_call')  # Check for MCP tool call
 
             if not message:
                 self.send_json_response({'error': 'Message is required'}, 400)
+                return
+
+            # Handle MCP tool calls
+            if mcp_tool_call:
+                print(f"🔧 MCP Tool call: {mcp_tool_call.get('tool_name', 'unknown')}")
+                self.handle_mcp_tool_call(mcp_tool_call, model)
                 return
 
             print(f"💬 Chat request: {message[:50]}... (model: {model}, knowledge_mode: {knowledge_mode})")
@@ -400,11 +407,123 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         except json.JSONDecodeError as e:
             print(f"❌ JSON decode error: {e}")
             self.send_json_response({'error': 'Invalid JSON in request'}, 400)
-            
+
         except Exception as e:
             print(f"❌ Chat API error: {e}")
             self.send_json_response({'error': f'Chat API error: {str(e)}'}, 500)
-    
+
+    def handle_mcp_tool_call(self, mcp_tool_call, model):
+        """Handle MCP tool execution requests."""
+        try:
+            import asyncio
+            import sys
+            from pathlib import Path
+
+            # Add mcp-tools to path
+            mcp_tools_path = os.path.join(os.path.dirname(__file__), 'mcp-tools')
+            if mcp_tools_path not in sys.path:
+                sys.path.insert(0, mcp_tools_path)
+
+            tool_id = mcp_tool_call.get('tool_id', '')
+            tool_name = mcp_tool_call.get('tool_name', '')
+            inputs = mcp_tool_call.get('inputs', {})
+
+            print(f"🔧 Executing MCP tool: {tool_name} ({tool_id})")
+            print(f"   Inputs: {inputs}")
+
+            # Handle whitepaper-review tool
+            if tool_id == 'whitepaper-review':
+                # Get input parameters
+                rubric_path = inputs.get('rubric_path', '')
+                content_path = inputs.get('content_path', '')
+                review_model = inputs.get('model', model)
+                timeout_seconds = inputs.get('timeout_seconds', '30')
+
+                if not rubric_path or not content_path:
+                    self.send_json_response({
+                        'error': 'Missing required parameters: rubric_path and content_path are required'
+                    }, 400)
+                    return
+
+                # Verify files exist
+                if not Path(rubric_path).exists():
+                    self.send_json_response({
+                        'error': f'Rubric file not found: {rubric_path}'
+                    }, 400)
+                    return
+
+                if not Path(content_path).exists():
+                    self.send_json_response({
+                        'error': f'Content file not found: {content_path}'
+                    }, 400)
+                    return
+
+                try:
+                    # Import and execute the whitepaper review tool
+                    from whitepaper_review_server import WhitePaperReviewServer
+
+                    # Create async function to execute the tool
+                    async def execute_review():
+                        server = WhitePaperReviewServer(
+                            ollama_url=os.getenv('OLLAMA_URL', 'http://localhost:11434'),
+                            default_model=review_model,
+                            default_timeout=int(timeout_seconds)
+                        )
+
+                        # Call the review method directly (not through MCP)
+                        result = await server._perform_review(
+                            rubric=await server._load_document_or_directory(rubric_path),
+                            content=await server._load_document_or_directory(content_path),
+                            model=review_model,
+                            timeout=int(timeout_seconds)
+                        )
+
+                        # Format the output
+                        formatted_result = server._format_output(
+                            result,
+                            'markdown',
+                            rubric_path,
+                            content_path
+                        )
+
+                        return formatted_result
+
+                    # Run the async function
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        response_text = loop.run_until_complete(execute_review())
+                        print(f"✅ MCP tool completed successfully")
+
+                        self.send_json_response({
+                            'response': response_text,
+                            'model': review_model,
+                            'mcp_tool': tool_name,
+                            'status': 'success'
+                        })
+                    finally:
+                        loop.close()
+
+                except ImportError as e:
+                    print(f"❌ Failed to import MCP tool: {e}")
+                    self.send_json_response({
+                        'error': f'Failed to import MCP tool: {str(e)}. Make sure required packages are installed (uv add mcp python-docx PyPDF2).'
+                    }, 500)
+
+            else:
+                # Unknown MCP tool
+                self.send_json_response({
+                    'error': f'Unknown MCP tool: {tool_id}'
+                }, 400)
+
+        except Exception as e:
+            print(f"❌ MCP tool error: {e}")
+            import traceback
+            traceback.print_exc()
+            self.send_json_response({
+                'error': f'MCP tool error: {str(e)}'
+            }, 500)
+
     def handle_models_api(self):
         """Handle models API requests to get available Ollama models."""
         try:

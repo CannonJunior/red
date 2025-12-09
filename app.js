@@ -192,8 +192,9 @@ class ChatInterface {
         });
 
         // Input changes
-        this.messageInput?.addEventListener('input', () => {
+        this.messageInput?.addEventListener('input', (e) => {
             this.updateSendButtonState();
+            this.handleMCPToolAutocomplete(e);
         });
     }
 
@@ -620,6 +621,373 @@ class ChatInterface {
     resetHistoryNavigation() {
         this.historyIndex = -1;
         this.currentDraft = '';
+    }
+
+    // MCP Tool Autocomplete and Quick Reference
+    async handleMCPToolAutocomplete(event) {
+        const input = this.messageInput.value;
+        const cursorPos = this.messageInput.selectionStart;
+
+        // Find the last # character before cursor
+        const textBeforeCursor = input.substring(0, cursorPos);
+        const hashIndex = textBeforeCursor.lastIndexOf('#');
+
+        if (hashIndex === -1) {
+            this.hideMCPAutocomplete();
+            return;
+        }
+
+        // Get the text after # up to cursor
+        const searchTerm = textBeforeCursor.substring(hashIndex + 1);
+
+        // Only show autocomplete if # is at start of word (after space or at start)
+        const beforeHash = hashIndex > 0 ? textBeforeCursor[hashIndex - 1] : ' ';
+        if (beforeHash !== ' ' && beforeHash !== '\n' && hashIndex !== 0) {
+            this.hideMCPAutocomplete();
+            return;
+        }
+
+        // Show autocomplete with filtered MCP tools
+        await this.showMCPAutocomplete(searchTerm, hashIndex);
+    }
+
+    async showMCPAutocomplete(searchTerm, hashIndex) {
+        try {
+            // Load MCP tools if not already loaded
+            if (!this.mcpTools) {
+                const response = await fetch('/mcp-tools/project_tools_config.json');
+                if (response.ok) {
+                    const config = await response.json();
+                    this.mcpTools = config.project_mcp_tools || [];
+                } else {
+                    this.mcpTools = [];
+                }
+            }
+
+            // Filter tools based on search term
+            const filteredTools = this.mcpTools.filter(tool =>
+                tool.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                tool.id.toLowerCase().includes(searchTerm.toLowerCase())
+            );
+
+            if (filteredTools.length === 0) {
+                this.hideMCPAutocomplete();
+                return;
+            }
+
+            // Create or update autocomplete dropdown
+            let dropdown = document.getElementById('mcp-autocomplete');
+            if (!dropdown) {
+                dropdown = document.createElement('div');
+                dropdown.id = 'mcp-autocomplete';
+                dropdown.className = 'absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto z-20';
+                this.messageInput.parentElement.insertBefore(dropdown, this.messageInput);
+            }
+
+            // Populate dropdown
+            dropdown.innerHTML = `
+                <div class="p-2 border-b border-gray-200 dark:border-gray-700">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
+                        MCP Tools (${filteredTools.length})
+                    </div>
+                </div>
+                <div class="py-1">
+                    ${filteredTools.map(tool => `
+                        <button type="button"
+                                class="mcp-autocomplete-item w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-start"
+                                data-tool-id="${tool.id}"
+                                data-tool-config='${JSON.stringify(tool)}'>
+                            <svg class="w-5 h-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                            </svg>
+                            <div class="flex-1">
+                                <div class="text-sm font-medium text-gray-900 dark:text-white">#${tool.id}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">${tool.description}</div>
+                            </div>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+
+            // Add click handlers
+            dropdown.querySelectorAll('.mcp-autocomplete-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const toolConfig = JSON.parse(item.dataset.toolConfig);
+                    this.selectMCPTool(toolConfig, hashIndex);
+                });
+            });
+
+            dropdown.style.display = 'block';
+
+        } catch (error) {
+            console.error('Failed to show MCP autocomplete:', error);
+            this.hideMCPAutocomplete();
+        }
+    }
+
+    hideMCPAutocomplete() {
+        const dropdown = document.getElementById('mcp-autocomplete');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+    }
+
+    async selectMCPTool(toolConfig, hashIndex) {
+        // Hide autocomplete
+        this.hideMCPAutocomplete();
+
+        // Replace #search with #tool-id in the input
+        const input = this.messageInput.value;
+        const beforeHash = input.substring(0, hashIndex);
+        const afterCursor = input.substring(this.messageInput.selectionStart);
+        this.messageInput.value = `${beforeHash}#${toolConfig.id}${afterCursor}`;
+
+        // Position cursor after the tool reference
+        const newCursorPos = hashIndex + toolConfig.id.length + 1;
+        this.messageInput.setSelectionRange(newCursorPos, newCursorPos);
+
+        // Start sequential input collection
+        await this.collectMCPToolInputs(toolConfig);
+    }
+
+    async collectMCPToolInputs(toolConfig) {
+        console.log('Starting MCP tool input collection for:', toolConfig.name);
+
+        // Create input collection modal
+        const modal = this.createMCPInputModal(toolConfig);
+        document.body.appendChild(modal);
+
+        // Setup form handlers
+        this.setupMCPInputForm(modal, toolConfig);
+    }
+
+    createMCPInputModal(toolConfig) {
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.id = 'mcp-input-modal';
+
+        const requiredInputs = toolConfig.required_inputs || [];
+        const optionalInputs = toolConfig.optional_inputs || [];
+
+        modal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-2xl mx-4 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-2">${toolConfig.name}</h3>
+                <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">${toolConfig.description}</p>
+
+                <form id="mcp-input-form">
+                    <div class="space-y-4">
+                        ${requiredInputs.map((input, idx) => this.createInputField(input, idx, true)).join('')}
+
+                        ${optionalInputs.length > 0 ? `
+                            <div class="border-t border-gray-200 dark:border-gray-700 pt-4 mt-4">
+                                <h4 class="text-md font-medium text-gray-900 dark:text-white mb-3">Optional Parameters</h4>
+                                ${optionalInputs.map((input, idx) => this.createInputField(input, idx + requiredInputs.length, false)).join('')}
+                            </div>
+                        ` : ''}
+                    </div>
+
+                    <div class="flex gap-3 mt-6 pt-4 border-t border-gray-200 dark:border-gray-700">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700 transition-colors">
+                            Run ${toolConfig.name}
+                        </button>
+                        <button type="button" id="mcp-input-cancel" class="bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500 transition-colors">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+
+        return modal;
+    }
+
+    createInputField(input, idx, required) {
+        const fieldId = `mcp-input-${idx}`;
+
+        if (input.type === 'file') {
+            return `
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        ${input.label} ${required ? '*' : '(optional)'}
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${input.description}</p>
+                    <div class="flex gap-2">
+                        <input type="file"
+                               id="${fieldId}"
+                               accept="${input.accept || '*'}"
+                               ${required ? 'required' : ''}
+                               class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm">
+                        <button type="button"
+                                class="px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500 text-sm"
+                                onclick="document.getElementById('${fieldId}').click()">
+                            Browse
+                        </button>
+                    </div>
+                </div>
+            `;
+        } else if (input.type === 'select') {
+            return `
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        ${input.label} ${required ? '*' : '(optional)'}
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${input.description}</p>
+                    <select id="${fieldId}"
+                            ${required ? 'required' : ''}
+                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                        ${(input.options || []).map(opt => `
+                            <option value="${opt.value}" ${opt.value === input.default ? 'selected' : ''}>
+                                ${opt.label}
+                            </option>
+                        `).join('')}
+                    </select>
+                </div>
+            `;
+        } else if (input.type === 'number') {
+            return `
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        ${input.label} ${required ? '*' : '(optional)'}
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${input.description}</p>
+                    <input type="number"
+                           id="${fieldId}"
+                           min="${input.min || 0}"
+                           max="${input.max || 9999}"
+                           value="${input.default || ''}"
+                           ${required ? 'required' : ''}
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                </div>
+            `;
+        } else {
+            return `
+                <div>
+                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                        ${input.label} ${required ? '*' : '(optional)'}
+                    </label>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${input.description}</p>
+                    <input type="text"
+                           id="${fieldId}"
+                           placeholder="${input.placeholder || ''}"
+                           ${required ? 'required' : ''}
+                           class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                </div>
+            `;
+        }
+    }
+
+    setupMCPInputForm(modal, toolConfig) {
+        const form = modal.querySelector('#mcp-input-form');
+        const cancelBtn = modal.querySelector('#mcp-input-cancel');
+
+        cancelBtn.addEventListener('click', () => {
+            document.body.removeChild(modal);
+        });
+
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            // Collect form data
+            const formData = {};
+            const requiredInputs = toolConfig.required_inputs || [];
+            const optionalInputs = toolConfig.optional_inputs || [];
+            const allInputs = [...requiredInputs, ...optionalInputs];
+
+            allInputs.forEach((input, idx) => {
+                const fieldId = `mcp-input-${idx}`;
+                const field = document.getElementById(fieldId);
+
+                if (field) {
+                    if (input.type === 'file') {
+                        formData[input.name] = field.files[0] ? field.files[0].name : null;
+                    } else {
+                        formData[input.name] = field.value;
+                    }
+                }
+            });
+
+            console.log('MCP Tool inputs collected:', formData);
+
+            // Close modal
+            document.body.removeChild(modal);
+
+            // Execute MCP tool with collected inputs
+            await this.executeMCPTool(toolConfig, formData);
+        });
+    }
+
+    async executeMCPTool(toolConfig, inputs) {
+        console.log('Executing MCP Tool:', toolConfig.name, 'with inputs:', inputs);
+
+        // Format the MCP tool call as a structured message
+        const toolCallMessage = `#${toolConfig.id}\n\n${Object.entries(inputs)
+            .filter(([k, v]) => v)  // Only include non-empty values
+            .map(([k, v]) => `${k}: ${v}`)
+            .join('\n')}`;
+
+        // Display user's tool request in chat
+        this.displayMessage('user', `🔧 ${toolConfig.name}\n\n${Object.entries(inputs)
+            .filter(([k, v]) => v)
+            .map(([k, v]) => `• ${k}: ${v}`)
+            .join('\n')}`);
+
+        // Set loading state
+        this.isLoading = true;
+        this.updateSendButtonState();
+
+        // Show typing indicator
+        const typingId = this.showTypingIndicator();
+
+        try {
+            // Prepare request to execute MCP tool
+            const requestBody = {
+                message: toolCallMessage,
+                model: this.currentModel,
+                workspace: window.app.knowledgeManager?.currentKnowledgeBase || 'default',
+                mcp_tool_call: {
+                    tool_id: toolConfig.id,
+                    tool_name: toolConfig.name,
+                    inputs: inputs
+                }
+            };
+
+            console.log('Sending MCP tool request:', requestBody);
+
+            // Send to chat API (backend should handle MCP tool calls)
+            const response = await fetch('/api/chat', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                },
+                body: JSON.stringify(requestBody)
+            });
+
+            if (!response.ok) {
+                throw new Error(`HTTP error! status: ${response.status}`);
+            }
+
+            const data = await response.json();
+            console.log('MCP tool response:', data);
+
+            // Remove typing indicator
+            this.removeTypingIndicator(typingId);
+
+            // Display the response
+            if (data.error) {
+                this.displayMessage('error', `❌ Error: ${data.error}`);
+            } else {
+                this.displayMessage('assistant', data.response || 'MCP tool executed successfully');
+            }
+
+        } catch (error) {
+            console.error('MCP tool execution error:', error);
+            this.removeTypingIndicator(typingId);
+            this.displayMessage('error', `❌ Failed to execute MCP tool: ${error.message}`);
+        } finally {
+            // Reset loading state
+            this.isLoading = false;
+            this.updateSendButtonState();
+        }
     }
 
     // Method to change chat sessions (for future multi-chat support)

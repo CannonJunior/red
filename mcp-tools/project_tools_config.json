@@ -1,0 +1,68 @@
+{
+  "project_mcp_tools": [
+    {
+      "id": "whitepaper-review",
+      "name": "White Paper Review",
+      "description": "Editorial review of user-supplied content with customizable grading rubrics",
+      "transport": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "mcp-tools/whitepaper_review_server.py"
+      ],
+      "cwd": "/home/junior/src/red",
+      "environment": {
+        "OLLAMA_URL": "http://localhost:11434",
+        "DEFAULT_MODEL": "qwen2.5:3b",
+        "DEFAULT_TIMEOUT": "120"
+      },
+      "required_inputs": [
+        {
+          "name": "rubric_path",
+          "label": "Grading Rubric",
+          "type": "file",
+          "accept": ".txt,.doc,.docx,.pdf",
+          "description": "Grading rubric for LLM to use for evaluating the content"
+        },
+        {
+          "name": "content_path",
+          "label": "Content for Review",
+          "type": "file",
+          "accept": ".txt,.doc,.docx,.pdf",
+          "description": "The content to be reviewed"
+        }
+      ],
+      "optional_inputs": [
+        {
+          "name": "model",
+          "label": "LLM Model",
+          "type": "select",
+          "options": [
+            {"value": "qwen2.5:3b", "label": "Qwen 2.5 3B (Fast)"},
+            {"value": "qwen2.5:7b", "label": "Qwen 2.5 7B (Balanced)"},
+            {"value": "llama3.1:8b", "label": "Llama 3.1 8B (Quality)"}
+          ],
+          "default": "qwen2.5:3b",
+          "description": "LLM model to use for evaluation"
+        },
+        {
+          "name": "timeout_seconds",
+          "label": "Response Time (seconds)",
+          "type": "number",
+          "min": 30,
+          "max": 300,
+          "default": 120,
+          "description": "Maximum response time in seconds (120s recommended for large documents)"
+        }
+      ],
+      "tools": [
+        "review_whitepaper",
+        "batch_review"
+      ],
+      "scope": "local",
+      "autoStart": false,
+      "debug": false,
+      "maxTokens": 10000
+    }
+  ]
+}
