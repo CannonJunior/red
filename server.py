@@ -16,6 +16,15 @@ import mimetypes
 from pathlib import Path
 from datetime import datetime
 
+# Import server decorators
+from server_decorators import require_system
+
+# Import debug logger
+from debug_logger import debug_log, info_log, error_log, success_log, warning_log
+
+# Import static cache
+from static_cache import get_static_cache
+
 # Import Ollama configuration
 from ollama_config import ollama_config
 
@@ -44,8 +53,6 @@ except ImportError as e:
 
 # Import Agent system functionality
 try:
-    import sys
-    import os
     # Add current directory to Python path for agent-system imports
     sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
 
@@ -164,7 +171,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             file_path = self.path.lstrip('/')
             full_path = os.path.join(os.getcwd(), file_path)
             
-            print(f"Request: {self.path} -> {file_path}")
+            debug_log(f"Request: {self.path} -> {file_path}")
             
             # Check if file exists
             if not os.path.exists(full_path) or not os.path.isfile(full_path):
@@ -173,16 +180,27 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             
             # Determine content type
             content_type = self.get_content_type(file_path)
-            
-            # Read and serve file
-            with open(full_path, 'rb') as f:
-                content = f.read()
-            
+
+            # Try to get from cache first
+            static_cache = get_static_cache()
+            content, etag = static_cache.get(full_path)
+
+            if content is None:
+                # Cache miss - read from disk
+                with open(full_path, 'rb') as f:
+                    content = f.read()
+                # Store in cache
+                etag = static_cache.set(full_path, content)
+                debug_log(f"Cache MISS: {file_path}", "💾")
+            else:
+                debug_log(f"Cache HIT: {file_path}", "⚡")
+
             # Send response
             self.send_response(200)
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(content)))
-            self.send_header('Cache-Control', 'no-cache')
+            self.send_header('ETag', etag)
+            self.send_header('Cache-Control', 'public, max-age=3600')
             # Add CORS headers
             self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
@@ -192,7 +210,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             # Send content
             self.wfile.write(content)
             
-            print(f"✅ Served {file_path} as {content_type}")
+            debug_log(f"Served {file_path} as {content_type}", "✅")
             
         except Exception as e:
             print(f"❌ Error serving {self.path}: {e}")
@@ -288,9 +306,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         """Handle chat API requests with MCP-style RAG tool integration."""
         try:
             # Read request body
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
 
             # Extract message, model, workspace, and knowledge mode
             message = request_data.get('message', '').strip()
@@ -305,11 +324,11 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
 
             # Handle MCP tool calls
             if mcp_tool_call:
-                print(f"🔧 MCP Tool call: {mcp_tool_call.get('tool_name', 'unknown')}")
+                debug_log(f"MCP Tool call: {mcp_tool_call.get('tool_name', 'unknown')}", "🔧")
                 self.handle_mcp_tool_call(mcp_tool_call, model)
                 return
 
-            print(f"💬 Chat request: {message[:50]}... (model: {model}, knowledge_mode: {knowledge_mode})")
+            debug_log(f"Chat request: {message[:50]}... (model: {model}, knowledge_mode: {knowledge_mode})", "💬")
 
             # Determine which mode to use based on knowledge_mode parameter
             use_rag = knowledge_mode == 'rag' and RAG_AVAILABLE
@@ -318,7 +337,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             if use_rag:
                 # Use RAG-enhanced response
                 response_text, model_used, sources, token_info = self.get_rag_enhanced_response(message, model, workspace)
-                print(f"🧠 RAG-enhanced response: {response_text[:50]}...")
+                debug_log(f"RAG-enhanced response: {response_text[:50]}...", "🧠")
 
                 # Count unique source files instead of chunks
                 unique_sources = set()
@@ -342,12 +361,12 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 })
             elif use_cag:
                 # Use CAG-enhanced response (with preloaded context)
-                print(f"💾 Making CAG request with model: {model}")
+                debug_log(f"Making CAG request with model: {model}", "💾")
                 result = ollama_config.generate_response(model, message)
 
                 if result['success']:
                     response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
-                    print(f"💾 CAG response: {response_text[:50]}...")
+                    debug_log(f"CAG response: {response_text[:50]}...", "💾")
 
                     # Extract token usage from Ollama response
                     prompt_tokens = result['data'].get('prompt_eval_count', 0)
@@ -374,12 +393,12 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     }, 503)
             else:
                 # Use robust Ollama configuration for standard response (no knowledge base)
-                print(f"📤 Making standard Ollama request with model: {model}")
+                debug_log(f"Making standard Ollama request with model: {model}", "📤")
                 result = ollama_config.generate_response(model, message)
 
                 if result['success']:
                     response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
-                    print(f"🤖 Standard response: {response_text[:50]}...")
+                    debug_log(f"Standard response: {response_text[:50]}...", "🤖")
 
                     # Extract token usage from Ollama response
                     prompt_tokens = result['data'].get('prompt_eval_count', 0)
@@ -416,7 +435,8 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
         """Handle MCP tool execution requests."""
         try:
             import asyncio
-            import sys
+            import base64
+            import tempfile
             from pathlib import Path
 
             # Add mcp-tools to path
@@ -428,8 +448,51 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             tool_name = mcp_tool_call.get('tool_name', '')
             inputs = mcp_tool_call.get('inputs', {})
 
-            print(f"🔧 Executing MCP tool: {tool_name} ({tool_id})")
-            print(f"   Inputs: {inputs}")
+            # Process file uploads: convert base64 content to temp files
+            temp_files = []  # Track temporary files for cleanup
+            processed_inputs = {}
+
+            for key, value in inputs.items():
+                if isinstance(value, dict) and 'filename' in value and 'content' in value:
+                    # This is a file upload - save to temp file
+                    try:
+                        file_content = base64.b64decode(value['content'])
+                        suffix = Path(value['filename']).suffix
+
+                        # Create temp file with original extension
+                        temp_file = tempfile.NamedTemporaryFile(
+                            mode='wb',
+                            suffix=suffix,
+                            delete=False
+                        )
+                        temp_file.write(file_content)
+                        temp_file.close()
+
+                        temp_files.append(temp_file.name)
+                        processed_inputs[key] = temp_file.name
+
+                        debug_log(f"Saved uploaded file {value['filename']} to {temp_file.name}", "📁")
+                    except Exception as e:
+                        error_log(f"Failed to process uploaded file: {e}")
+                        # Cleanup any temp files created so far
+                        for temp_path in temp_files:
+                            try:
+                                os.unlink(temp_path)
+                            except:
+                                pass
+                        self.send_json_response({
+                            'error': f'Failed to process uploaded file: {str(e)}'
+                        }, 400)
+                        return
+                else:
+                    # Regular string value
+                    processed_inputs[key] = value
+
+            # Use processed inputs (with temp file paths) instead of raw inputs
+            inputs = processed_inputs
+
+            debug_log(f"Executing MCP tool: {tool_name} ({tool_id})", "🔧")
+            debug_log(f"   Inputs: {inputs}")
 
             # Handle whitepaper-review tool
             if tool_id == 'whitepaper-review':
@@ -512,7 +575,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     asyncio.set_event_loop(loop)
                     try:
                         response_text = loop.run_until_complete(execute_review())
-                        print(f"✅ MCP tool completed successfully")
+                        debug_log(f"MCP tool completed successfully", "✅")
 
                         self.send_json_response({
                             'response': response_text,
@@ -540,10 +603,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 timeout_seconds = inputs.get('timeout_seconds', '180') or '180'
                 preserve_formatting = inputs.get('preserve_formatting', True)
 
-                print(f"📄 PowerPoint Tool - Received inputs:")
-                print(f"   template_path: {template_path}")
-                print(f"   documents_folder: {documents_folder}")
-                print(f"   output_path: {output_path}")
+                debug_log(f"PowerPoint Tool - Received inputs:", "📄")
+                debug_log(f"   template_path: {template_path}")
+                debug_log(f"   documents_folder: {documents_folder}")
+                debug_log(f"   output_path: {output_path}")
 
                 if not template_path or not documents_folder:
                     print(f"❌ Missing parameters - template: {bool(template_path)}, folder: {bool(documents_folder)}")
@@ -582,18 +645,18 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                         import json
 
                         # Validate template
-                        print(f"📄 Validating template: {template_path}")
+                        debug_log(f"Validating template: {template_path}", "📄")
                         validation = await server._validate_template(template_path)
-                        print(f"✅ Template valid: {validation['slide_count']} slides, {validation['placeholder_count']} placeholders")
+                        debug_log(f"Template valid: {validation['slide_count']} slides, {validation['placeholder_count']} placeholders", "✅")
 
                         # Load template
                         from pptx import Presentation
                         presentation = Presentation(template_path)
 
                         # Extract placeholders
-                        print(f"🔍 Extracting placeholders with style: {placeholder_style}")
+                        debug_log(f"Extracting placeholders with style: {placeholder_style}", "🔍")
                         placeholders = server._extract_placeholders(presentation, placeholder_style)
-                        print(f"📋 Found {len(placeholders)} unique placeholders")
+                        debug_log(f"Found {len(placeholders)} unique placeholders", "📋")
 
                         if not placeholders:
                             return json.dumps({
@@ -602,10 +665,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                             })
 
                         # Load documents
-                        print(f"📂 Loading documents from: {documents_folder}")
+                        debug_log(f"Loading documents from: {documents_folder}", "📂")
                         docs = await server.document_loader.load(documents_folder, recursive=False)
                         combined_docs = server.document_loader.combine_documents(docs, strategy="sections")
-                        print(f"✅ Loaded {len(docs)} document(s)")
+                        debug_log(f"Loaded {len(docs)} document(s)", "✅")
 
                         if not combined_docs:
                             return json.dumps({
@@ -614,7 +677,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                             })
 
                         # Extract data using LLM
-                        print(f"🤖 Extracting data using strategy: {extraction_strategy}")
+                        debug_log(f"Extracting data using strategy: {extraction_strategy}", "🤖")
                         extracted_data = await server._extract_data(
                             documents=combined_docs,
                             placeholders=list(placeholders.keys()),
@@ -622,23 +685,23 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                             model=ppt_model,
                             timeout=int(timeout_seconds)
                         )
-                        print(f"✅ Extracted {len(extracted_data)} values")
+                        debug_log(f"Extracted {len(extracted_data)} values", "✅")
 
                         # Fill placeholders
-                        print(f"✏️  Filling placeholders in template")
+                        debug_log(f"Filling placeholders in template", "✏️")
                         filled_count = server._fill_placeholders(
                             presentation=presentation,
                             placeholders=placeholders,
                             extracted_data=extracted_data,
                             preserve_formatting=preserve_formatting
                         )
-                        print(f"✅ Filled {filled_count} placeholder(s)")
+                        debug_log(f"Filled {filled_count} placeholder(s)", "✅")
 
                         # Save output
                         output_full_path = Path(server.config.output_dir) / output_path
                         output_full_path.parent.mkdir(parents=True, exist_ok=True)
                         presentation.save(str(output_full_path))
-                        print(f"💾 Saved to: {output_full_path}")
+                        debug_log(f"Saved to: {output_full_path}", "💾")
 
                         # Return result
                         return json.dumps({
@@ -656,7 +719,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     asyncio.set_event_loop(loop)
                     try:
                         response_text = loop.run_until_complete(execute_fill())
-                        print(f"✅ MCP tool completed successfully")
+                        debug_log(f"MCP tool completed successfully", "✅")
 
                         # Parse the JSON response to display nicely
                         result = json.loads(response_text)
@@ -709,17 +772,26 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             self.send_json_response({
                 'error': f'MCP tool error: {str(e)}'
             }, 500)
+        finally:
+            # Clean up temporary files
+            for temp_path in temp_files:
+                try:
+                    if os.path.exists(temp_path):
+                        os.unlink(temp_path)
+                        debug_log(f"Cleaned up temp file: {temp_path}", "🗑️")
+                except Exception as cleanup_error:
+                    error_log(f"Failed to clean up temp file {temp_path}: {cleanup_error}")
 
     def handle_models_api(self):
         """Handle models API requests to get available Ollama models."""
         try:
             # Use robust Ollama configuration to get models
-            print("📋 Requesting available Ollama models...")
+            debug_log("Requesting available Ollama models...", "📋")
             result = ollama_config.get_available_models()
             
             if result['success']:
                 models = [model['name'] for model in result['data'].get('models', [])]
-                print(f"📋 Available models: {models}")
+                debug_log(f"Available models: {models}", "📋")
                 
                 self.send_json_response({
                     'models': models,
@@ -743,7 +815,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle RAG status API requests."""
         try:
             status_result = handle_rag_status_request()
-            print(f"🔍 RAG status: {status_result.get('status', 'unknown')}")
+            debug_log(f"RAG status: {status_result.get('status', 'unknown')}", "🔍")
             self.send_json_response(status_result)
         except Exception as e:
             print(f"❌ RAG status API error: {e}")
@@ -752,10 +824,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_rag_search_api(self):
         """Handle RAG search API requests."""
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
-            
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+
             query = request_data.get('query', '').strip()
             max_results = request_data.get('max_results', 5)
             
@@ -764,7 +837,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                 return
             
             search_result = handle_rag_search_request(query, max_results)
-            print(f"🔍 RAG search: '{query}' -> {search_result.get('results', []).__len__()} results")
+            debug_log(f"RAG search: '{query}' -> {search_result.get('results', []).__len__()} results", "🔍")
             self.send_json_response(search_result)
         except Exception as e:
             print(f"❌ RAG search API error: {e}")
@@ -773,10 +846,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_rag_query_api(self):
         """Handle RAG query API requests."""
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
-            
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+
             query = request_data.get('query', '').strip()
             max_context = request_data.get('max_context', 5)
             
@@ -785,7 +859,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                 return
             
             query_result = handle_rag_query_request(query, max_context)
-            print(f"🤖 RAG query: '{query}' -> {query_result.get('status', 'unknown')}")
+            debug_log(f"RAG query: '{query}' -> {query_result.get('status', 'unknown')}", "🤖")
             self.send_json_response(query_result)
         except Exception as e:
             print(f"❌ RAG query API error: {e}")
@@ -801,10 +875,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                 self._handle_file_upload()
             else:
                 # Handle JSON request with file path
-                content_length = int(self.headers.get('Content-Length', 0))
-                post_data = self.rfile.read(content_length)
-                request_data = json.loads(post_data.decode('utf-8'))
-                
+                request_data = self.get_request_body()
+                if request_data is None:
+                    self.send_json_response({'error': 'Invalid JSON'}, 400)
+                    return
+
                 file_path = request_data.get('file_path', '').strip()
                 
                 if not file_path:
@@ -812,7 +887,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                     return
                 
                 ingest_result = handle_rag_ingest_request(file_path)
-                print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
+                debug_log(f"RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}", "📄")
                 self.send_json_response(ingest_result)
                 
         except Exception as e:
@@ -823,8 +898,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle multipart form data file upload."""
         import cgi
         import tempfile
-        import os
-        
+
         try:
             # Parse multipart form data
             content_type = self.headers.get('Content-Type', '')
@@ -857,7 +931,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             if 'knowledge_base' in form:
                 knowledge_base = form['knowledge_base'].value
             
-            print(f"📤 File upload for workspace: {knowledge_base}")
+            debug_log(f"File upload for workspace: {knowledge_base}", "📤")
             
             # Create uploads directory if it doesn't exist
             uploads_dir = Path('uploads')
@@ -868,13 +942,13 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             with open(file_path, 'wb') as f:
                 f.write(file_item.file.read())
             
-            print(f"📤 File uploaded: {file_item.filename} -> {file_path}")
+            debug_log(f"File uploaded: {file_item.filename} -> {file_path}", "📤")
             
             # Process the uploaded file with RAG system
             try:
-                print(f"🔄 Starting RAG ingestion for: {file_path} (workspace: {knowledge_base})")
+                debug_log(f"Starting RAG ingestion for: {file_path} (workspace: {knowledge_base})", "🔄")
                 ingest_result = handle_rag_ingest_request(str(file_path), knowledge_base)
-                print(f"📄 RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}")
+                debug_log(f"RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}", "📄")
                 
                 if ingest_result.get('status') == 'error':
                     print(f"❌ RAG ingestion failed: {ingest_result.get('message', 'Unknown error')}")
@@ -891,7 +965,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             # Clean up uploaded file after processing (optional)
             try:
                 os.remove(file_path)
-                print(f"🧹 Cleaned up temporary file: {file_path}")
+                debug_log(f"Cleaned up temporary file: {file_path}", "🧹")
             except OSError as cleanup_error:
                 print(f"⚠️  Could not clean up file {file_path}: {cleanup_error}")
             
@@ -951,12 +1025,12 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                 }
 
                 # Debug: Print sources information
-                print(f"🔍 RAG Debug - Sources count: {len(sources)}")
-                print(f"🔍 RAG Debug - Sources type: {type(sources)}")
+                debug_log(f"RAG Debug - Sources count: {len(sources)}", "🔍")
+                debug_log(f"RAG Debug - Sources type: {type(sources)}", "🔍")
                 if sources:
-                    print(f"🔍 RAG Debug - First source: {sources[0]}")
+                    debug_log(f"RAG Debug - First source: {sources[0]}", "🔍")
                 else:
-                    print(f"🔍 RAG Debug - RAG result keys: {rag_result.keys()}")
+                    debug_log(f"RAG Debug - RAG result keys: {rag_result.keys()}", "🔍")
 
                 # Add source attribution if sources exist
                 if sources:
@@ -991,7 +1065,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     
     def get_standard_ollama_response_with_tokens(self, message, model):
         """Get standard Ollama response with token usage information."""
-        print(f"📤 Making fallback Ollama request with model: {model}")
+        debug_log(f"Making fallback Ollama request with model: {model}", "📤")
         result = ollama_config.generate_response(model, message)
 
         if result['success']:
@@ -1012,12 +1086,12 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     def get_standard_ollama_response(self, message, model):
         """Get standard Ollama response without RAG using robust configuration."""
-        print(f"📤 Making fallback Ollama request with model: {model}")
+        debug_log(f"Making fallback Ollama request with model: {model}", "📤")
         result = ollama_config.generate_response(model, message)
         
         if result['success']:
             response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
-            print(f"🤖 Fallback Ollama response: {response_text[:50]}...")
+            debug_log(f"Fallback Ollama response: {response_text[:50]}...", "🤖")
             return response_text
         else:
             error_msg = f"Ollama connection failed after {result['attempt']} attempts: {result['error']}"
@@ -1028,12 +1102,13 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_search_api(self):
         """Handle universal search API requests."""
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
-            
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+
             search_result = handle_search_request(request_data)
-            print(f"🔍 Search: '{request_data.get('query', '')}' -> {search_result.get('data', {}).get('total_count', 0)} results")
+            debug_log(f"Search: '{request_data.get('query', '')}' -> {search_result.get('data', {}).get('total_count', 0)} results", "🔍")
             self.send_json_response(search_result)
             
         except Exception as e:
@@ -1046,16 +1121,17 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             if self.command == 'GET':
                 # GET request - list folders
                 folders_result = handle_folders_request()
-                print(f"📁 Folders: {len(folders_result.get('folders', []))} folders")
+                debug_log(f"Folders: {len(folders_result.get('folders', []))} folders", "📁")
                 self.send_json_response(folders_result)
             else:
                 # POST request - create folder
-                content_length = int(self.headers.get('Content-Length', 0))
-                post_data = self.rfile.read(content_length)
-                request_data = json.loads(post_data.decode('utf-8'))
-                
+                request_data = self.get_request_body()
+                if request_data is None:
+                    self.send_json_response({'error': 'Invalid JSON'}, 400)
+                    return
+
                 create_result = handle_create_folder_request(request_data)
-                print(f"📁 Create folder: {request_data.get('name', 'Unknown')}")
+                debug_log(f"Create folder: {request_data.get('name', 'Unknown')}", "📁")
                 self.send_json_response(create_result)
             
         except Exception as e:
@@ -1065,12 +1141,13 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_search_create_folder_api(self):
         """Handle folder creation API requests."""
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
-            
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+
             create_result = handle_create_folder_request(request_data)
-            print(f"📁 Create folder: {request_data.get('name', 'Unknown')}")
+            debug_log(f"Create folder: {request_data.get('name', 'Unknown')}", "📁")
             self.send_json_response(create_result)
             
         except Exception as e:
@@ -1081,7 +1158,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle tags listing API requests."""
         try:
             tags_result = handle_tags_request()
-            print(f"🏷️  Tags: {len(tags_result.get('tags', []))} tags")
+            debug_log(f"Tags: {len(tags_result.get('tags', []))} tags", "🏷️")
             self.send_json_response(tags_result)
             
         except Exception as e:
@@ -1091,12 +1168,13 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_search_add_object_api(self):
         """Handle adding searchable objects API requests."""
         try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
-            
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+
             add_result = handle_add_object_request(request_data)
-            print(f"➕ Add object: {request_data.get('title', 'Unknown')} ({request_data.get('type', 'unknown')})")
+            debug_log(f"Add object: {request_data.get('title', 'Unknown')} ({request_data.get('type', 'unknown')})", "➕")
             self.send_json_response(add_result)
             
         except Exception as e:
@@ -1176,13 +1254,39 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             '.gif': 'image/gif',
             '.ico': 'image/x-icon',
         }
-        
+
         # Get file extension
         _, ext = os.path.splitext(file_path.lower())
-        
+
         # Return specific type or default
         return content_types.get(ext, 'text/plain')
-    
+
+    def get_request_body(self):
+        """
+        Parse JSON request body safely.
+
+        Returns:
+            dict: Parsed JSON data, or None if parsing fails, or {} if no content
+
+        Usage:
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+        """
+        try:
+            content_length = int(self.headers.get('Content-Length', 0))
+            if content_length == 0:
+                return {}
+            post_data = self.rfile.read(content_length)
+            return json.loads(post_data.decode('utf-8'))
+        except (ValueError, json.JSONDecodeError) as e:
+            debug_log(f"Failed to parse request body: {e}", "⚠️")
+            return None
+        except Exception as e:
+            debug_log(f"Unexpected error parsing request body: {e}", "❌")
+            return None
+
     def log_message(self, format, *args):
         """Override to provide cleaner logging."""
         return  # Disable default logging to reduce noise
@@ -1191,16 +1295,14 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle RAG documents listing API requests."""
         try:
             # Extract workspace parameter from request
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 0:
-                post_data = self.rfile.read(content_length)
-                request_data = json.loads(post_data.decode('utf-8'))
-                workspace = request_data.get('workspace', 'default')
-            else:
-                workspace = 'default'
-            
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+            workspace = request_data.get('workspace', 'default')
+
             documents_result = handle_rag_documents_request(workspace)
-            print(f"📋 RAG documents: {len(documents_result.get('documents', []))} documents found for workspace '{workspace}'")
+            debug_log(f"RAG documents: {len(documents_result.get('documents', []))} documents found for workspace '{workspace}'", "📋")
             self.send_json_response(documents_result)
             
         except Exception as e:
@@ -1211,7 +1313,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle RAG analytics API requests."""
         try:
             analytics_result = handle_rag_analytics_request()
-            print(f"📊 RAG analytics: {analytics_result.get('document_count', 0)} docs, {analytics_result.get('chunk_count', 0)} chunks")
+            debug_log(f"RAG analytics: {analytics_result.get('document_count', 0)} docs, {analytics_result.get('chunk_count', 0)} chunks", "📊")
             self.send_json_response(analytics_result)
             
         except Exception as e:
@@ -1223,7 +1325,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         try:
             # For now, just return success
             # This should eventually implement actual file upload and ingestion
-            print(f"📤 RAG upload request received")
+            debug_log(f"RAG upload request received", "📤")
             
             self.send_json_response({
                 'status': 'success',
@@ -1238,15 +1340,13 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle RAG document deletion API requests."""
         try:
             # Extract workspace parameter from request
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 0:
-                post_data = self.rfile.read(content_length)
-                request_data = json.loads(post_data.decode('utf-8'))
-                workspace = request_data.get('workspace', 'default')
-            else:
-                workspace = 'default'
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+            workspace = request_data.get('workspace', 'default')
 
-            print(f"🗑️ RAG delete request for document: {document_id} from workspace: {workspace}")
+            debug_log(f"RAG delete request for document: {document_id} from workspace: {workspace}", "🗑️")
 
             # Call the actual delete function from RAG API
             result = handle_rag_document_delete_request(document_id, workspace)
@@ -1271,10 +1371,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     # ========== CAG API Handlers ==========
 
+    @require_system('cag')
     def handle_cag_status_api(self):
         """Handle CAG cache status API requests."""
         try:
-            if not CAG_AVAILABLE or cag_manager is None:
+            if cag_manager is None:
                 # Calculate optimal capacity even if CAG manager failed to initialize
                 from cag_api import calculate_optimal_cag_capacity
                 optimal_capacity = calculate_optimal_cag_capacity()
@@ -1297,10 +1398,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ CAG status API error: {e}")
             self.send_json_response({'error': f'CAG status error: {str(e)}'}, 500)
 
+    @require_system('cag')
     def handle_cag_load_api(self):
         """Handle CAG document loading API requests."""
         try:
-            if not CAG_AVAILABLE or cag_manager is None:
+            if cag_manager is None:
                 self.send_json_response({'error': 'CAG system not available'}, 503)
                 return
 
@@ -1354,8 +1456,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
             else:
                 # Handle JSON request with file path
-                post_data = self.rfile.read(content_length)
-                request_data = json.loads(post_data.decode('utf-8'))
+                request_data = self.get_request_body()
+                if request_data is None:
+                    self.send_json_response({'error': 'Invalid JSON'}, 400)
+                    return
                 file_path = request_data.get('file_path')
 
                 if not file_path:
@@ -1371,10 +1475,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             traceback.print_exc()
             self.send_json_response({'error': f'CAG load failed: {str(e)}'}, 500)
 
+    @require_system('cag')
     def handle_cag_clear_api(self):
         """Handle CAG cache clear API requests."""
         try:
-            if not CAG_AVAILABLE or cag_manager is None:
+            if cag_manager is None:
                 self.send_json_response({'error': 'CAG system not available'}, 503)
                 return
 
@@ -1385,10 +1490,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ CAG clear API error: {e}")
             self.send_json_response({'error': f'CAG clear failed: {str(e)}'}, 500)
 
+    @require_system('cag')
     def handle_cag_document_delete_api(self, document_id):
         """Handle CAG document deletion API requests."""
         try:
-            if not CAG_AVAILABLE or cag_manager is None:
+            if cag_manager is None:
                 self.send_json_response({'error': 'CAG system not available'}, 503)
                 return
 
@@ -1399,16 +1505,18 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ CAG document delete API error: {e}")
             self.send_json_response({'error': f'Delete failed: {str(e)}'}, 500)
 
+    @require_system('cag')
     def handle_cag_query_api(self):
         """Handle CAG-enhanced query API requests."""
         try:
-            if not CAG_AVAILABLE or cag_manager is None:
+            if cag_manager is None:
                 self.send_json_response({'error': 'CAG system not available'}, 503)
                 return
 
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
 
             query = request_data.get('query', '')
             model = request_data.get('model', 'qwen2.5:3b')
@@ -1453,10 +1561,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     # ========== End CAG API Handlers ==========
 
+    @require_system('rag')
     def handle_knowledge_graph_api(self):
         """Handle knowledge graph visualization API requests using vector embeddings."""
         try:
-            if not RAG_AVAILABLE or not KNOWLEDGE_GRAPH_AVAILABLE:
+            if not KNOWLEDGE_GRAPH_AVAILABLE:
                 self.send_json_response({
                     'error': 'RAG system or Knowledge Graph Builder not available',
                     'entities': [],
@@ -1491,24 +1600,17 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             relationship_count = len(graph_data.get("relationships", []))
             chunk_count = chunks_result.get('total_chunks', 0)
 
-            print(f"📊 Vector-based knowledge graph: {entity_count} entities, {relationship_count} relationships from {chunk_count} vector chunks")
+            debug_log(f"Vector-based knowledge graph: {entity_count} entities, {relationship_count} relationships from {chunk_count} vector chunks", "📊")
             self.send_json_response(graph_data)
 
         except Exception as e:
             print(f"❌ Knowledge graph API error: {e}")
             self.send_json_response({'error': f'Knowledge graph failed: {str(e)}'}, 500)
 
+    @require_system('rag')
     def handle_performance_dashboard_api(self):
         """Handle performance dashboard API requests using real analytics data."""
         try:
-            if not RAG_AVAILABLE:
-                self.send_json_response({
-                    'error': 'RAG system not available',
-                    'metrics': {},
-                    'time_series': []
-                }, 503)
-                return
-
             # Get real analytics from RAG system
             analytics_result = handle_rag_analytics_request()
 
@@ -1557,24 +1659,17 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                 "data_source": "Real ChromaDB analytics"
             }
 
-            print(f"📈 Performance dashboard: {document_count} docs, {chunk_count} chunks")
+            debug_log(f"Performance dashboard: {document_count} docs, {chunk_count} chunks", "📈")
             self.send_json_response(dashboard_data)
 
         except Exception as e:
             print(f"❌ Performance dashboard API error: {e}")
             self.send_json_response({'error': f'Performance dashboard failed: {str(e)}'}, 500)
 
+    @require_system('rag')
     def handle_search_results_api(self):
         """Handle search results explorer API requests using real RAG search."""
         try:
-            if not RAG_AVAILABLE:
-                self.send_json_response({
-                    'error': 'RAG system not available',
-                    'search_results': [],
-                    'query_info': {}
-                }, 503)
-                return
-
             # Perform a real search using the RAG system
             sample_query = "knowledge documents content"
             search_result = handle_rag_search_request(sample_query, max_results=5)
@@ -1637,7 +1732,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                 "data_source": "Real RAG search"
             }
 
-            print(f"🔍 Search explorer: {len(search_results)} real results from ChromaDB")
+            debug_log(f"Search explorer: {len(search_results)} real results from ChromaDB", "🔍")
             self.send_json_response(explorer_data)
 
         except Exception as e:
@@ -1645,16 +1740,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             self.send_json_response({'error': f'Search results failed: {str(e)}'}, 500)
 
     # Agent System API Methods
+    @require_system('agent_system')
     def handle_agents_api(self):
         """Handle /api/agents endpoint."""
         try:
-            if not AGENT_SYSTEM_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Agent system not available'
-                }, 503)
-                return
-
             if self.command == 'GET':
                 # Return mock agents for now
                 agents = [
@@ -1693,9 +1782,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
             elif self.command == 'POST':
                 # Create new agent
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length).decode('utf-8')
-                agent_data = json.loads(post_data)
+                agent_data = self.get_request_body()
+                if agent_data is None:
+                    self.send_json_response({'error': 'Invalid JSON'}, 400)
+                    return
 
                 # Generate a unique agent ID
                 agent_id = f"agent_{str(uuid.uuid4())[:8]}"
@@ -1711,7 +1801,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                     'created_at': datetime.datetime.now().isoformat()
                 }
 
-                print(f"✅ Created new agent: {new_agent['name']} ({agent_id})")
+                debug_log(f"Created new agent: {new_agent['name']} ({agent_id})", "✅")
 
                 self.send_json_response({
                     'status': 'success',
@@ -1729,15 +1819,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Agents API error: {e}")
             self.send_json_response({'error': f'Agents API failed: {str(e)}'}, 500)
 
+    @require_system('agent_system')
     def handle_agents_metrics_api(self):
         """Handle /api/agents/metrics endpoint for real-time monitoring."""
         try:
-            if not AGENT_SYSTEM_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Agent system not available'
-                }, 503)
-                return
 
             # Return agent metrics for monitoring dashboard
             metrics = {
@@ -1786,15 +1871,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Agents metrics API error: {e}")
             self.send_json_response({'error': f'Agents metrics API failed: {str(e)}'}, 500)
 
+    @require_system('agent_system')
     def handle_agents_detail_api(self):
         """Handle /api/agents/{agent_id} endpoint."""
         try:
-            if not AGENT_SYSTEM_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Agent system not available'
-                }, 503)
-                return
 
             # Extract agent_id from path
             agent_id = self.path.split('/')[-1]
@@ -1828,15 +1908,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Agent detail API error: {e}")
             self.send_json_response({'error': f'Agent API failed: {str(e)}'}, 500)
 
+    @require_system('agent_system')
     def handle_mcp_servers_api(self):
         """Handle /api/mcp/servers endpoint."""
         try:
-            if not AGENT_SYSTEM_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Agent system not available'
-                }, 503)
-                return
 
             if self.command == 'GET':
                 # Return mock MCP servers
@@ -1868,9 +1943,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
             elif self.command == 'POST':
                 # Add new MCP server with comprehensive configuration
-                content_length = int(self.headers['Content-Length'])
-                post_data = self.rfile.read(content_length).decode('utf-8')
-                server_data = json.loads(post_data)
+                server_data = self.get_request_body()
+                if server_data is None:
+                    self.send_json_response({'error': 'Invalid JSON'}, 400)
+                    return
 
                 # Generate a unique server ID
                 server_id = f"server_{str(uuid.uuid4())[:8]}"
@@ -1923,7 +1999,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                     }, 400)
                     return
 
-                print(f"✅ Added new MCP server: {new_server['name']} ({server_id}) - Transport: {new_server['transport']}")
+                debug_log(f"Added new MCP server: {new_server['name']} ({server_id}) - Transport: {new_server['transport']}", "✅")
 
                 self.send_json_response({
                     'status': 'success',
@@ -1946,15 +2022,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ MCP servers API error: {e}")
             self.send_json_response({'error': f'MCP servers API failed: {str(e)}'}, 500)
 
+    @require_system('agent_system')
     def handle_mcp_server_action_api(self):
         """Handle /api/mcp/servers/{server_id}/action endpoint."""
         try:
-            if not AGENT_SYSTEM_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Agent system not available'
-                }, 503)
-                return
 
             # For now, just return success for any action
             self.send_json_response({
@@ -1966,27 +2037,14 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ MCP server action API error: {e}")
             self.send_json_response({'error': f'MCP server action failed: {str(e)}'}, 500)
 
+    @require_system('agent_system')
     def handle_nlp_parse_task_api(self):
         """Handle /api/nlp/parse-task endpoint."""
         try:
-            if not AGENT_SYSTEM_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Agent system not available'
-                }, 503)
-                return
-
             # Read request body
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length > 0:
-                post_data = self.rfile.read(content_length)
-                try:
-                    data = json.loads(post_data.decode('utf-8'))
-                except json.JSONDecodeError:
-                    self.send_json_response({'error': 'Invalid JSON'}, 400)
-                    return
-            else:
-                self.send_json_response({'error': 'No data provided'}, 400)
+            data = self.get_request_body()
+            if data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
                 return
 
             user_input = data.get('user_input', '')
@@ -2041,15 +2099,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ NLP parse task API error: {e}")
             self.send_json_response({'error': f'NLP parse task failed: {str(e)}'}, 500)
 
+    @require_system('agent_system')
     def handle_nlp_capabilities_api(self):
         """Handle /api/nlp/capabilities endpoint."""
         try:
-            if not AGENT_SYSTEM_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Agent system not available'
-                }, 503)
-                return
 
             # Return NLP capabilities
             self.send_json_response({
@@ -2094,15 +2147,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ NLP capabilities API error: {e}")
             self.send_json_response({'error': f'NLP capabilities failed: {str(e)}'}, 500)
 
+    @require_system('agent_system')
     def handle_mcp_metrics_api(self):
         """Handle /api/mcp/metrics endpoint."""
         try:
-            if not AGENT_SYSTEM_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Agent system not available'
-                }, 503)
-                return
 
             # Return MCP system metrics
             self.send_json_response({
@@ -2155,47 +2203,37 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     # ========== Prompts API Handlers ==========
 
+    @require_system('prompts')
     def handle_prompts_list_api(self):
         """Handle GET /api/prompts - List all prompts."""
         try:
-            if not PROMPTS_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Prompts system not available'
-                }, 503)
-                return
 
             # Parse query parameters
             query_params = {}
             # For now, just list all prompts
             result = handle_prompts_list_request(query_params)
 
-            print(f"📋 Prompts list: {result.get('count', 0)} prompts")
+            debug_log(f"Prompts list: {result.get('count', 0)} prompts", "📋")
             self.send_json_response(result)
 
         except Exception as e:
             print(f"❌ Prompts list API error: {e}")
             self.send_json_response({'error': f'Prompts list failed: {str(e)}'}, 500)
 
+    @require_system('prompts')
     def handle_prompts_create_api(self):
         """Handle POST /api/prompts - Create new prompt."""
         try:
-            if not PROMPTS_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Prompts system not available'
-                }, 503)
-                return
-
             # Read request body
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
 
             result = handle_prompts_create_request(request_data)
 
             if result.get('status') == 'success':
-                print(f"✅ Created prompt: {request_data.get('name', 'Unknown')}")
+                debug_log(f"Created prompt: {request_data.get('name', 'Unknown')}", "✅")
                 self.send_json_response(result, 201)
             else:
                 print(f"❌ Failed to create prompt: {result.get('message', 'Unknown error')}")
@@ -2205,15 +2243,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Prompts create API error: {e}")
             self.send_json_response({'error': f'Prompts create failed: {str(e)}'}, 500)
 
+    @require_system('prompts')
     def handle_prompts_detail_api(self):
         """Handle GET /api/prompts/{prompt_id} - Get prompt by ID."""
         try:
-            if not PROMPTS_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Prompts system not available'
-                }, 503)
-                return
 
             # Extract prompt ID from path
             prompt_id = self.path.split('/')[-1]
@@ -2229,28 +2262,24 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Prompts detail API error: {e}")
             self.send_json_response({'error': f'Prompts detail failed: {str(e)}'}, 500)
 
+    @require_system('prompts')
     def handle_prompts_update_api(self):
         """Handle PUT/POST /api/prompts/{prompt_id} - Update prompt."""
         try:
-            if not PROMPTS_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Prompts system not available'
-                }, 503)
-                return
 
             # Extract prompt ID from path
             prompt_id = self.path.split('/')[-1]
 
             # Read request body
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
 
             result = handle_prompts_update_request(prompt_id, request_data)
 
             if result.get('status') == 'success':
-                print(f"✅ Updated prompt: {prompt_id}")
+                debug_log(f"Updated prompt: {prompt_id}", "✅")
                 self.send_json_response(result)
             else:
                 print(f"❌ Failed to update prompt: {result.get('message', 'Unknown error')}")
@@ -2260,20 +2289,15 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Prompts update API error: {e}")
             self.send_json_response({'error': f'Prompts update failed: {str(e)}'}, 500)
 
+    @require_system('prompts')
     def handle_prompts_delete_api(self, prompt_id):
         """Handle DELETE /api/prompts/{prompt_id} - Delete prompt."""
         try:
-            if not PROMPTS_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Prompts system not available'
-                }, 503)
-                return
 
             result = handle_prompts_delete_request(prompt_id)
 
             if result.get('status') == 'success':
-                print(f"🗑️  Deleted prompt: {prompt_id}")
+                debug_log(f"Deleted prompt: {prompt_id}", "🗑️")
                 self.send_json_response(result)
             else:
                 self.send_json_response(result, 404)
@@ -2282,20 +2306,15 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Prompts delete API error: {e}")
             self.send_json_response({'error': f'Prompts delete failed: {str(e)}'}, 500)
 
+    @require_system('prompts')
     def handle_prompts_use_api(self):
         """Handle POST /api/prompts/use - Use a prompt (get content)."""
         try:
-            if not PROMPTS_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Prompts system not available'
-                }, 503)
-                return
-
             # Read request body
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
 
             result = handle_prompts_use_request(request_data)
 
@@ -2308,24 +2327,19 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Prompts use API error: {e}")
             self.send_json_response({'error': f'Prompts use failed: {str(e)}'}, 500)
 
+    @require_system('prompts')
     def handle_prompts_search_api(self):
         """Handle POST /api/prompts/search - Search prompts."""
         try:
-            if not PROMPTS_AVAILABLE:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': 'Prompts system not available'
-                }, 503)
-                return
-
             # Read request body
-            content_length = int(self.headers.get('Content-Length', 0))
-            post_data = self.rfile.read(content_length)
-            request_data = json.loads(post_data.decode('utf-8'))
+            request_data = self.get_request_body()
+            if request_data is None:
+                self.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
 
             result = handle_prompts_search_request(request_data)
 
-            print(f"🔍 Prompts search: {result.get('count', 0)} results")
+            debug_log(f"Prompts search: {result.get('count', 0)} results", "🔍")
             self.send_json_response(result)
 
         except Exception as e:

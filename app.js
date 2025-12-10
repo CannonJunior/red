@@ -1,3 +1,13 @@
+// Debug mode - set to true to enable verbose console logging
+// Can be controlled via localStorage: localStorage.setItem('DEBUG_MODE', 'true')
+const DEBUG_MODE = localStorage.getItem('DEBUG_MODE') === 'true';
+
+function debugLog(...args) {
+    if (DEBUG_MODE) {
+        console.log(...args);
+    }
+}
+
 // Theme management
 class ThemeManager {
     constructor() {
@@ -66,7 +76,7 @@ class ThemeManager {
         this.applyTheme();
         this.updateThemeSelectors();
         
-        console.log(`Theme changed to: ${this.theme}`);
+        debugLog(`Theme changed to: ${this.theme}`);
     }
 
     updateFavicon(isDark) {
@@ -155,12 +165,12 @@ class ChatInterface {
             
             if (response.ok) {
                 const data = await response.json();
-                console.log('Available models:', data.models);
+                debugLog('Available models:', data.models);
                 
                 // Automatically select the first available model if we don't have one
                 if (data.models && data.models.length > 0 && !this.currentModel) {
                     this.currentModel = data.models[0];
-                    console.log('Auto-selected model:', this.currentModel);
+                    debugLog('Auto-selected model:', this.currentModel);
                 }
             }
         } catch (error) {
@@ -168,7 +178,7 @@ class ChatInterface {
             // Fallback to a default model if no model is selected
             if (!this.currentModel) {
                 this.currentModel = 'qwen2.5:3b';
-                console.log('Using fallback model:', this.currentModel);
+                debugLog('Using fallback model:', this.currentModel);
             }
         }
     }
@@ -211,7 +221,7 @@ class ChatInterface {
         const message = this.messageInput?.value.trim();
         if (!message || this.isLoading) return;
 
-        console.log('Sending message:', message);
+        debugLog('Sending message:', message);
 
         // Capture start time
         const startTime = Date.now();
@@ -255,7 +265,7 @@ class ChatInterface {
                 requestBody.query = message;
             }
 
-            console.log('Sending chat request:', { endpoint: apiEndpoint, body: requestBody, mode: knowledgeMode });
+            debugLog('Sending chat request:', { endpoint: apiEndpoint, body: requestBody, mode: knowledgeMode });
 
             // Send to appropriate API
             const response = await fetch(apiEndpoint, {
@@ -266,7 +276,7 @@ class ChatInterface {
                 body: JSON.stringify(requestBody)
             });
 
-            console.log('Received response:', {
+            debugLog('Received response:', {
                 status: response.status,
                 statusText: response.statusText,
                 ok: response.ok,
@@ -274,7 +284,7 @@ class ChatInterface {
             });
 
             const data = await response.json();
-            console.log('Parsed response data:', data);
+            debugLog('Parsed response data:', data);
 
             // Capture end time and calculate elapsed
             const endTime = Date.now();
@@ -292,7 +302,7 @@ class ChatInterface {
 
             if (response.ok) {
                 // Debug RAG information
-                console.log('RAG Debug Info:', {
+                debugLog('RAG Debug Info:', {
                     rag_enabled: data.rag_enabled,
                     sources_used: data.sources_used,
                     sources_used_type: typeof data.sources_used
@@ -751,7 +761,7 @@ class ChatInterface {
     }
 
     async collectMCPToolInputs(toolConfig) {
-        console.log('Starting MCP tool input collection for:', toolConfig.name);
+        debugLog('Starting MCP tool input collection for:', toolConfig.name);
 
         // Create input collection modal
         const modal = this.createMCPInputModal(toolConfig);
@@ -823,7 +833,7 @@ class ChatInterface {
                                accept="${input.accept || '*'}"
                                ${isDirectory ? 'webkitdirectory directory' : ''}
                                style="display: none;"
-                               onchange="document.getElementById('${fieldId}').value = this.files[0]?.path || this.value">
+                               onchange="const f=this.files[0]; if(f) { document.getElementById('${fieldId}').value = f.name; document.getElementById('${fieldId}').fileObject = f; }">
                         <button type="button"
                                 class="px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500 text-sm whitespace-nowrap"
                                 onclick="document.getElementById('${fieldId}-file').click()">
@@ -831,7 +841,7 @@ class ChatInterface {
                         </button>
                     </div>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
-                        💡 Tip: Enter the full path or click Browse to select
+                        💡 Tip: Click Browse to upload ${isDirectory ? 'a directory' : 'a file'} from your computer
                     </p>
                 </div>
             `;
@@ -903,18 +913,42 @@ class ChatInterface {
             const optionalInputs = toolConfig.optional_inputs || [];
             const allInputs = [...requiredInputs, ...optionalInputs];
 
-            allInputs.forEach((input, idx) => {
+            // Helper function to read file as base64
+            const readFileAsBase64 = (file) => {
+                return new Promise((resolve, reject) => {
+                    const reader = new FileReader();
+                    reader.onload = () => resolve(reader.result.split(',')[1]); // Remove data:...;base64, prefix
+                    reader.onerror = reject;
+                    reader.readAsDataURL(file);
+                });
+            };
+
+            // Collect all form values, reading files if necessary
+            for (let idx = 0; idx < allInputs.length; idx++) {
+                const input = allInputs[idx];
                 const fieldId = `mcp-input-${idx}`;
                 const field = document.getElementById(fieldId);
 
                 if (field) {
-                    // For file and directory inputs, we now use text fields
-                    // so just get the text value
-                    formData[input.name] = field.value;
+                    // Check if this field has a File object attached
+                    if (field.fileObject) {
+                        // Read file content and send metadata
+                        const fileContent = await readFileAsBase64(field.fileObject);
+                        formData[input.name] = {
+                            filename: field.fileObject.name,
+                            content: fileContent,
+                            size: field.fileObject.size,
+                            type: field.fileObject.type,
+                            lastModified: field.fileObject.lastModified
+                        };
+                    } else {
+                        // Regular text value
+                        formData[input.name] = field.value;
+                    }
                 }
-            });
+            }
 
-            console.log('MCP Tool inputs collected:', formData);
+            debugLog('MCP Tool inputs collected:', formData);
 
             // Close modal
             document.body.removeChild(modal);
@@ -925,7 +959,7 @@ class ChatInterface {
     }
 
     async executeMCPTool(toolConfig, inputs) {
-        console.log('Executing MCP Tool:', toolConfig.name, 'with inputs:', inputs);
+        debugLog('Executing MCP Tool:', toolConfig.name, 'with inputs:', inputs);
 
         // Format the MCP tool call as a structured message
         const toolCallMessage = `#${toolConfig.id}\n\n${Object.entries(inputs)
@@ -959,7 +993,7 @@ class ChatInterface {
                 }
             };
 
-            console.log('Sending MCP tool request:', requestBody);
+            debugLog('Sending MCP tool request:', requestBody);
 
             // Send to chat API (backend should handle MCP tool calls)
             const response = await fetch('/api/chat', {
@@ -970,19 +1004,17 @@ class ChatInterface {
                 body: JSON.stringify(requestBody)
             });
 
-            if (!response.ok) {
-                throw new Error(`HTTP error! status: ${response.status}`);
-            }
-
+            // Always try to parse the response body, even for errors
             const data = await response.json();
-            console.log('MCP tool response:', data);
+            debugLog('MCP tool response:', data);
 
             // Remove typing indicator
             this.removeTypingIndicator(typingId);
 
-            // Display the response
-            if (data.error) {
-                this.displayMessage('error', `❌ Error: ${data.error}`);
+            // Display the response or error
+            if (!response.ok || data.error) {
+                const errorMsg = data.error || `HTTP error! status: ${response.status}`;
+                this.displayMessage('error', `❌ Error: ${errorMsg}`);
             } else {
                 this.displayMessage('assistant', data.response || 'MCP tool executed successfully');
             }
@@ -1137,7 +1169,7 @@ class Navigation {
                 if (window.mcpAgentManager) {
                     window.mcpAgentManager.showAddMCPServerDialog();
                 } else {
-                    console.log('MCP Agent Manager not available');
+                    debugLog('MCP Agent Manager not available');
                 }
             });
         }
@@ -1151,7 +1183,7 @@ class Navigation {
                 if (window.mcpAgentManager) {
                     window.mcpAgentManager.showCreateAgentDialog();
                 } else {
-                    console.log('MCP Agent Manager not available');
+                    debugLog('MCP Agent Manager not available');
                 }
             });
         }
@@ -1256,7 +1288,7 @@ class Navigation {
     selectModel(modelName) {
         if (window.app?.chatInterface) {
             window.app.chatInterface.currentModel = modelName;
-            console.log(`Selected model: ${modelName}`);
+            debugLog(`Selected model: ${modelName}`);
 
             // Update all model selectors
             document.querySelectorAll('#model-selector, #default-model-selector').forEach(selector => {
@@ -1372,7 +1404,7 @@ class Navigation {
             }
         }
         
-        console.log('Started new chat');
+        debugLog('Started new chat');
     }
 
     toggleKnowledgeBaseList(show) {
@@ -1450,17 +1482,17 @@ class KnowledgeManager {
 
     async loadKnowledgeData() {
         try {
-            console.log('🔄 Starting knowledge data reload...');
+            debugLog('🔄 Starting knowledge data reload...');
             // Load documents from RAG system
-            console.log('📄 Loading documents...');
+            debugLog('📄 Loading documents...');
             await this.loadDocuments();
-            console.log('📊 Loading analytics...');
+            debugLog('📊 Loading analytics...');
             // Load analytics
             await this.loadAnalytics();
-            console.log('🎨 Updating UI...');
+            debugLog('🎨 Updating UI...');
             // Update UI
             this.updateKnowledgeUI();
-            console.log('✅ Knowledge data reload completed');
+            debugLog('✅ Knowledge data reload completed');
         } catch (error) {
             console.error('❌ Failed to load knowledge data:', error);
             this.showError('Failed to load knowledge base data');
@@ -1674,7 +1706,7 @@ class KnowledgeManager {
             if (e.target.files.length > 0) {
                 this.selectedFiles = Array.from(e.target.files);
                 this.updateFileSelectionDisplay();
-                console.log(`Selected ${this.selectedFiles.length} files for upload`);
+                debugLog(`Selected ${this.selectedFiles.length} files for upload`);
             }
         });
 
@@ -1708,7 +1740,7 @@ class KnowledgeManager {
             if (files.length > 0) {
                 this.selectedFiles = files;
                 this.updateFileSelectionDisplay();
-                console.log(`Dropped ${files.length} files for upload`);
+                debugLog(`Dropped ${files.length} files for upload`);
             }
         });
 
@@ -1818,7 +1850,7 @@ class KnowledgeManager {
             xhr.upload.onprogress = (event) => {
                 if (event.lengthComputable) {
                     const percentComplete = (event.loaded / event.total) * 100;
-                    console.log(`Upload progress for ${file.name}: ${percentComplete.toFixed(1)}%`);
+                    debugLog(`Upload progress for ${file.name}: ${percentComplete.toFixed(1)}%`);
                 }
             };
 
@@ -1859,9 +1891,9 @@ class KnowledgeManager {
         }
         
         // Reload knowledge data after uploads
-        console.log('Reloading knowledge data after upload...');
+        debugLog('Reloading knowledge data after upload...');
         await this.loadKnowledgeData();
-        console.log('Knowledge data reloaded successfully');
+        debugLog('Knowledge data reloaded successfully');
     }
 
     async uploadFile(file) {
@@ -1876,7 +1908,7 @@ class KnowledgeManager {
 
             if (response.ok) {
                 const data = await response.json();
-                console.log('File uploaded successfully:', data);
+                debugLog('File uploaded successfully:', data);
                 this.showSuccess(`File "${file.name}" uploaded successfully`);
             } else {
                 throw new Error(`Upload failed: ${response.statusText}`);
@@ -1898,12 +1930,12 @@ class KnowledgeManager {
             });
 
             if (response.ok) {
-                console.log(`Document ${documentId} deleted successfully`);
+                debugLog(`Document ${documentId} deleted successfully`);
                 this.showSuccess(`Document ${documentId} deleted successfully`);
                 // Reload knowledge data
-                console.log('Reloading knowledge data after delete...');
+                debugLog('Reloading knowledge data after delete...');
                 await this.loadKnowledgeData();
-                console.log('Knowledge data reloaded after delete');
+                debugLog('Knowledge data reloaded after delete');
             } else {
                 throw new Error(`Delete failed: ${response.statusText}`);
             }
@@ -1958,12 +1990,13 @@ class KnowledgeManager {
 
     showSuccess(message) {
         // Simple success notification
-        console.log('Success:', message);
+        debugLog('Success:', message);
         // TODO: Implement proper toast notifications
     }
 
     showError(message) {
         // Simple error notification
+        // Keep console.error for user-facing errors
         console.error('Error:', message);
         // TODO: Implement proper toast notifications
     }
@@ -2340,7 +2373,7 @@ class App {
 
     setupApp() {
         // Initialize any additional app functionality
-        console.log('App initialized successfully');
+        debugLog('App initialized successfully');
         
         // Setup error handling
         window.addEventListener('error', (e) => {
@@ -2351,7 +2384,7 @@ class App {
         if (window.performance) {
             window.addEventListener('load', () => {
                 const loadTime = performance.now();
-                console.log(`App loaded in ${Math.round(loadTime)}ms`);
+                debugLog(`App loaded in ${Math.round(loadTime)}ms`);
             });
         }
     }
@@ -2393,15 +2426,15 @@ class IntegrationManager {
             this.socket = new WebSocket(this.wsEndpoint);
             
             this.socket.onopen = () => {
-                console.log('WebSocket connected');
+                debugLog('WebSocket connected');
             };
 
             this.socket.onmessage = (event) => {
-                console.log('WebSocket message:', event.data);
+                debugLog('WebSocket message:', event.data);
             };
 
             this.socket.onclose = () => {
-                console.log('WebSocket disconnected');
+                debugLog('WebSocket disconnected');
             };
 
             this.socket.onerror = (error) => {
@@ -2445,20 +2478,20 @@ document.addEventListener('DOMContentLoaded', () => {
     // Initialize CAG Manager
     if (typeof CAGManager !== 'undefined') {
         window.app.cagManager = new CAGManager();
-        console.log('✅ CAG Manager initialized');
+        debugLog('✅ CAG Manager initialized');
     }
 
     // Initialize MCP Agent System integration
     initializeMCPAgentIntegration();
 
     // Make integration manager available globally for future use
-    console.log('Robobrain loaded and ready');
-    console.log('🤖 MCP Agent System integration initialized');
+    debugLog('Robobrain loaded and ready');
+    debugLog('🤖 MCP Agent System integration initialized');
 });
 
 // MCP Agent System Integration
 function initializeMCPAgentIntegration() {
-    console.log('🔗 Integrating MCP Agent System with main navigation...');
+    debugLog('🔗 Integrating MCP Agent System with main navigation...');
 
     // Add MCP and Agents sections to navigation if they don't exist
     // addMCPAgentNavigation(); // Disabled - using static navigation in index.html instead
@@ -2469,7 +2502,7 @@ function initializeMCPAgentIntegration() {
     // Initialize dashboard widgets
     initializeMCPAgentDashboard();
 
-    console.log('✅ MCP Agent System integration completed');
+    debugLog('✅ MCP Agent System integration completed');
 }
 
 function addMCPAgentNavigation() {
@@ -2483,7 +2516,7 @@ function addMCPAgentNavigation() {
 
     // Check if MCP/Agents navigation already exists
     if (document.getElementById('mcp-nav') || document.getElementById('agents-nav')) {
-        console.log('📋 MCP/Agents navigation already exists');
+        debugLog('📋 MCP/Agents navigation already exists');
         return;
     }
 
@@ -2537,7 +2570,7 @@ function setupMCPAgentNavHandlers() {
 }
 
 function showMCPSection() {
-    console.log('📋 Showing MCP section');
+    debugLog('📋 Showing MCP section');
 
     // Hide other sections
     hideAllSections();
@@ -2564,7 +2597,7 @@ function showMCPSection() {
 }
 
 function showAgentsSection() {
-    console.log('🤖 Showing Agents section');
+    debugLog('🤖 Showing Agents section');
 
     // Hide other sections
     hideAllSections();
