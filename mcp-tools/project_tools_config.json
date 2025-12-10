@@ -63,6 +63,105 @@
       "autoStart": false,
       "debug": false,
       "maxTokens": 10000
+    },
+    {
+      "id": "powerpoint-template-fill",
+      "name": "PowerPoint Template Fill",
+      "description": "Fill PowerPoint templates with data extracted from document folders",
+      "transport": "stdio",
+      "command": "uv",
+      "args": [
+        "run",
+        "mcp-tools/powerpoint_template_server.py"
+      ],
+      "cwd": "/home/junior/src/red",
+      "environment": {
+        "OLLAMA_URL": "http://localhost:11434",
+        "DEFAULT_MODEL": "qwen2.5:3b",
+        "DEFAULT_TIMEOUT": "180"
+      },
+      "required_inputs": [
+        {
+          "name": "template_path",
+          "label": "PowerPoint Template",
+          "type": "file",
+          "accept": ".pptx",
+          "description": "PowerPoint template with {{placeholder}} markers"
+        },
+        {
+          "name": "documents_folder",
+          "label": "Documents Folder",
+          "type": "directory",
+          "description": "Folder containing source documents (.txt, .docx, .pdf)"
+        }
+      ],
+      "optional_inputs": [
+        {
+          "name": "output_path",
+          "label": "Output File Name",
+          "type": "text",
+          "default": "filled_presentation.pptx",
+          "description": "Name for the output PowerPoint file"
+        },
+        {
+          "name": "placeholder_style",
+          "label": "Placeholder Format",
+          "type": "select",
+          "options": [
+            {"value": "mustache", "label": "{{placeholder}} (Mustache)"},
+            {"value": "bracket", "label": "[PLACEHOLDER] (Brackets)"},
+            {"value": "angle", "label": "<placeholder> (Angle Brackets)"}
+          ],
+          "default": "angle",
+          "description": "Placeholder marker style used in template"
+        },
+        {
+          "name": "extraction_strategy",
+          "label": "Data Extraction Method",
+          "type": "select",
+          "options": [
+            {"value": "llm_smart", "label": "LLM Smart Extraction (Recommended)"},
+            {"value": "keyword_match", "label": "Keyword Matching (Fallback)"}
+          ],
+          "default": "llm_smart",
+          "description": "How to extract data from documents"
+        },
+        {
+          "name": "model",
+          "label": "LLM Model",
+          "type": "select",
+          "options": [
+            {"value": "qwen2.5:3b", "label": "Qwen 2.5 3B (Fast)"},
+            {"value": "qwen2.5:7b", "label": "Qwen 2.5 7B (Balanced)"},
+            {"value": "llama3.1:8b", "label": "Llama 3.1 8B (Quality)"}
+          ],
+          "default": "qwen2.5:3b",
+          "description": "LLM model for data extraction"
+        },
+        {
+          "name": "timeout_seconds",
+          "label": "Timeout (seconds)",
+          "type": "number",
+          "min": 60,
+          "max": 600,
+          "default": 180,
+          "description": "Processing timeout (3 minutes default)"
+        },
+        {
+          "name": "preserve_formatting",
+          "label": "Preserve Formatting",
+          "type": "checkbox",
+          "default": true,
+          "description": "Attempt to preserve template text formatting"
+        }
+      ],
+      "tools": [
+        "fill_powerpoint_template"
+      ],
+      "scope": "local",
+      "autoStart": false,
+      "debug": false,
+      "maxTokens": 10000
     }
   ]
 }

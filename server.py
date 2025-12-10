@@ -459,7 +459,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     return
 
                 try:
-                    # Import and execute the whitepaper review tool
+                    # Import and execute the whitepaper review tool (refactored version)
                     from whitepaper_review_server import WhitePaperReviewServer
 
                     # Create async function to execute the tool
@@ -470,10 +470,29 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                             default_timeout=int(timeout_seconds)
                         )
 
-                        # Call the review method directly (not through MCP)
+                        # Load documents using shared DocumentLoader
+                        rubric_docs = await server.document_loader.load(rubric_path)
+                        rubric_text = server.document_loader.combine_documents(rubric_docs, strategy="concatenate")
+
+                        content_docs = await server.document_loader.load(content_path)
+                        content_text = server.document_loader.combine_documents(content_docs, strategy="sections")
+
+                        if not rubric_text:
+                            return json.dumps({
+                                "status": "error",
+                                "message": f"Failed to load rubric from: {rubric_path}"
+                            })
+
+                        if not content_text:
+                            return json.dumps({
+                                "status": "error",
+                                "message": f"Failed to load content from: {content_path}"
+                            })
+
+                        # Call the review method directly
                         result = await server._perform_review(
-                            rubric=await server._load_document_or_directory(rubric_path),
-                            content=await server._load_document_or_directory(content_path),
+                            rubric=rubric_text,
+                            content=content_text,
                             model=review_model,
                             timeout=int(timeout_seconds)
                         )
@@ -508,6 +527,173 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     print(f"❌ Failed to import MCP tool: {e}")
                     self.send_json_response({
                         'error': f'Failed to import MCP tool: {str(e)}. Make sure required packages are installed (uv add mcp python-docx PyPDF2).'
+                    }, 500)
+
+            elif tool_id == 'powerpoint-template-fill':
+                # Get input parameters
+                template_path = inputs.get('template_path', '')
+                documents_folder = inputs.get('documents_folder', '')
+                output_path = inputs.get('output_path', 'filled_presentation.pptx') or 'filled_presentation.pptx'
+                placeholder_style = inputs.get('placeholder_style', 'angle') or 'angle'
+                extraction_strategy = inputs.get('extraction_strategy', 'llm_smart') or 'llm_smart'
+                ppt_model = inputs.get('model', model)
+                timeout_seconds = inputs.get('timeout_seconds', '180') or '180'
+                preserve_formatting = inputs.get('preserve_formatting', True)
+
+                print(f"📄 PowerPoint Tool - Received inputs:")
+                print(f"   template_path: {template_path}")
+                print(f"   documents_folder: {documents_folder}")
+                print(f"   output_path: {output_path}")
+
+                if not template_path or not documents_folder:
+                    print(f"❌ Missing parameters - template: {bool(template_path)}, folder: {bool(documents_folder)}")
+                    self.send_json_response({
+                        'error': 'Missing required parameters: template_path and documents_folder are required'
+                    }, 400)
+                    return
+
+                # Verify template file exists
+                if not Path(template_path).exists():
+                    self.send_json_response({
+                        'error': f'Template file not found: {template_path}'
+                    }, 400)
+                    return
+
+                # Verify documents folder exists
+                if not Path(documents_folder).exists():
+                    self.send_json_response({
+                        'error': f'Documents folder not found: {documents_folder}'
+                    }, 400)
+                    return
+
+                try:
+                    # Import and execute the PowerPoint template tool
+                    from powerpoint_template_server import PowerPointTemplateServer
+
+                    # Create async function to execute the tool
+                    async def execute_fill():
+                        server = PowerPointTemplateServer(
+                            ollama_url=os.getenv('OLLAMA_URL', 'http://localhost:11434'),
+                            default_model=ppt_model,
+                            default_timeout=int(timeout_seconds)
+                        )
+
+                        # Import necessary modules for the call
+                        import json
+
+                        # Validate template
+                        print(f"📄 Validating template: {template_path}")
+                        validation = await server._validate_template(template_path)
+                        print(f"✅ Template valid: {validation['slide_count']} slides, {validation['placeholder_count']} placeholders")
+
+                        # Load template
+                        from pptx import Presentation
+                        presentation = Presentation(template_path)
+
+                        # Extract placeholders
+                        print(f"🔍 Extracting placeholders with style: {placeholder_style}")
+                        placeholders = server._extract_placeholders(presentation, placeholder_style)
+                        print(f"📋 Found {len(placeholders)} unique placeholders")
+
+                        if not placeholders:
+                            return json.dumps({
+                                "status": "error",
+                                "message": "No placeholders found in template"
+                            })
+
+                        # Load documents
+                        print(f"📂 Loading documents from: {documents_folder}")
+                        docs = await server.document_loader.load(documents_folder, recursive=False)
+                        combined_docs = server.document_loader.combine_documents(docs, strategy="sections")
+                        print(f"✅ Loaded {len(docs)} document(s)")
+
+                        if not combined_docs:
+                            return json.dumps({
+                                "status": "error",
+                                "message": f"No documents loaded from: {documents_folder}"
+                            })
+
+                        # Extract data using LLM
+                        print(f"🤖 Extracting data using strategy: {extraction_strategy}")
+                        extracted_data = await server._extract_data(
+                            documents=combined_docs,
+                            placeholders=list(placeholders.keys()),
+                            strategy=extraction_strategy,
+                            model=ppt_model,
+                            timeout=int(timeout_seconds)
+                        )
+                        print(f"✅ Extracted {len(extracted_data)} values")
+
+                        # Fill placeholders
+                        print(f"✏️  Filling placeholders in template")
+                        filled_count = server._fill_placeholders(
+                            presentation=presentation,
+                            placeholders=placeholders,
+                            extracted_data=extracted_data,
+                            preserve_formatting=preserve_formatting
+                        )
+                        print(f"✅ Filled {filled_count} placeholder(s)")
+
+                        # Save output
+                        output_full_path = Path(server.config.output_dir) / output_path
+                        output_full_path.parent.mkdir(parents=True, exist_ok=True)
+                        presentation.save(str(output_full_path))
+                        print(f"💾 Saved to: {output_full_path}")
+
+                        # Return result
+                        return json.dumps({
+                            "status": "success",
+                            "output_file": str(output_full_path),
+                            "placeholders_found": len(placeholders),
+                            "placeholders_filled": filled_count,
+                            "documents_processed": len(docs),
+                            "extraction_strategy": extraction_strategy,
+                            "model_used": ppt_model
+                        }, indent=2)
+
+                    # Run the async function
+                    loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(loop)
+                    try:
+                        response_text = loop.run_until_complete(execute_fill())
+                        print(f"✅ MCP tool completed successfully")
+
+                        # Parse the JSON response to display nicely
+                        result = json.loads(response_text)
+
+                        if result.get('status') == 'success':
+                            # Format success message
+                            message = f"""✅ **PowerPoint Template Filled Successfully**
+
+**Output File:** `{result['output_file']}`
+**Placeholders Found:** {result['placeholders_found']}
+**Placeholders Filled:** {result['placeholders_filled']}
+**Documents Processed:** {result['documents_processed']}
+**Extraction Strategy:** {result['extraction_strategy']}
+**Model Used:** {result['model_used']}
+
+The filled PowerPoint presentation has been saved to `{result['output_file']}`.
+"""
+                            self.send_json_response({
+                                'response': message,
+                                'model': ppt_model,
+                                'mcp_tool': tool_name,
+                                'status': 'success',
+                                'output_file': result['output_file']
+                            })
+                        else:
+                            # Error in processing
+                            self.send_json_response({
+                                'response': result.get('message', 'Unknown error'),
+                                'status': 'error'
+                            })
+                    finally:
+                        loop.close()
+
+                except ImportError as e:
+                    print(f"❌ Failed to import MCP tool: {e}")
+                    self.send_json_response({
+                        'error': f'Failed to import MCP tool: {str(e)}. Make sure required packages are installed (uv add python-pptx).'
                     }, 500)
 
             else:

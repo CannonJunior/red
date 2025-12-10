@@ -804,7 +804,8 @@ class ChatInterface {
     createInputField(input, idx, required) {
         const fieldId = `mcp-input-${idx}`;
 
-        if (input.type === 'file') {
+        if (input.type === 'file' || input.type === 'directory') {
+            const isDirectory = input.type === 'directory';
             return `
                 <div>
                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -812,17 +813,26 @@ class ChatInterface {
                     </label>
                     <p class="text-xs text-gray-500 dark:text-gray-400 mb-2">${input.description}</p>
                     <div class="flex gap-2">
-                        <input type="file"
+                        <input type="text"
                                id="${fieldId}"
-                               accept="${input.accept || '*'}"
+                               placeholder="${isDirectory ? 'Enter directory path or browse' : 'Enter file path or browse'}"
                                ${required ? 'required' : ''}
                                class="flex-1 px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white text-sm">
+                        <input type="file"
+                               id="${fieldId}-file"
+                               accept="${input.accept || '*'}"
+                               ${isDirectory ? 'webkitdirectory directory' : ''}
+                               style="display: none;"
+                               onchange="document.getElementById('${fieldId}').value = this.files[0]?.path || this.value">
                         <button type="button"
-                                class="px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500 text-sm"
-                                onclick="document.getElementById('${fieldId}').click()">
-                            Browse
+                                class="px-3 py-2 bg-gray-100 dark:bg-gray-600 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-500 text-sm whitespace-nowrap"
+                                onclick="document.getElementById('${fieldId}-file').click()">
+                            📁 Browse
                         </button>
                     </div>
+                    <p class="text-xs text-gray-500 dark:text-gray-400 mt-1">
+                        💡 Tip: Enter the full path or click Browse to select
+                    </p>
                 </div>
             `;
         } else if (input.type === 'select') {
@@ -898,11 +908,9 @@ class ChatInterface {
                 const field = document.getElementById(fieldId);
 
                 if (field) {
-                    if (input.type === 'file') {
-                        formData[input.name] = field.files[0] ? field.files[0].name : null;
-                    } else {
-                        formData[input.name] = field.value;
-                    }
+                    // For file and directory inputs, we now use text fields
+                    // so just get the text value
+                    formData[input.name] = field.value;
                 }
             });
 

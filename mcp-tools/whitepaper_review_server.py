@@ -1,18 +1,19 @@
 #!/usr/bin/env python3
 """
-White Paper Review MCP Server
+White Paper Review MCP Server (Refactored)
 Editorial review system for user-supplied content with customizable grading rubrics.
 
 Zero-cost, locally-running MCP server for document editorial review.
+Uses shared infrastructure from common/ modules.
 """
 
 import asyncio
 import json
 import os
 import sys
+import time
 from pathlib import Path
 from typing import Optional, Dict, Any, List
-import mimetypes
 from datetime import datetime
 
 # MCP SDK imports
@@ -23,20 +24,16 @@ except ImportError:
     print("ERROR: MCP SDK not installed. Install with: uv add mcp")
     sys.exit(1)
 
-# Document processing imports
+# Shared infrastructure
 try:
-    import docx
-    from PyPDF2 import PdfReader
+    from common.config import get_config
+    from common.document_loader import DocumentLoader
+    from common.ollama_client import OllamaClient
+    from common.errors import DocumentLoadError, ExtractionError
 except ImportError:
-    print("WARNING: Document processing libraries not fully installed")
-    print("Install with: uv add python-docx PyPDF2")
-
-# Ollama integration for LLM-based review
-try:
-    import urllib.request
-    import urllib.parse
-except ImportError:
-    pass
+    print("ERROR: Shared infrastructure not available")
+    print("Make sure common/ modules are in mcp-tools/common/")
+    sys.exit(1)
 
 
 class WhitePaperReviewServer:
@@ -49,25 +46,38 @@ class WhitePaperReviewServer:
     - Directory batch processing
     - Configurable LLM model and response time
     - Zero-cost local operation using Ollama
+    - Uses shared infrastructure (DocumentLoader, OllamaClient, MCPToolConfig)
     """
 
     def __init__(
         self,
-        ollama_url: str = "http://localhost:11434",
-        default_model: str = "qwen2.5:3b",
-        default_timeout: int = 30
+        ollama_url: Optional[str] = None,
+        default_model: Optional[str] = None,
+        default_timeout: Optional[int] = None,
+        config=None
     ):
         """
         Initialize the White Paper Review Server.
 
         Args:
-            ollama_url: Ollama API endpoint
-            default_model: Default LLM model for reviews
-            default_timeout: Default timeout in seconds
+            ollama_url: Ollama API endpoint (uses config default if None)
+            default_model: Default LLM model (uses config default if None)
+            default_timeout: Default timeout in seconds (uses config default if None)
+            config: MCPToolConfig instance (creates if None)
         """
-        self.ollama_url = ollama_url
-        self.default_model = default_model
-        self.default_timeout = default_timeout
+        # Use shared configuration
+        self.config = config or get_config()
+
+        # Allow override of specific settings for backwards compatibility
+        self.ollama_url = ollama_url or self.config.ollama_url
+        self.default_model = default_model or self.config.default_model
+        self.default_timeout = default_timeout or self.config.default_timeout
+
+        # Initialize shared modules
+        self.document_loader = DocumentLoader(config=self.config)
+        self.ollama_client = OllamaClient(config=self.config)
+
+        # Initialize MCP
         self.mcp = FastMCP("whitepaper-review")
 
         # Register MCP tools
@@ -91,7 +101,7 @@ class WhitePaperReviewServer:
                 rubric_path: Path to grading rubric file (.txt, .doc, .docx, .pdf, or directory)
                 content_path: Path to content for review (.txt, .doc, .docx, .pdf, or directory)
                 model: LLM model to use (default: qwen2.5:3b)
-                timeout_seconds: Maximum response time in seconds (default: 30)
+                timeout_seconds: Maximum response time in seconds (default: 120)
                 output_format: Output format - 'markdown', 'json', or 'text' (default: markdown)
 
             Returns:
@@ -102,23 +112,27 @@ class WhitePaperReviewServer:
             timeout_seconds = timeout_seconds or self.default_timeout
 
             try:
-                # Load rubric
-                rubric_text = await self._load_document_or_directory(rubric_path)
+                # Load rubric using shared DocumentLoader
+                rubric_docs = await self.document_loader.load(rubric_path)
+                rubric_text = self.document_loader.combine_documents(rubric_docs, strategy="concatenate")
+
                 if not rubric_text:
                     return json.dumps({
                         "status": "error",
                         "message": f"Failed to load rubric from: {rubric_path}"
                     })
 
-                # Load content
-                content_text = await self._load_document_or_directory(content_path)
+                # Load content using shared DocumentLoader
+                content_docs = await self.document_loader.load(content_path)
+                content_text = self.document_loader.combine_documents(content_docs, strategy="sections")
+
                 if not content_text:
                     return json.dumps({
                         "status": "error",
                         "message": f"Failed to load content from: {content_path}"
                     })
 
-                # Perform review using LLM
+                # Perform review using shared OllamaClient
                 review_result = await self._perform_review(
                     rubric=rubric_text,
                     content=content_text,
@@ -136,6 +150,18 @@ class WhitePaperReviewServer:
 
                 return formatted_result
 
+            except DocumentLoadError as e:
+                return json.dumps({
+                    "status": "error",
+                    "message": e.message,
+                    "suggestions": e.suggestions
+                })
+            except ExtractionError as e:
+                return json.dumps({
+                    "status": "error",
+                    "message": e.message,
+                    "suggestions": e.suggestions
+                })
             except Exception as e:
                 return json.dumps({
                     "status": "error",
@@ -157,7 +183,7 @@ class WhitePaperReviewServer:
                 rubric_path: Path to grading rubric file
                 content_directory: Directory containing documents to review
                 model: LLM model to use (default: qwen2.5:3b)
-                timeout_seconds: Maximum response time per document (default: 30)
+                timeout_seconds: Maximum response time per document (default: 120)
                 file_extensions: File extensions to process (default: ['.txt', '.pdf', '.doc', '.docx'])
 
             Returns:
@@ -165,51 +191,49 @@ class WhitePaperReviewServer:
             """
             model = model or self.default_model
             timeout_seconds = timeout_seconds or self.default_timeout
-            file_extensions = file_extensions or ['.txt', '.pdf', '.doc', '.docx']
+            file_extensions = file_extensions or self.config.supported_document_formats
 
             try:
-                # Load rubric
-                rubric_text = await self._load_document_or_directory(rubric_path)
+                # Load rubric using shared DocumentLoader
+                rubric_docs = await self.document_loader.load(rubric_path)
+                rubric_text = self.document_loader.combine_documents(rubric_docs, strategy="concatenate")
+
                 if not rubric_text:
                     return json.dumps({
                         "status": "error",
                         "message": f"Failed to load rubric from: {rubric_path}"
                     })
 
-                # Find all documents in directory
-                content_dir = Path(content_directory)
-                if not content_dir.is_dir():
-                    return json.dumps({
-                        "status": "error",
-                        "message": f"Content directory not found: {content_directory}"
-                    })
+                # Load all documents from directory
+                content_docs = await self.document_loader.load(
+                    content_directory,
+                    recursive=False,
+                    formats=file_extensions
+                )
 
+                # Review each document
                 results = []
-                for file_path in content_dir.iterdir():
-                    if file_path.suffix.lower() in file_extensions:
-                        try:
-                            # Load document
-                            content_text = await self._load_single_document(str(file_path))
+                for doc in content_docs:
+                    try:
+                        # Review document
+                        review_result = await self._perform_review(
+                            rubric=rubric_text,
+                            content=doc.text,
+                            model=model,
+                            timeout=timeout_seconds
+                        )
 
-                            # Review document
-                            review_result = await self._perform_review(
-                                rubric=rubric_text,
-                                content=content_text,
-                                model=model,
-                                timeout=timeout_seconds
-                            )
-
-                            results.append({
-                                "file": file_path.name,
-                                "status": "success",
-                                "review": review_result
-                            })
-                        except Exception as e:
-                            results.append({
-                                "file": file_path.name,
-                                "status": "error",
-                                "message": str(e)
-                            })
+                        results.append({
+                            "file": doc.metadata.file_name,
+                            "status": "success",
+                            "review": review_result
+                        })
+                    except Exception as e:
+                        results.append({
+                            "file": doc.metadata.file_name,
+                            "status": "error",
+                            "message": str(e)
+                        })
 
                 return json.dumps({
                     "status": "success",
@@ -217,87 +241,17 @@ class WhitePaperReviewServer:
                     "results": results
                 }, indent=2)
 
+            except DocumentLoadError as e:
+                return json.dumps({
+                    "status": "error",
+                    "message": e.message,
+                    "suggestions": e.suggestions
+                })
             except Exception as e:
                 return json.dumps({
                     "status": "error",
                     "message": f"Batch review failed: {str(e)}"
                 })
-
-    async def _load_document_or_directory(self, path: str) -> Optional[str]:
-        """
-        Load document(s) from a file or directory.
-
-        Args:
-            path: File path or directory path
-
-        Returns:
-            Combined text content from document(s)
-        """
-        path_obj = Path(path)
-
-        if not path_obj.exists():
-            return None
-
-        if path_obj.is_file():
-            return await self._load_single_document(path)
-        elif path_obj.is_dir():
-            # Load all supported documents in directory
-            combined_text = []
-            for file_path in path_obj.iterdir():
-                if file_path.suffix.lower() in ['.txt', '.pdf', '.doc', '.docx']:
-                    try:
-                        text = await self._load_single_document(str(file_path))
-                        if text:
-                            combined_text.append(f"--- {file_path.name} ---\n{text}\n")
-                    except Exception as e:
-                        print(f"Warning: Could not load {file_path.name}: {e}")
-
-            return "\n".join(combined_text) if combined_text else None
-
-        return None
-
-    async def _load_single_document(self, file_path: str) -> Optional[str]:
-        """
-        Load a single document file.
-
-        Args:
-            file_path: Path to document file
-
-        Returns:
-            Text content of the document
-        """
-        file_path_obj = Path(file_path)
-        suffix = file_path_obj.suffix.lower()
-
-        try:
-            if suffix == '.txt':
-                # Plain text
-                with open(file_path, 'r', encoding='utf-8') as f:
-                    return f.read()
-
-            elif suffix == '.pdf':
-                # PDF using PyPDF2
-                reader = PdfReader(file_path)
-                text_parts = []
-                for page in reader.pages:
-                    text_parts.append(page.extract_text())
-                return "\n".join(text_parts)
-
-            elif suffix in ['.doc', '.docx']:
-                # Word document using python-docx
-                doc = docx.Document(file_path)
-                text_parts = []
-                for paragraph in doc.paragraphs:
-                    text_parts.append(paragraph.text)
-                return "\n".join(text_parts)
-
-            else:
-                print(f"Warning: Unsupported file type: {suffix}")
-                return None
-
-        except Exception as e:
-            print(f"Error loading {file_path}: {e}")
-            return None
 
     async def _perform_review(
         self,
@@ -318,6 +272,9 @@ class WhitePaperReviewServer:
         Returns:
             Review results dictionary
         """
+        # Record start time
+        start_time = time.time()
+
         # Construct review prompt
         prompt = f"""You are an expert editorial reviewer. Review the following content according to the provided grading rubric.
 
@@ -336,45 +293,36 @@ Provide a comprehensive editorial review that:
 
 Please structure your review clearly with sections corresponding to the rubric criteria."""
 
-        # Call Ollama API
+        # Call Ollama using shared client
         try:
-            request_data = {
-                'model': model,
-                'prompt': prompt,
-                'stream': False,
-                'options': {
-                    'temperature': 0.7,
-                    'top_p': 0.9
-                }
-            }
-
-            req = urllib.request.Request(
-                f"{self.ollama_url}/api/generate",
-                data=json.dumps(request_data).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
+            response_text = await self.ollama_client.generate(
+                prompt=prompt,
+                model=model,
+                timeout=timeout
             )
 
-            # Set timeout
-            response = urllib.request.urlopen(req, timeout=timeout)
-            result = json.loads(response.read().decode('utf-8'))
+            # Calculate elapsed time
+            elapsed_seconds = time.time() - start_time
+            elapsed_minutes = int(elapsed_seconds // 60)
+            elapsed_secs = int(elapsed_seconds % 60)
+            elapsed_formatted = f"{elapsed_minutes}m {elapsed_secs}s" if elapsed_minutes > 0 else f"{elapsed_secs}s"
 
             return {
-                "review_text": result.get('response', 'No response generated'),
+                "review_text": response_text or 'No response generated',
                 "model_used": model,
                 "timestamp": datetime.now().isoformat(),
+                "elapsed_time": elapsed_formatted,
+                "elapsed_seconds": elapsed_seconds,
                 "tokens_used": {
-                    "prompt": result.get('prompt_eval_count', 0),
-                    "completion": result.get('eval_count', 0),
-                    "total": result.get('prompt_eval_count', 0) + result.get('eval_count', 0)
+                    "prompt": 0,  # Ollama client doesn't return token counts yet
+                    "completion": 0,
+                    "total": 0
                 }
             }
 
-        except urllib.error.URLError as e:
-            raise Exception(f"Ollama API connection failed: {e.reason}")
-        except json.JSONDecodeError as e:
-            raise Exception(f"Invalid response from Ollama: {e}")
-        except Exception as e:
-            raise Exception(f"Review generation failed: {str(e)}")
+        except ExtractionError as e:
+            # Re-raise with review context
+            raise Exception(f"Review generation failed: {e.message}")
 
     def _format_output(
         self,
@@ -408,6 +356,7 @@ Please structure your review clearly with sections corresponding to the rubric c
 
 **Date:** {review_result['timestamp']}
 **Model:** {review_result['model_used']}
+**Elapsed Time:** {review_result.get('elapsed_time', 'N/A')}
 **Rubric:** {rubric_path}
 **Content:** {content_path}
 
@@ -421,9 +370,9 @@ Please structure your review clearly with sections corresponding to the rubric c
 
 ## Metadata
 
-- **Tokens Used:** {review_result['tokens_used']['total']}
-  - Prompt: {review_result['tokens_used']['prompt']}
-  - Completion: {review_result['tokens_used']['completion']}
+- **Model:** {review_result['model_used']}
+- **Timestamp:** {review_result['timestamp']}
+- **Elapsed Time:** {review_result.get('elapsed_time', 'N/A')}
 """
             return md
 
@@ -432,10 +381,12 @@ Please structure your review clearly with sections corresponding to the rubric c
 
     async def run(self):
         """Run the MCP server."""
-        print("🚀 Starting White Paper Review MCP Server...")
+        print("🚀 Starting White Paper Review MCP Server (Refactored)...")
         print(f"📋 Ollama URL: {self.ollama_url}")
         print(f"🤖 Default Model: {self.default_model}")
         print(f"⏱️  Default Timeout: {self.default_timeout}s")
+        print(f"💾 Cache Enabled: {self.config.enable_cache}")
+        print(f"📂 Cache Dir: {self.config.cache_dir}")
         print("✅ MCP Server ready for connections")
 
         await self.mcp.run()
@@ -443,12 +394,12 @@ Please structure your review clearly with sections corresponding to the rubric c
 
 async def main():
     """Main entry point for the MCP server."""
-    # Read configuration from environment variables
-    ollama_url = os.getenv('OLLAMA_URL', 'http://localhost:11434')
-    default_model = os.getenv('DEFAULT_MODEL', 'qwen2.5:3b')
-    default_timeout = int(os.getenv('DEFAULT_TIMEOUT', '30'))
+    # Read configuration from environment variables (for backwards compatibility)
+    ollama_url = os.getenv('OLLAMA_URL')
+    default_model = os.getenv('DEFAULT_MODEL')
+    default_timeout = int(os.getenv('DEFAULT_TIMEOUT', '0')) or None
 
-    # Create and run server
+    # Create and run server (will use MCPToolConfig defaults if env vars not set)
     server = WhitePaperReviewServer(
         ollama_url=ollama_url,
         default_model=default_model,
