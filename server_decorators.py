@@ -33,23 +33,27 @@ def require_system(*systems: str) -> Callable:
     def decorator(func: Callable) -> Callable:
         @wraps(func)
         def wrapper(self, *args, **kwargs):
-            # Access global variables from the calling module
-            # This avoids circular import issues
-            import sys
-            calling_module = sys.modules[func.__module__]
+            # Import system module to check availability flags
+            try:
+                from server.utils import system as system_module
+            except ImportError:
+                # Fallback for original server.py (no modular structure)
+                import sys
+                calling_module = sys.modules[func.__module__]
+                system_module = calling_module
 
             # Check each required system
-            for system in systems:
-                available_var = f"{system.upper()}_AVAILABLE"
+            for system_name in systems:
+                available_var = f"{system_name.upper()}_AVAILABLE"
 
-                # Get the availability flag from the calling module's globals
-                is_available = getattr(calling_module, available_var, False)
+                # Get the availability flag from the system module
+                is_available = getattr(system_module, available_var, False)
 
                 if not is_available:
                     # Send error response and exit early
                     self.send_json_response({
                         'status': 'error',
-                        'message': f'{system.upper()} system not available'
+                        'message': f'{system_name.upper()} system not available'
                     }, 503)
                     return
 

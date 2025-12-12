@@ -8,6 +8,138 @@ function debugLog(...args) {
     }
 }
 
+// Request Cache - memoizes GET requests for better performance
+class RequestCache {
+    constructor() {
+        this.cache = new Map();
+        this.ttl = 5 * 60 * 1000; // 5 minutes default TTL
+        this.hits = 0;
+        this.misses = 0;
+    }
+
+    /**
+     * Generate cache key from URL and options
+     */
+    _getCacheKey(url, options = {}) {
+        const method = options.method || 'GET';
+        const body = options.body || '';
+        return `${method}:${url}:${body}`;
+    }
+
+    /**
+     * Get cached response or fetch and cache
+     */
+    async fetch(url, options = {}) {
+        const method = options.method || 'GET';
+
+        // Only cache GET requests
+        if (method !== 'GET') {
+            return fetch(url, options);
+        }
+
+        const key = this._getCacheKey(url, options);
+        const cached = this.cache.get(key);
+
+        // Check if cached and not expired
+        if (cached && Date.now() < cached.expiresAt) {
+            this.hits++;
+            debugLog(`🔥 Cache HIT: ${url} (${this.getHitRate()}% hit rate)`);
+            // Return a clone of the cached response
+            return new Response(
+                JSON.stringify(cached.data),
+                {
+                    status: cached.status,
+                    statusText: cached.statusText,
+                    headers: cached.headers
+                }
+            );
+        }
+
+        // Cache miss - fetch from server
+        this.misses++;
+        debugLog(`💾 Cache MISS: ${url}`);
+
+        try {
+            const response = await fetch(url, options);
+
+            // Only cache successful GET responses
+            if (response.ok && method === 'GET') {
+                const clonedResponse = response.clone();
+                const data = await clonedResponse.json();
+
+                this.cache.set(key, {
+                    data: data,
+                    status: response.status,
+                    statusText: response.statusText,
+                    headers: Object.fromEntries(response.headers),
+                    expiresAt: Date.now() + this.ttl
+                });
+
+                debugLog(`✅ Cached: ${url} (expires in ${this.ttl / 1000}s)`);
+            }
+
+            return response;
+        } catch (error) {
+            console.error(`❌ Fetch error for ${url}:`, error);
+            throw error;
+        }
+    }
+
+    /**
+     * Clear all cached entries
+     */
+    clear() {
+        const size = this.cache.size;
+        this.cache.clear();
+        this.hits = 0;
+        this.misses = 0;
+        debugLog(`🗑️ Cleared ${size} cached entries`);
+    }
+
+    /**
+     * Clear specific URL from cache
+     */
+    invalidate(url, options = {}) {
+        const key = this._getCacheKey(url, options);
+        const deleted = this.cache.delete(key);
+        if (deleted) {
+            debugLog(`🗑️ Invalidated cache for: ${url}`);
+        }
+        return deleted;
+    }
+
+    /**
+     * Get cache hit rate percentage
+     */
+    getHitRate() {
+        const total = this.hits + this.misses;
+        return total === 0 ? 0 : Math.round((this.hits / total) * 100);
+    }
+
+    /**
+     * Get cache statistics
+     */
+    getStats() {
+        return {
+            size: this.cache.size,
+            hits: this.hits,
+            misses: this.misses,
+            hitRate: this.getHitRate()
+        };
+    }
+
+    /**
+     * Set TTL for cache entries (in milliseconds)
+     */
+    setTTL(ttlMs) {
+        this.ttl = ttlMs;
+        debugLog(`⏱️ Cache TTL set to ${ttlMs / 1000}s`);
+    }
+}
+
+// Global request cache instance
+const requestCache = new RequestCache();
+
 // Theme management
 class ThemeManager {
     constructor() {
@@ -2091,7 +2223,7 @@ class VisualizationManager {
     }
 
     async renderKnowledgeGraph() {
-        const response = await fetch('/api/visualizations/knowledge-graph');
+        const response = await requestCache.fetch('/api/visualizations/knowledge-graph');
         const data = await response.json();
 
         if (!response.ok) {
@@ -2111,7 +2243,7 @@ class VisualizationManager {
     }
 
     async renderPerformanceDashboard() {
-        const response = await fetch('/api/visualizations/performance');
+        const response = await requestCache.fetch('/api/visualizations/performance');
         const data = await response.json();
 
         if (!response.ok) {
@@ -2147,7 +2279,7 @@ class VisualizationManager {
     }
 
     async renderSearchExplorer() {
-        const response = await fetch('/api/visualizations/search-results');
+        const response = await requestCache.fetch('/api/visualizations/search-results');
         const data = await response.json();
 
         if (!response.ok) {

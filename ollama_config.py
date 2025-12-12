@@ -3,9 +3,10 @@ Centralized Ollama configuration and connection management.
 
 This module provides robust Ollama connection handling with:
 - Environment variable support for different deployment scenarios
-- Connection timeout and retry mechanisms  
+- Connection timeout and retry mechanisms
 - Consistent error handling across the application
 - Health checks and connection validation
+- HTTP connection pooling for improved performance
 """
 
 import os
@@ -17,6 +18,9 @@ import urllib.error
 import socket
 from typing import Dict, Any, Optional, List
 from urllib.parse import urljoin
+
+# Import connection pool for performance
+from connection_pool import get_http_pool
 
 # Configure logging
 logger = logging.getLogger(__name__)
@@ -30,19 +34,22 @@ class OllamaConfig:
         self.host = os.getenv('OLLAMA_HOST', 'localhost')
         self.port = int(os.getenv('OLLAMA_PORT', '11434'))
         self.base_url = os.getenv('OLLAMA_BASE_URL', f'http://{self.host}:{self.port}')
-        
+
         # Connection settings
         self.timeout = float(os.getenv('OLLAMA_TIMEOUT', '30.0'))
         self.connect_timeout = float(os.getenv('OLLAMA_CONNECT_TIMEOUT', '10.0'))
         self.max_retries = int(os.getenv('OLLAMA_MAX_RETRIES', '3'))
         self.retry_delay = float(os.getenv('OLLAMA_RETRY_DELAY', '1.0'))
-        
+
         # API endpoints
         self.generate_endpoint = urljoin(self.base_url, '/api/generate')
         self.tags_endpoint = urljoin(self.base_url, '/api/tags')
         self.chat_endpoint = urljoin(self.base_url, '/api/chat')
-        
-        logger.info(f"Ollama configuration initialized: {self.base_url} (timeout: {self.timeout}s)")
+
+        # HTTP connection pool for improved performance
+        self.http_pool = get_http_pool()
+
+        logger.info(f"Ollama configuration initialized: {self.base_url} (timeout: {self.timeout}s) with connection pooling")
     
     def test_connection(self) -> Dict[str, Any]:
         """Test connection to Ollama server with comprehensive diagnostics."""
@@ -112,24 +119,26 @@ class OllamaConfig:
         return result
     
     def make_request(self, endpoint: str, data: Dict[str, Any], method: str = 'POST') -> Dict[str, Any]:
-        """Make a robust HTTP request to Ollama with retries and error handling."""
+        """Make a robust HTTP request to Ollama with retries and error handling using connection pool."""
         last_error = None
-        
+
         for attempt in range(self.max_retries):
             try:
                 logger.debug(f"Ollama request attempt {attempt + 1}/{self.max_retries} to {endpoint}")
-                
+
                 # Prepare request
                 json_data = json.dumps(data).encode('utf-8')
                 req = urllib.request.Request(endpoint, data=json_data)
                 req.add_header('Content-Type', 'application/json')
                 req.get_method = lambda: method
-                
-                # Make request with timeout
-                with urllib.request.urlopen(req, timeout=self.timeout) as response:
-                    if response.status == 200:
+
+                # Make request using connection pool for better performance
+                with self.http_pool.get_connection() as opener:
+                    response = opener.open(req, timeout=self.timeout)
+
+                    if response.getcode() == 200:
                         raw_response = response.read().decode('utf-8')
-                        
+
                         # Handle multiple JSON objects or streaming responses
                         try:
                             # Try parsing as single JSON object first
@@ -162,7 +171,7 @@ class OllamaConfig:
 
                             if result is None:
                                 raise json.JSONDecodeError("No valid JSON found in response", raw_response, 0)
-                        
+
                         logger.debug(f"Ollama request successful on attempt {attempt + 1}")
                         return {
                             'success': True,
@@ -171,7 +180,7 @@ class OllamaConfig:
                             'error': None
                         }
                     else:
-                        last_error = f"HTTP {response.status}: {response.reason}"
+                        last_error = f"HTTP {response.getcode()}"
                         
             except socket.timeout:
                 last_error = f"Request timeout after {self.timeout}s"

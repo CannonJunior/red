@@ -14,6 +14,9 @@ import hashlib
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+# Import connection pool for performance
+from connection_pool import get_sqlite_pool
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -125,7 +128,8 @@ class SearchDatabase:
     
     def init_database(self):
         """Initialize database tables with proper schema."""
-        with sqlite3.connect(self.db_path) as conn:
+        pool = get_sqlite_pool(self.db_path)
+        with pool.get_connection() as conn:
             conn.execute("PRAGMA foreign_keys = ON")
             
             # Create searchable_objects table
@@ -222,7 +226,8 @@ class UniversalSearchSystem:
     def add_object(self, obj: SearchableObject) -> bool:
         """Add a searchable object to the system."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            pool = get_sqlite_pool(self.db.db_path)
+            with pool.get_connection() as conn:
                 # Insert object
                 conn.execute("""
                     INSERT OR REPLACE INTO searchable_objects 
@@ -300,7 +305,8 @@ class UniversalSearchSystem:
     def search(self, search_filter: SearchFilter) -> Dict[str, Any]:
         """Perform universal search with filters."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            pool = get_sqlite_pool(self.db.db_path)
+            with pool.get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 
                 # Build query parameters
@@ -428,7 +434,8 @@ class UniversalSearchSystem:
     def create_folder(self, folder: Folder) -> bool:
         """Create a new folder."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            pool = get_sqlite_pool(self.db.db_path)
+            with pool.get_connection() as conn:
                 conn.execute("""
                     INSERT INTO folders (id, name, parent_id, color, icon, object_types, created_date, is_shared)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
@@ -448,7 +455,8 @@ class UniversalSearchSystem:
     def get_folders(self) -> List[Dict[str, Any]]:
         """Get all folders in hierarchical structure."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            pool = get_sqlite_pool(self.db.db_path)
+            with pool.get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute("""
                     SELECT f.*, COUNT(o.id) as object_count
@@ -473,7 +481,8 @@ class UniversalSearchSystem:
     def get_tags(self) -> List[Dict[str, Any]]:
         """Get all tags sorted by usage count."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            pool = get_sqlite_pool(self.db.db_path)
+            with pool.get_connection() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute("""
                     SELECT * FROM tags 
@@ -537,7 +546,8 @@ class UniversalSearchSystem:
     def delete_object(self, object_id: str) -> bool:
         """Delete an object and its associations."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            pool = get_sqlite_pool(self.db.db_path)
+            with pool.get_connection() as conn:
                 # Delete from FTS
                 conn.execute("DELETE FROM objects_fts WHERE object_id = ?", (object_id,))
                 

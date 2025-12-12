@@ -25,8 +25,20 @@ from debug_logger import debug_log, info_log, error_log, success_log, warning_lo
 # Import static cache
 from static_cache import get_static_cache
 
+# Import CORS configuration
+from cors_config import apply_cors_headers
+
 # Import Ollama configuration
 from ollama_config import ollama_config
+
+# Import compression handler
+from compression_handler import get_compression_handler
+
+# Import request validation
+from request_validation import validate_request, ChatRequest, RAGQueryRequest, RAGSearchRequest, RAGIngestRequest, CAGQueryRequest, CAGLoadRequest, SearchRequest, SearchCreateFolderRequest, SearchAddObjectRequest
+
+# Import rate limiting
+from rate_limiter import rate_limit
 
 # Import RAG functionality
 try:
@@ -181,19 +193,27 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             # Determine content type
             content_type = self.get_content_type(file_path)
 
-            # Try to get from cache first
-            static_cache = get_static_cache()
-            content, etag = static_cache.get(full_path)
+            # Check if client accepts gzip encoding
+            accepts_gzip = 'gzip' in self.headers.get('Accept-Encoding', '').lower()
 
-            if content is None:
-                # Cache miss - read from disk
-                with open(full_path, 'rb') as f:
-                    content = f.read()
-                # Store in cache
-                etag = static_cache.set(full_path, content)
-                debug_log(f"Cache MISS: {file_path}", "💾")
-            else:
-                debug_log(f"Cache HIT: {file_path}", "⚡")
+            # Try compression first if supported
+            compression_handler = get_compression_handler()
+            content, is_compressed = compression_handler.get_compressed_content(
+                full_path,
+                accepts_gzip
+            )
+
+            # Generate ETag for cache validation
+            import hashlib
+            etag = f'"{hashlib.md5(content).hexdigest()}"'
+
+            # Check client's ETag for 304 Not Modified
+            client_etag = self.headers.get('If-None-Match')
+            if client_etag == etag:
+                self.send_response(304)
+                apply_cors_headers(self, self.headers.get('Origin'))
+                self.end_headers()
+                return
 
             # Send response
             self.send_response(200)
@@ -201,12 +221,16 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Length', str(len(content)))
             self.send_header('ETag', etag)
             self.send_header('Cache-Control', 'public, max-age=3600')
+
+            # Add gzip encoding header if compressed
+            if is_compressed:
+                self.send_header('Content-Encoding', 'gzip')
+                self.send_header('Vary', 'Accept-Encoding')
+
             # Add CORS headers
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            apply_cors_headers(self, self.headers.get('Origin'))
             self.end_headers()
-            
+
             # Send content
             self.wfile.write(content)
             
@@ -302,25 +326,17 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             print(f"❌ Error handling DELETE {self.path}: {e}")
             self.send_error(500, f"Internal server error: {e}")
     
+    @rate_limit(requests_per_minute=60, burst=10)
+    @validate_request(ChatRequest)
     def handle_chat_api(self):
         """Handle chat API requests with MCP-style RAG tool integration."""
         try:
-            # Read request body
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            # Extract message, model, workspace, and knowledge mode
-            message = request_data.get('message', '').strip()
-            model = request_data.get('model', 'qwen2.5:3b')  # Default to smaller model
-            workspace = request_data.get('workspace', 'default')  # Extract workspace
-            knowledge_mode = request_data.get('knowledge_mode', 'none')  # Extract knowledge mode
-            mcp_tool_call = request_data.get('mcp_tool_call')  # Check for MCP tool call
-
-            if not message:
-                self.send_json_response({'error': 'Message is required'}, 400)
-                return
+            # Use validated data
+            message = self.validated_data.message
+            model = self.validated_data.model
+            workspace = self.validated_data.workspace
+            knowledge_mode = self.validated_data.knowledge_mode
+            mcp_tool_call = self.validated_data.mcp_tool_call
 
             # Handle MCP tool calls
             if mcp_tool_call:
@@ -821,21 +837,15 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ RAG status API error: {e}")
             self.send_json_response({'error': f'RAG status error: {str(e)}'}, 500)
     
+    @rate_limit(requests_per_minute=120, burst=20)
+    @validate_request(RAGSearchRequest)
     def handle_rag_search_api(self):
         """Handle RAG search API requests."""
         try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
+            # Use validated data
+            query = self.validated_data.query
+            max_results = self.validated_data.max_results
 
-            query = request_data.get('query', '').strip()
-            max_results = request_data.get('max_results', 5)
-            
-            if not query:
-                self.send_json_response({'error': 'Query is required'}, 400)
-                return
-            
             search_result = handle_rag_search_request(query, max_results)
             debug_log(f"RAG search: '{query}' -> {search_result.get('results', []).__len__()} results", "🔍")
             self.send_json_response(search_result)
@@ -843,21 +853,15 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ RAG search API error: {e}")
             self.send_json_response({'error': f'RAG search error: {str(e)}'}, 500)
     
+    @rate_limit(requests_per_minute=60, burst=10)
+    @validate_request(RAGQueryRequest)
     def handle_rag_query_api(self):
         """Handle RAG query API requests."""
         try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
+            # Use validated data
+            query = self.validated_data.query
+            max_context = self.validated_data.max_context
 
-            query = request_data.get('query', '').strip()
-            max_context = request_data.get('max_context', 5)
-            
-            if not query:
-                self.send_json_response({'error': 'Query is required'}, 400)
-                return
-            
             query_result = handle_rag_query_request(query, max_context)
             debug_log(f"RAG query: '{query}' -> {query_result.get('status', 'unknown')}", "🤖")
             self.send_json_response(query_result)
@@ -869,29 +873,30 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle RAG document ingestion API requests (supports both FormData files and JSON file paths)."""
         try:
             content_type = self.headers.get('Content-Type', '')
-            
+
             if content_type.startswith('multipart/form-data'):
-                # Handle file upload via FormData
+                # Handle file upload via FormData (no validation decorator - different handling)
                 self._handle_file_upload()
             else:
-                # Handle JSON request with file path
-                request_data = self.get_request_body()
-                if request_data is None:
-                    self.send_json_response({'error': 'Invalid JSON'}, 400)
-                    return
+                # Handle JSON request with file path - use validation
+                self._handle_rag_ingest_json()
 
-                file_path = request_data.get('file_path', '').strip()
-                
-                if not file_path:
-                    self.send_json_response({'error': 'File path is required'}, 400)
-                    return
-                
-                ingest_result = handle_rag_ingest_request(file_path)
-                debug_log(f"RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}", "📄")
-                self.send_json_response(ingest_result)
-                
         except Exception as e:
             print(f"❌ RAG ingest API error: {e}")
+            self.send_json_response({'error': f'RAG ingest error: {str(e)}'}, 500)
+
+    @validate_request(RAGIngestRequest)
+    def _handle_rag_ingest_json(self):
+        """Handle JSON-based RAG ingest with file path."""
+        try:
+            # Use validated data
+            file_path = self.validated_data.file_path
+
+            ingest_result = handle_rag_ingest_request(file_path)
+            debug_log(f"RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}", "📄")
+            self.send_json_response(ingest_result)
+        except Exception as e:
+            print(f"❌ RAG ingest JSON error: {e}")
             self.send_json_response({'error': f'RAG ingest error: {str(e)}'}, 500)
 
     def _handle_file_upload(self):
@@ -1099,18 +1104,23 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             return f"Sorry, I'm currently unable to process your request. {error_msg}"
     
     # Search API handlers
+    @rate_limit(requests_per_minute=120, burst=20)
+    @validate_request(SearchRequest)
     def handle_search_api(self):
         """Handle universal search API requests."""
         try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
+            # Convert validated data to dict for handle_search_request
+            request_data = {
+                'query': self.validated_data.query,
+                'filters': self.validated_data.filters,
+                'page_size': self.validated_data.page_size,
+                'offset': self.validated_data.offset
+            }
 
             search_result = handle_search_request(request_data)
-            debug_log(f"Search: '{request_data.get('query', '')}' -> {search_result.get('data', {}).get('total_count', 0)} results", "🔍")
+            debug_log(f"Search: '{self.validated_data.query}' -> {search_result.get('data', {}).get('total_count', 0)} results", "🔍")
             self.send_json_response(search_result)
-            
+
         except Exception as e:
             print(f"❌ Search API error: {e}")
             self.send_json_response({'error': f'Search failed: {str(e)}'}, 500)
@@ -1138,18 +1148,21 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Folders API error: {e}")
             self.send_json_response({'error': f'Folders operation failed: {str(e)}'}, 500)
     
+    @validate_request(SearchCreateFolderRequest)
     def handle_search_create_folder_api(self):
         """Handle folder creation API requests."""
         try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
+            # Convert validated data to dict for handle_create_folder_request
+            request_data = {
+                'name': self.validated_data.name,
+                'parent_id': self.validated_data.parent_id,
+                'color': self.validated_data.color
+            }
 
             create_result = handle_create_folder_request(request_data)
-            debug_log(f"Create folder: {request_data.get('name', 'Unknown')}", "📁")
+            debug_log(f"Create folder: {self.validated_data.name}", "📁")
             self.send_json_response(create_result)
-            
+
         except Exception as e:
             print(f"❌ Create folder API error: {e}")
             self.send_json_response({'error': f'Create folder failed: {str(e)}'}, 500)
@@ -1165,18 +1178,25 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ Tags API error: {e}")
             self.send_json_response({'error': f'Tags operation failed: {str(e)}'}, 500)
     
+    @validate_request(SearchAddObjectRequest)
     def handle_search_add_object_api(self):
         """Handle adding searchable objects API requests."""
         try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
+            # Convert validated data to dict for handle_add_object_request
+            request_data = {
+                'type': self.validated_data.type,
+                'title': self.validated_data.title,
+                'content': self.validated_data.content,
+                'folder_id': self.validated_data.folder_id,
+                'tags': self.validated_data.tags,
+                'metadata': self.validated_data.metadata,
+                'author': self.validated_data.author
+            }
 
             add_result = handle_add_object_request(request_data)
-            debug_log(f"Add object: {request_data.get('title', 'Unknown')} ({request_data.get('type', 'unknown')})", "➕")
+            debug_log(f"Add object: {self.validated_data.title} ({self.validated_data.type})", "➕")
             self.send_json_response(add_result)
-            
+
         except Exception as e:
             print(f"❌ Add object API error: {e}")
             self.send_json_response({'error': f'Add object failed: {str(e)}'}, 500)
@@ -1189,9 +1209,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         self.send_response(status_code)
         self.send_header('Content-Type', 'application/json')
         self.send_header('Content-Length', str(len(response_bytes)))
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+        apply_cors_headers(self, self.headers.get('Origin'))
         self.end_headers()
         
         self.wfile.write(response_bytes)
@@ -1221,9 +1239,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(file_size))
             self.send_header('Cache-Control', 'no-cache')
-            self.send_header('Access-Control-Allow-Origin', '*')
-            self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
-            self.send_header('Access-Control-Allow-Headers', 'Content-Type')
+            apply_cors_headers(self, self.headers.get('Origin'))
             self.end_headers()
             
         except Exception as e:
@@ -1455,24 +1471,30 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                 self.send_json_response(result)
 
             else:
-                # Handle JSON request with file path
-                request_data = self.get_request_body()
-                if request_data is None:
-                    self.send_json_response({'error': 'Invalid JSON'}, 400)
-                    return
-                file_path = request_data.get('file_path')
-
-                if not file_path:
-                    self.send_json_response({'error': 'file_path required'}, 400)
-                    return
-
-                result = cag_manager.load_document(file_path)
-                self.send_json_response(result)
+                # Handle JSON request with file path - use validation
+                self._handle_cag_load_json()
 
         except Exception as e:
             print(f"❌ CAG load API error: {e}")
             import traceback
             traceback.print_exc()
+            self.send_json_response({'error': f'CAG load failed: {str(e)}'}, 500)
+
+    @validate_request(CAGLoadRequest)
+    def _handle_cag_load_json(self):
+        """Handle JSON-based CAG load with file path."""
+        try:
+            if cag_manager is None:
+                self.send_json_response({'error': 'CAG system not available'}, 503)
+                return
+
+            # Use validated data
+            file_path = self.validated_data.file_path
+
+            result = cag_manager.load_document(file_path)
+            self.send_json_response(result)
+        except Exception as e:
+            print(f"❌ CAG load JSON error: {e}")
             self.send_json_response({'error': f'CAG load failed: {str(e)}'}, 500)
 
     @require_system('cag')
@@ -1505,7 +1527,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             print(f"❌ CAG document delete API error: {e}")
             self.send_json_response({'error': f'Delete failed: {str(e)}'}, 500)
 
+    @rate_limit(requests_per_minute=30, burst=5)
     @require_system('cag')
+    @validate_request(CAGQueryRequest)
     def handle_cag_query_api(self):
         """Handle CAG-enhanced query API requests."""
         try:
@@ -1513,17 +1537,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
                 self.send_json_response({'error': 'CAG system not available'}, 503)
                 return
 
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            query = request_data.get('query', '')
-            model = request_data.get('model', 'qwen2.5:3b')
-
-            if not query:
-                self.send_json_response({'error': 'query required'}, 400)
-                return
+            # Use validated data
+            query = self.validated_data.query
+            model = self.validated_data.model
 
             # Build full context with cached documents
             full_context = cag_manager.get_context_for_query(query)
