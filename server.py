@@ -28,6 +28,64 @@ from static_cache import get_static_cache
 # Import Ollama configuration
 from ollama_config import ollama_config
 
+# Import server utilities
+from server.utils.json_response import send_json_response as send_json_response_util
+from server.utils.request_helpers import get_content_type as get_content_type_util, get_request_body as get_request_body_util
+
+# Import route handlers
+from server.routes.models import handle_models_api as handle_models_route
+from server.routes.chat import handle_chat_api as handle_chat_route
+from server.routes.rag import (
+    handle_rag_status_api as handle_rag_status_route,
+    handle_rag_search_api as handle_rag_search_route,
+    handle_rag_query_api as handle_rag_query_route,
+    handle_rag_ingest_api as handle_rag_ingest_route,
+    handle_rag_documents_api as handle_rag_documents_route,
+    handle_rag_analytics_api as handle_rag_analytics_route,
+    handle_rag_upload_api as handle_rag_upload_route,
+    handle_rag_document_delete_api as handle_rag_document_delete_route
+)
+from server.routes.cag import (
+    handle_cag_status_api as handle_cag_status_route,
+    handle_cag_load_api as handle_cag_load_route,
+    handle_cag_clear_api as handle_cag_clear_route,
+    handle_cag_document_delete_api as handle_cag_document_delete_route,
+    handle_cag_query_api as handle_cag_query_route
+)
+from server.routes.prompts import (
+    handle_prompts_list_api as handle_prompts_list_route,
+    handle_prompts_create_api as handle_prompts_create_route,
+    handle_prompts_detail_api as handle_prompts_detail_route,
+    handle_prompts_update_api as handle_prompts_update_route,
+    handle_prompts_delete_api as handle_prompts_delete_route,
+    handle_prompts_use_api as handle_prompts_use_route,
+    handle_prompts_search_api as handle_prompts_search_route
+)
+from server.routes.search import (
+    handle_search_api as handle_search_route,
+    handle_search_folders_api as handle_search_folders_route,
+    handle_search_create_folder_api as handle_search_create_folder_route,
+    handle_search_tags_api as handle_search_tags_route,
+    handle_search_add_object_api as handle_search_add_object_route
+)
+from server.routes.agents import (
+    handle_agents_api as handle_agents_route,
+    handle_agents_metrics_api as handle_agents_metrics_route,
+    handle_agents_detail_api as handle_agents_detail_route
+)
+from server.routes.mcp import (
+    handle_mcp_servers_api as handle_mcp_servers_route,
+    handle_mcp_server_action_api as handle_mcp_server_action_route,
+    handle_nlp_parse_task_api as handle_nlp_parse_task_route,
+    handle_nlp_capabilities_api as handle_nlp_capabilities_route,
+    handle_mcp_metrics_api as handle_mcp_metrics_route
+)
+from server.routes.visualizations import (
+    handle_knowledge_graph_api as handle_knowledge_graph_route,
+    handle_performance_dashboard_api as handle_performance_dashboard_route,
+    handle_search_results_api as handle_search_results_route
+)
+
 # Import RAG functionality
 try:
     from rag_api import handle_rag_status_request, handle_rag_search_request, handle_rag_query_request, handle_rag_ingest_request, handle_rag_documents_request, handle_rag_analytics_request, handle_rag_document_delete_request, handle_rag_vector_chunks_request
@@ -304,132 +362,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     
     def handle_chat_api(self):
         """Handle chat API requests with MCP-style RAG tool integration."""
-        try:
-            # Read request body
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            # Extract message, model, workspace, and knowledge mode
-            message = request_data.get('message', '').strip()
-            model = request_data.get('model', 'qwen2.5:3b')  # Default to smaller model
-            workspace = request_data.get('workspace', 'default')  # Extract workspace
-            knowledge_mode = request_data.get('knowledge_mode', 'none')  # Extract knowledge mode
-            mcp_tool_call = request_data.get('mcp_tool_call')  # Check for MCP tool call
-
-            if not message:
-                self.send_json_response({'error': 'Message is required'}, 400)
-                return
-
-            # Handle MCP tool calls
-            if mcp_tool_call:
-                debug_log(f"MCP Tool call: {mcp_tool_call.get('tool_name', 'unknown')}", "🔧")
-                self.handle_mcp_tool_call(mcp_tool_call, model)
-                return
-
-            debug_log(f"Chat request: {message[:50]}... (model: {model}, knowledge_mode: {knowledge_mode})", "💬")
-
-            # Determine which mode to use based on knowledge_mode parameter
-            use_rag = knowledge_mode == 'rag' and RAG_AVAILABLE
-            use_cag = knowledge_mode == 'cag' and CAG_AVAILABLE
-
-            if use_rag:
-                # Use RAG-enhanced response
-                response_text, model_used, sources, token_info = self.get_rag_enhanced_response(message, model, workspace)
-                debug_log(f"RAG-enhanced response: {response_text[:50]}...", "🧠")
-
-                # Count unique source files instead of chunks
-                unique_sources = set()
-                if sources:
-                    for source in sources:
-                        if 'metadata' in source and 'source' in source['metadata']:
-                            file_path = source['metadata']['source']
-                            document_name = os.path.basename(file_path)
-                            unique_sources.add(document_name)
-
-                # Send RAG response back to client
-                self.send_json_response({
-                    'response': response_text,
-                    'model': model_used,
-                    'rag_enabled': True,
-                    'sources_used': len(unique_sources),
-                    'timestamp': '',
-                    'tokens_used': token_info.get('total_tokens', 0),
-                    'prompt_tokens': token_info.get('prompt_tokens', 0),
-                    'completion_tokens': token_info.get('completion_tokens', 0)
-                })
-            elif use_cag:
-                # Use CAG-enhanced response (with preloaded context)
-                debug_log(f"Making CAG request with model: {model}", "💾")
-                result = ollama_config.generate_response(model, message)
-
-                if result['success']:
-                    response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
-                    debug_log(f"CAG response: {response_text[:50]}...", "💾")
-
-                    # Extract token usage from Ollama response
-                    prompt_tokens = result['data'].get('prompt_eval_count', 0)
-                    completion_tokens = result['data'].get('eval_count', 0)
-                    total_tokens = prompt_tokens + completion_tokens
-
-                    # Send response back to client (with cag_enabled flag)
-                    self.send_json_response({
-                        'response': response_text,
-                        'model': model,
-                        'rag_enabled': False,
-                        'cag_enabled': True,
-                        'timestamp': result['data'].get('created_at', ''),
-                        'connection_attempt': result['attempt'],
-                        'tokens_used': total_tokens,
-                        'prompt_tokens': prompt_tokens,
-                        'completion_tokens': completion_tokens
-                    })
-                else:
-                    print(f"❌ Ollama request failed: {result['error']}")
-                    self.send_json_response({
-                        'error': f"Ollama request failed: {result['error']}",
-                        'connection_attempt': result['attempt']
-                    }, 503)
-            else:
-                # Use robust Ollama configuration for standard response (no knowledge base)
-                debug_log(f"Making standard Ollama request with model: {model}", "📤")
-                result = ollama_config.generate_response(model, message)
-
-                if result['success']:
-                    response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
-                    debug_log(f"Standard response: {response_text[:50]}...", "🤖")
-
-                    # Extract token usage from Ollama response
-                    prompt_tokens = result['data'].get('prompt_eval_count', 0)
-                    completion_tokens = result['data'].get('eval_count', 0)
-                    total_tokens = prompt_tokens + completion_tokens
-
-                    # Send response back to client
-                    self.send_json_response({
-                        'response': response_text,
-                        'model': model,
-                        'rag_enabled': False,
-                        'timestamp': result['data'].get('created_at', ''),
-                        'connection_attempt': result['attempt'],
-                        'tokens_used': total_tokens,
-                        'prompt_tokens': prompt_tokens,
-                        'completion_tokens': completion_tokens
-                    })
-                else:
-                    print(f"❌ Ollama request failed: {result['error']}")
-                    self.send_json_response({
-                        'error': f"Ollama request failed: {result['error']}",
-                        'connection_attempt': result['attempt']
-                    }, 503)
-            
-        except json.JSONDecodeError as e:
-            print(f"❌ JSON decode error: {e}")
-            self.send_json_response({'error': 'Invalid JSON in request'}, 400)
-
-        except Exception as e:
-            print(f"❌ Chat API error: {e}")
-            self.send_json_response({'error': f'Chat API error: {str(e)}'}, 500)
+        handle_chat_route(self)
 
     def handle_mcp_tool_call(self, mcp_tool_call, model):
         """Handle MCP tool execution requests."""
@@ -784,116 +717,20 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     def handle_models_api(self):
         """Handle models API requests to get available Ollama models."""
-        try:
-            # Use robust Ollama configuration to get models
-            debug_log("Requesting available Ollama models...", "📋")
-            result = ollama_config.get_available_models()
-            
-            if result['success']:
-                models = [model['name'] for model in result['data'].get('models', [])]
-                debug_log(f"Available models: {models}", "📋")
-                
-                self.send_json_response({
-                    'models': models,
-                    'count': len(models),
-                    'connection_attempt': result['attempt']
-                })
-            else:
-                print(f"❌ Failed to get models: {result['error']}")
-                self.send_json_response({
-                    'error': f"Failed to get models: {result['error']}",
-                    'models': [],
-                    'count': 0,
-                    'connection_attempt': result['attempt']
-                }, 503)
-            
-        except Exception as e:
-            print(f"❌ Models API error: {e}")
-            self.send_json_response({'error': f'Models API error: {str(e)}'}, 500)
+        handle_models_route(self)
     
     def handle_rag_status_api(self):
         """Handle RAG status API requests."""
-        try:
-            status_result = handle_rag_status_request()
-            debug_log(f"RAG status: {status_result.get('status', 'unknown')}", "🔍")
-            self.send_json_response(status_result)
-        except Exception as e:
-            print(f"❌ RAG status API error: {e}")
-            self.send_json_response({'error': f'RAG status error: {str(e)}'}, 500)
-    
+        handle_rag_status_route(self)
     def handle_rag_search_api(self):
         """Handle RAG search API requests."""
-        try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            query = request_data.get('query', '').strip()
-            max_results = request_data.get('max_results', 5)
-            
-            if not query:
-                self.send_json_response({'error': 'Query is required'}, 400)
-                return
-            
-            search_result = handle_rag_search_request(query, max_results)
-            debug_log(f"RAG search: '{query}' -> {search_result.get('results', []).__len__()} results", "🔍")
-            self.send_json_response(search_result)
-        except Exception as e:
-            print(f"❌ RAG search API error: {e}")
-            self.send_json_response({'error': f'RAG search error: {str(e)}'}, 500)
-    
+        handle_rag_search_route(self)
     def handle_rag_query_api(self):
         """Handle RAG query API requests."""
-        try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            query = request_data.get('query', '').strip()
-            max_context = request_data.get('max_context', 5)
-            
-            if not query:
-                self.send_json_response({'error': 'Query is required'}, 400)
-                return
-            
-            query_result = handle_rag_query_request(query, max_context)
-            debug_log(f"RAG query: '{query}' -> {query_result.get('status', 'unknown')}", "🤖")
-            self.send_json_response(query_result)
-        except Exception as e:
-            print(f"❌ RAG query API error: {e}")
-            self.send_json_response({'error': f'RAG query error: {str(e)}'}, 500)
-    
+        handle_rag_query_route(self)
     def handle_rag_ingest_api(self):
         """Handle RAG document ingestion API requests (supports both FormData files and JSON file paths)."""
-        try:
-            content_type = self.headers.get('Content-Type', '')
-            
-            if content_type.startswith('multipart/form-data'):
-                # Handle file upload via FormData
-                self._handle_file_upload()
-            else:
-                # Handle JSON request with file path
-                request_data = self.get_request_body()
-                if request_data is None:
-                    self.send_json_response({'error': 'Invalid JSON'}, 400)
-                    return
-
-                file_path = request_data.get('file_path', '').strip()
-                
-                if not file_path:
-                    self.send_json_response({'error': 'File path is required'}, 400)
-                    return
-                
-                ingest_result = handle_rag_ingest_request(file_path)
-                debug_log(f"RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}", "📄")
-                self.send_json_response(ingest_result)
-                
-        except Exception as e:
-            print(f"❌ RAG ingest API error: {e}")
-            self.send_json_response({'error': f'RAG ingest error: {str(e)}'}, 500)
-
+        handle_rag_ingest_route(self)
     def _handle_file_upload(self):
         """Handle multipart form data file upload."""
         import cgi
@@ -1101,100 +938,22 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     # Search API handlers
     def handle_search_api(self):
         """Handle universal search API requests."""
-        try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            search_result = handle_search_request(request_data)
-            debug_log(f"Search: '{request_data.get('query', '')}' -> {search_result.get('data', {}).get('total_count', 0)} results", "🔍")
-            self.send_json_response(search_result)
-            
-        except Exception as e:
-            print(f"❌ Search API error: {e}")
-            self.send_json_response({'error': f'Search failed: {str(e)}'}, 500)
-    
+        handle_search_route(self)
     def handle_search_folders_api(self):
         """Handle folders listing API requests."""
-        try:
-            if self.command == 'GET':
-                # GET request - list folders
-                folders_result = handle_folders_request()
-                debug_log(f"Folders: {len(folders_result.get('folders', []))} folders", "📁")
-                self.send_json_response(folders_result)
-            else:
-                # POST request - create folder
-                request_data = self.get_request_body()
-                if request_data is None:
-                    self.send_json_response({'error': 'Invalid JSON'}, 400)
-                    return
-
-                create_result = handle_create_folder_request(request_data)
-                debug_log(f"Create folder: {request_data.get('name', 'Unknown')}", "📁")
-                self.send_json_response(create_result)
-            
-        except Exception as e:
-            print(f"❌ Folders API error: {e}")
-            self.send_json_response({'error': f'Folders operation failed: {str(e)}'}, 500)
-    
+        handle_search_folders_route(self)
     def handle_search_create_folder_api(self):
         """Handle folder creation API requests."""
-        try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            create_result = handle_create_folder_request(request_data)
-            debug_log(f"Create folder: {request_data.get('name', 'Unknown')}", "📁")
-            self.send_json_response(create_result)
-            
-        except Exception as e:
-            print(f"❌ Create folder API error: {e}")
-            self.send_json_response({'error': f'Create folder failed: {str(e)}'}, 500)
-    
+        handle_search_create_folder_route(self)
     def handle_search_tags_api(self):
         """Handle tags listing API requests."""
-        try:
-            tags_result = handle_tags_request()
-            debug_log(f"Tags: {len(tags_result.get('tags', []))} tags", "🏷️")
-            self.send_json_response(tags_result)
-            
-        except Exception as e:
-            print(f"❌ Tags API error: {e}")
-            self.send_json_response({'error': f'Tags operation failed: {str(e)}'}, 500)
-    
+        handle_search_tags_route(self)
     def handle_search_add_object_api(self):
         """Handle adding searchable objects API requests."""
-        try:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            add_result = handle_add_object_request(request_data)
-            debug_log(f"Add object: {request_data.get('title', 'Unknown')} ({request_data.get('type', 'unknown')})", "➕")
-            self.send_json_response(add_result)
-            
-        except Exception as e:
-            print(f"❌ Add object API error: {e}")
-            self.send_json_response({'error': f'Add object failed: {str(e)}'}, 500)
-
+        handle_search_add_object_route(self)
     def send_json_response(self, data, status_code=200):
         """Send a JSON response."""
-        response_json = json.dumps(data)
-        response_bytes = response_json.encode('utf-8')
-        
-        self.send_response(status_code)
-        self.send_header('Content-Type', 'application/json')
-        self.send_header('Content-Length', str(len(response_bytes)))
-        self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
-        self.send_header('Access-Control-Allow-Headers', 'Content-Type')
-        self.end_headers()
-        
-        self.wfile.write(response_bytes)
+        send_json_response_util(self, data, status_code)
     
     def do_HEAD(self):
         """Handle HEAD requests (like GET but without body)."""
@@ -1240,52 +999,11 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     
     def get_content_type(self, file_path):
         """Determine content type based on file extension."""
-        # Define explicit mappings for web files
-        content_types = {
-            '.html': 'text/html; charset=utf-8',
-            '.htm': 'text/html; charset=utf-8',
-            '.css': 'text/css; charset=utf-8',
-            '.js': 'application/javascript; charset=utf-8',
-            '.svg': 'image/svg+xml',
-            '.json': 'application/json',
-            '.png': 'image/png',
-            '.jpg': 'image/jpeg',
-            '.jpeg': 'image/jpeg',
-            '.gif': 'image/gif',
-            '.ico': 'image/x-icon',
-        }
-
-        # Get file extension
-        _, ext = os.path.splitext(file_path.lower())
-
-        # Return specific type or default
-        return content_types.get(ext, 'text/plain')
+        return get_content_type_util(file_path)
 
     def get_request_body(self):
-        """
-        Parse JSON request body safely.
-
-        Returns:
-            dict: Parsed JSON data, or None if parsing fails, or {} if no content
-
-        Usage:
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-        """
-        try:
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length == 0:
-                return {}
-            post_data = self.rfile.read(content_length)
-            return json.loads(post_data.decode('utf-8'))
-        except (ValueError, json.JSONDecodeError) as e:
-            debug_log(f"Failed to parse request body: {e}", "⚠️")
-            return None
-        except Exception as e:
-            debug_log(f"Unexpected error parsing request body: {e}", "❌")
-            return None
+        """Parse JSON request body safely."""
+        return get_request_body_util(self)
 
     def log_message(self, format, *args):
         """Override to provide cleaner logging."""
@@ -1293,1112 +1011,94 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     def handle_rag_documents_api(self):
         """Handle RAG documents listing API requests."""
-        try:
-            # Extract workspace parameter from request
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-            workspace = request_data.get('workspace', 'default')
-
-            documents_result = handle_rag_documents_request(workspace)
-            debug_log(f"RAG documents: {len(documents_result.get('documents', []))} documents found for workspace '{workspace}'", "📋")
-            self.send_json_response(documents_result)
-            
-        except Exception as e:
-            print(f"❌ RAG documents API error: {e}")
-            self.send_json_response({'error': f'Failed to load documents: {str(e)}'}, 500)
-
+        handle_rag_documents_route(self)
     def handle_rag_analytics_api(self):
         """Handle RAG analytics API requests."""
-        try:
-            analytics_result = handle_rag_analytics_request()
-            debug_log(f"RAG analytics: {analytics_result.get('document_count', 0)} docs, {analytics_result.get('chunk_count', 0)} chunks", "📊")
-            self.send_json_response(analytics_result)
-            
-        except Exception as e:
-            print(f"❌ RAG analytics API error: {e}")
-            self.send_json_response({'error': f'Failed to load analytics: {str(e)}'}, 500)
-
+        handle_rag_analytics_route(self)
     def handle_rag_upload_api(self):
         """Handle RAG file upload API requests."""
-        try:
-            # For now, just return success
-            # This should eventually implement actual file upload and ingestion
-            debug_log(f"RAG upload request received", "📤")
-            
-            self.send_json_response({
-                'status': 'success',
-                'message': 'File uploaded successfully'
-            })
-            
-        except Exception as e:
-            print(f"❌ RAG upload API error: {e}")
-            self.send_json_response({'error': f'Upload failed: {str(e)}'}, 500)
-
+        handle_rag_upload_route(self)
     def handle_rag_document_delete_api(self, document_id):
         """Handle RAG document deletion API requests."""
-        try:
-            # Extract workspace parameter from request
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-            workspace = request_data.get('workspace', 'default')
-
-            debug_log(f"RAG delete request for document: {document_id} from workspace: {workspace}", "🗑️")
-
-            # Call the actual delete function from RAG API
-            result = handle_rag_document_delete_request(document_id, workspace)
-
-            if result.get("status") == "success":
-                self.send_json_response({
-                    'status': 'success',
-                    'message': result.get('message', f'Document {document_id} deleted successfully'),
-                    'document_id': document_id,
-                    'timestamp': result.get('timestamp')
-                })
-            else:
-                self.send_json_response({
-                    'status': 'error',
-                    'error': result.get('message', f'Failed to delete document {document_id}'),
-                    'document_id': document_id
-                }, 400)
-
-        except Exception as e:
-            print(f"❌ RAG document delete API error: {e}")
-            self.send_json_response({'error': f'Delete failed: {str(e)}'}, 500)
-
-    # ========== CAG API Handlers ==========
-
-    @require_system('cag')
+        handle_rag_document_delete_route(self, document_id)
     def handle_cag_status_api(self):
         """Handle CAG cache status API requests."""
-        try:
-            if cag_manager is None:
-                # Calculate optimal capacity even if CAG manager failed to initialize
-                from cag_api import calculate_optimal_cag_capacity
-                optimal_capacity = calculate_optimal_cag_capacity()
-
-                self.send_json_response({
-                    'error': 'CAG system not available',
-                    'total_tokens': 0,
-                    'available_tokens': optimal_capacity,
-                    'max_tokens': optimal_capacity,
-                    'usage_percent': 0,
-                    'document_count': 0,
-                    'documents': []
-                }, 503)
-                return
-
-            status = cag_manager.get_cache_status()
-            self.send_json_response(status)
-
-        except Exception as e:
-            print(f"❌ CAG status API error: {e}")
-            self.send_json_response({'error': f'CAG status error: {str(e)}'}, 500)
-
-    @require_system('cag')
+        handle_cag_status_route(self)
     def handle_cag_load_api(self):
         """Handle CAG document loading API requests."""
-        try:
-            if cag_manager is None:
-                self.send_json_response({'error': 'CAG system not available'}, 503)
-                return
-
-            content_length = int(self.headers.get('Content-Length', 0))
-            if content_length == 0:
-                self.send_json_response({'error': 'No data received'}, 400)
-                return
-
-            # Check if this is multipart form data (file upload)
-            content_type = self.headers.get('Content-Type', '')
-
-            if content_type.startswith('multipart/form-data'):
-                # Handle file upload
-                boundary = content_type.split('boundary=')[1].encode()
-                post_data = self.rfile.read(content_length)
-
-                # Parse multipart form data
-                import cgi
-                import io
-                environ = {
-                    'REQUEST_METHOD': 'POST',
-                    'CONTENT_TYPE': content_type,
-                    'CONTENT_LENGTH': str(content_length),
-                }
-
-                fields = cgi.FieldStorage(
-                    fp=io.BytesIO(post_data),
-                    environ=environ,
-                    keep_blank_values=True
-                )
-
-                if 'file' not in fields:
-                    self.send_json_response({'error': 'No file uploaded'}, 400)
-                    return
-
-                file_item = fields['file']
-                filename = file_item.filename
-                file_data = file_item.file.read()
-
-                # Save to temp file
-                temp_path = Path(f'/tmp/cag_{uuid.uuid4()}_{filename}')
-                temp_path.write_bytes(file_data)
-
-                # Load into CAG
-                result = cag_manager.load_document(str(temp_path))
-
-                # Clean up temp file
-                temp_path.unlink()
-
-                self.send_json_response(result)
-
-            else:
-                # Handle JSON request with file path
-                request_data = self.get_request_body()
-                if request_data is None:
-                    self.send_json_response({'error': 'Invalid JSON'}, 400)
-                    return
-                file_path = request_data.get('file_path')
-
-                if not file_path:
-                    self.send_json_response({'error': 'file_path required'}, 400)
-                    return
-
-                result = cag_manager.load_document(file_path)
-                self.send_json_response(result)
-
-        except Exception as e:
-            print(f"❌ CAG load API error: {e}")
-            import traceback
-            traceback.print_exc()
-            self.send_json_response({'error': f'CAG load failed: {str(e)}'}, 500)
-
-    @require_system('cag')
+        handle_cag_load_route(self)
     def handle_cag_clear_api(self):
         """Handle CAG cache clear API requests."""
-        try:
-            if cag_manager is None:
-                self.send_json_response({'error': 'CAG system not available'}, 503)
-                return
-
-            result = cag_manager.clear_cache()
-            self.send_json_response(result)
-
-        except Exception as e:
-            print(f"❌ CAG clear API error: {e}")
-            self.send_json_response({'error': f'CAG clear failed: {str(e)}'}, 500)
-
-    @require_system('cag')
+        handle_cag_clear_route(self)
     def handle_cag_document_delete_api(self, document_id):
         """Handle CAG document deletion API requests."""
-        try:
-            if cag_manager is None:
-                self.send_json_response({'error': 'CAG system not available'}, 503)
-                return
-
-            result = cag_manager.remove_document(document_id)
-            self.send_json_response(result)
-
-        except Exception as e:
-            print(f"❌ CAG document delete API error: {e}")
-            self.send_json_response({'error': f'Delete failed: {str(e)}'}, 500)
-
-    @require_system('cag')
+        handle_cag_document_delete_route(self, document_id)
     def handle_cag_query_api(self):
         """Handle CAG-enhanced query API requests."""
-        try:
-            if cag_manager is None:
-                self.send_json_response({'error': 'CAG system not available'}, 503)
-                return
-
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            query = request_data.get('query', '')
-            model = request_data.get('model', 'qwen2.5:3b')
-
-            if not query:
-                self.send_json_response({'error': 'query required'}, 400)
-                return
-
-            # Build full context with cached documents
-            full_context = cag_manager.get_context_for_query(query)
-
-            # Send to LLM
-            ollama_url = f"{ollama_config.base_url}/api/generate"
-            payload = {
-                'model': model,
-                'prompt': full_context,
-                'stream': False
-            }
-
-            req = urllib.request.Request(
-                ollama_url,
-                data=json.dumps(payload).encode('utf-8'),
-                headers={'Content-Type': 'application/json'}
-            )
-
-            with urllib.request.urlopen(req) as response:
-                result = json.loads(response.read().decode('utf-8'))
-
-            self.send_json_response({
-                'status': 'success',
-                'response': result.get('response', ''),
-                'model': model,
-                'context_tokens': cag_manager.total_tokens,
-                'mode': 'cag'
-            })
-
-        except Exception as e:
-            print(f"❌ CAG query API error: {e}")
-            import traceback
-            traceback.print_exc()
-            self.send_json_response({'error': f'CAG query failed: {str(e)}'}, 500)
-
-    # ========== End CAG API Handlers ==========
-
-    @require_system('rag')
+        handle_cag_query_route(self)
     def handle_knowledge_graph_api(self):
         """Handle knowledge graph visualization API requests using vector embeddings."""
-        try:
-            if not KNOWLEDGE_GRAPH_AVAILABLE:
-                self.send_json_response({
-                    'error': 'RAG system or Knowledge Graph Builder not available',
-                    'entities': [],
-                    'relationships': []
-                }, 503)
-                return
-
-            # Get vector chunks with embeddings from ChromaDB
-            chunks_result = handle_rag_vector_chunks_request()
-
-            if chunks_result.get('status') != 'success':
-                self.send_json_response({
-                    "entities": [],
-                    "relationships": [],
-                    "metadata": {
-                        "total_entities": 0,
-                        "total_relationships": 0,
-                        "message": "No vector chunks available. Upload documents to create knowledge graph.",
-                        "generated_at": datetime.now().isoformat()
-                    }
-                })
-                return
-
-            # Build knowledge graph from vector data
-            graph_builder = VectorKnowledgeGraphBuilder()
-            graph_data = graph_builder.build_knowledge_graph_from_vectors(chunks_result)
-
-            # Add timestamp to metadata
-            graph_data["metadata"]["generated_at"] = datetime.now().isoformat()
-
-            entity_count = len(graph_data.get("entities", []))
-            relationship_count = len(graph_data.get("relationships", []))
-            chunk_count = chunks_result.get('total_chunks', 0)
-
-            debug_log(f"Vector-based knowledge graph: {entity_count} entities, {relationship_count} relationships from {chunk_count} vector chunks", "📊")
-            self.send_json_response(graph_data)
-
-        except Exception as e:
-            print(f"❌ Knowledge graph API error: {e}")
-            self.send_json_response({'error': f'Knowledge graph failed: {str(e)}'}, 500)
-
-    @require_system('rag')
+        handle_knowledge_graph_route(self)
     def handle_performance_dashboard_api(self):
         """Handle performance dashboard API requests using real analytics data."""
-        try:
-            # Get real analytics from RAG system
-            analytics_result = handle_rag_analytics_request()
-
-            # Extract real metrics
-            document_count = analytics_result.get('document_count', 0)
-            chunk_count = analytics_result.get('chunk_count', 0)
-
-            # Generate realistic metrics based on actual data
-            metrics = {
-                "total_documents": document_count,
-                "total_chunks": chunk_count,
-                "avg_chunks_per_doc": chunk_count / max(document_count, 1),
-                "system_health": "healthy" if document_count > 0 else "no_data",
-                "data_source": "ChromaDB",
-                "embedding_model": "all-MiniLM-L6-v2",
-                "last_updated": datetime.now().isoformat()
-            }
-
-            # Generate basic time series data (since we don't track query history yet)
-            time_series = [
-                {
-                    "timestamp": datetime.now().isoformat(),
-                    "document_count": document_count,
-                    "chunk_count": chunk_count,
-                    "system_status": "operational"
-                }
-            ]
-
-            # Recommendations based on actual state
-            recommendations = []
-            if document_count == 0:
-                recommendations.append("Upload documents to start using the knowledge base")
-            elif document_count < 5:
-                recommendations.append("Consider adding more documents for better search results")
-            else:
-                recommendations.append("Knowledge base is well-populated and ready for queries")
-
-            if chunk_count > 0:
-                recommendations.append(f"Vector database contains {chunk_count} searchable chunks")
-
-            dashboard_data = {
-                "metrics": metrics,
-                "time_series": time_series,
-                "alerts": [],
-                "recommendations": recommendations,
-                "data_source": "Real ChromaDB analytics"
-            }
-
-            debug_log(f"Performance dashboard: {document_count} docs, {chunk_count} chunks", "📈")
-            self.send_json_response(dashboard_data)
-
-        except Exception as e:
-            print(f"❌ Performance dashboard API error: {e}")
-            self.send_json_response({'error': f'Performance dashboard failed: {str(e)}'}, 500)
-
-    @require_system('rag')
+        handle_performance_dashboard_route(self)
     def handle_search_results_api(self):
         """Handle search results explorer API requests using real RAG search."""
-        try:
-            # Perform a real search using the RAG system
-            sample_query = "knowledge documents content"
-            search_result = handle_rag_search_request(sample_query, max_results=5)
-
-            if search_result.get('status') != 'success':
-                self.send_json_response({
-                    "search_results": [],
-                    "query_info": {
-                        "query": sample_query,
-                        "total_found": 0,
-                        "execution_time": 0,
-                        "message": "No documents available for search. Upload documents first."
-                    },
-                    "data_source": "Real RAG search"
-                })
-                return
-
-            # Format real search results
-            search_results = []
-            results = search_result.get('results', [])
-
-            for i, result in enumerate(results):
-                # Extract meaningful title from document content or metadata
-                content = result.get('document', '')
-                metadata = result.get('metadata', {})
-
-                # Try to create a meaningful title
-                title = metadata.get('file_name', f"Document {i+1}")
-                if not title and content:
-                    # Use first line as title if available
-                    first_line = content.split('\n')[0].strip()
-                    title = first_line[:50] + "..." if len(first_line) > 50 else first_line
-
-                search_results.append({
-                    "id": f"search_result_{i}",
-                    "title": title,
-                    "content": content[:200] + "..." if len(content) > 200 else content,
-                    "score": result.get('similarity_score', 0),
-                    "source": metadata.get('source', 'Unknown source'),
-                    "metadata": {
-                        "file_type": metadata.get('file_type', 'unknown'),
-                        "chunk_index": metadata.get('chunk_index', 0),
-                        "chunk_type": metadata.get('chunk_type', 'content')
-                    }
-                })
-
-            explorer_data = {
-                "search_results": search_results,
-                "query_info": {
-                    "query": sample_query,
-                    "total_found": len(search_results),
-                    "execution_time": search_result.get('execution_time', 0),
-                    "strategy": "semantic_search",
-                    "data_source": "ChromaDB"
-                },
-                "filters": {
-                    "available_types": list(set(r["metadata"]["file_type"] for r in search_results)),
-                    "available_chunks": list(set(r["metadata"]["chunk_type"] for r in search_results))
-                },
-                "data_source": "Real RAG search"
-            }
-
-            debug_log(f"Search explorer: {len(search_results)} real results from ChromaDB", "🔍")
-            self.send_json_response(explorer_data)
-
-        except Exception as e:
-            print(f"❌ Search results API error: {e}")
-            self.send_json_response({'error': f'Search results failed: {str(e)}'}, 500)
-
-    # Agent System API Methods
-    @require_system('agent_system')
+        handle_search_results_route(self)
     def handle_agents_api(self):
         """Handle /api/agents endpoint."""
-        try:
-            if self.command == 'GET':
-                # Return mock agents for now
-                agents = [
-                    {
-                        'agent_id': 'rag_research_agent',
-                        'name': 'RAG Research Agent',
-                        'description': 'Specialized in document analysis and research',
-                        'status': 'active',
-                        'capabilities': ['vector_search', 'document_analysis', 'llm_inference'],
-                        'current_tasks': 0
-                    },
-                    {
-                        'agent_id': 'code_review_agent',
-                        'name': 'Code Review Agent',
-                        'description': 'Security and performance code analysis',
-                        'status': 'active',
-                        'capabilities': ['code_analysis', 'security_review', 'static_analysis'],
-                        'current_tasks': 0
-                    },
-                    {
-                        'agent_id': 'vector_data_analyst',
-                        'name': 'Vector Data Analyst',
-                        'description': 'Mojo SIMD-optimized vector analysis',
-                        'status': 'active',
-                        'capabilities': ['vector_analysis', 'data_clustering', 'similarity_search'],
-                        'current_tasks': 0
-                    }
-                ]
-
-                self.send_json_response({
-                    'status': 'success',
-                    'agents': agents,
-                    'count': len(agents),
-                    'red_compliant': True
-                })
-
-            elif self.command == 'POST':
-                # Create new agent
-                agent_data = self.get_request_body()
-                if agent_data is None:
-                    self.send_json_response({'error': 'Invalid JSON'}, 400)
-                    return
-
-                # Generate a unique agent ID
-                agent_id = f"agent_{str(uuid.uuid4())[:8]}"
-
-                # Create agent response
-                new_agent = {
-                    'agent_id': agent_id,
-                    'name': agent_data.get('name', 'Unnamed Agent'),
-                    'description': agent_data.get('description', ''),
-                    'status': 'active',
-                    'capabilities': agent_data.get('capabilities', ['general']),
-                    'current_tasks': 0,
-                    'created_at': datetime.datetime.now().isoformat()
-                }
-
-                debug_log(f"Created new agent: {new_agent['name']} ({agent_id})", "✅")
-
-                self.send_json_response({
-                    'status': 'success',
-                    'message': 'Agent created successfully',
-                    'data': new_agent
-                })
-
-            else:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': f'Method {self.command} not allowed'
-                }, 405)
-
-        except Exception as e:
-            print(f"❌ Agents API error: {e}")
-            self.send_json_response({'error': f'Agents API failed: {str(e)}'}, 500)
-
-    @require_system('agent_system')
+        handle_agents_route(self)
     def handle_agents_metrics_api(self):
         """Handle /api/agents/metrics endpoint for real-time monitoring."""
-        try:
-
-            # Return agent metrics for monitoring dashboard
-            metrics = {
-                'timestamp': time.time(),
-                'agents': {
-                    'rag_research_agent': {
-                        'status': 'active',
-                        'cpu_usage': 0.0,
-                        'memory_usage_mb': 0,
-                        'tasks_completed': 0,
-                        'tasks_pending': 0,
-                        'avg_response_time_ms': 0
-                    },
-                    'code_review_agent': {
-                        'status': 'active',
-                        'cpu_usage': 0.0,
-                        'memory_usage_mb': 0,
-                        'tasks_completed': 0,
-                        'tasks_pending': 0,
-                        'avg_response_time_ms': 0
-                    },
-                    'vector_data_analyst': {
-                        'status': 'active',
-                        'cpu_usage': 0.0,
-                        'memory_usage_mb': 0,
-                        'tasks_completed': 0,
-                        'tasks_pending': 0,
-                        'avg_response_time_ms': 0
-                    }
-                },
-                'system': {
-                    'total_agents': 3,
-                    'active_agents': 3,
-                    'total_tasks': 0,
-                    'completed_tasks': 0,
-                    'failed_tasks': 0
-                }
-            }
-
-            self.send_json_response({
-                'status': 'success',
-                'metrics': metrics
-            })
-
-        except Exception as e:
-            print(f"❌ Agents metrics API error: {e}")
-            self.send_json_response({'error': f'Agents metrics API failed: {str(e)}'}, 500)
-
-    @require_system('agent_system')
+        handle_agents_metrics_route(self)
     def handle_agents_detail_api(self):
         """Handle /api/agents/{agent_id} endpoint."""
-        try:
-
-            # Extract agent_id from path
-            agent_id = self.path.split('/')[-1]
-
-            if agent_id == 'metrics':
-                # Return agent metrics
-                self.send_json_response({
-                    'status': 'success',
-                    'metrics': {
-                        'total_agents': 3,
-                        'active_agents': 3,
-                        'avg_response_time_ms': 6,
-                        'total_cost': 0.00,
-                        'mojo_simd_enabled': True,
-                        'red_compliance': {
-                            'cost_first': True,
-                            'agent_native': True,
-                            'mojo_optimized': True,
-                            'local_first': True,
-                            'simple_scale': True
-                        }
-                    }
-                })
-            else:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': f'Agent {agent_id} not found'
-                }, 404)
-
-        except Exception as e:
-            print(f"❌ Agent detail API error: {e}")
-            self.send_json_response({'error': f'Agent API failed: {str(e)}'}, 500)
-
-    @require_system('agent_system')
+        handle_agents_detail_route(self)
     def handle_mcp_servers_api(self):
         """Handle /api/mcp/servers endpoint."""
-        try:
-
-            if self.command == 'GET':
-                # Return mock MCP servers
-                servers = [
-                    {
-                        'server_id': 'ollama_server',
-                        'name': 'Ollama Local LLM Server',
-                        'description': 'Local Ollama integration for zero-cost inference',
-                        'status': 'running',
-                        'host': 'localhost:11434',
-                        'tools': ['llm_inference', 'text_generation']
-                    },
-                    {
-                        'server_id': 'chromadb_server',
-                        'name': 'ChromaDB Vector Server',
-                        'description': 'Local vector database for RAG operations',
-                        'status': 'running',
-                        'host': 'localhost:9090',
-                        'tools': ['vector_search', 'similarity_search', 'document_indexing']
-                    }
-                ]
-
-                self.send_json_response({
-                    'status': 'success',
-                    'servers': servers,
-                    'cost': '$0.00',
-                    'red_compliant': True
-                })
-
-            elif self.command == 'POST':
-                # Add new MCP server with comprehensive configuration
-                server_data = self.get_request_body()
-                if server_data is None:
-                    self.send_json_response({'error': 'Invalid JSON'}, 400)
-                    return
-
-                # Generate a unique server ID
-                server_id = f"server_{str(uuid.uuid4())[:8]}"
-
-                # Create comprehensive server configuration
-                new_server = {
-                    'server_id': server_id,
-                    'name': server_data.get('name', 'Unnamed Server'),
-                    'description': server_data.get('description', ''),
-                    'transport': server_data.get('transport', 'stdio'),
-                    'status': 'stopped',  # New servers start stopped
-                    'scope': server_data.get('scope', 'local'),
-                    'maxTokens': server_data.get('maxTokens', 10000),
-                    'autoStart': server_data.get('autoStart', False),
-                    'debug': server_data.get('debug', False),
-                    'created_at': datetime.now().isoformat()
-                }
-
-                # Transport-specific configuration
-                if server_data.get('transport') == 'stdio':
-                    new_server.update({
-                        'command': server_data.get('command', ''),
-                        'args': server_data.get('args', []),
-                        'cwd': server_data.get('cwd'),
-                        'environment': server_data.get('environment', {})
-                    })
-                    new_server['host'] = 'local'
-                    new_server['tools'] = ['local_execution', 'file_system']
-                else:
-                    new_server.update({
-                        'url': server_data.get('url', ''),
-                        'timeout': server_data.get('timeout', 30),
-                        'auth': server_data.get('auth', {'type': 'none'})
-                    })
-                    new_server['host'] = server_data.get('url', 'remote')
-                    new_server['tools'] = ['remote_api', 'web_services']
-
-                # Validate required fields
-                if server_data.get('transport') == 'stdio' and not server_data.get('command'):
-                    self.send_json_response({
-                        'status': 'error',
-                        'message': 'Command is required for stdio transport'
-                    }, 400)
-                    return
-
-                if server_data.get('transport') in ['sse', 'http'] and not server_data.get('url'):
-                    self.send_json_response({
-                        'status': 'error',
-                        'message': 'URL is required for remote transport'
-                    }, 400)
-                    return
-
-                debug_log(f"Added new MCP server: {new_server['name']} ({server_id}) - Transport: {new_server['transport']}", "✅")
-
-                self.send_json_response({
-                    'status': 'success',
-                    'message': 'MCP server added successfully',
-                    'data': new_server,
-                    'config': {
-                        'transport': new_server['transport'],
-                        'scope': new_server['scope'],
-                        'ready_to_start': bool(new_server.get('command') or new_server.get('url'))
-                    }
-                })
-
-            else:
-                self.send_json_response({
-                    'status': 'error',
-                    'message': f'Method {self.command} not allowed'
-                }, 405)
-
-        except Exception as e:
-            print(f"❌ MCP servers API error: {e}")
-            self.send_json_response({'error': f'MCP servers API failed: {str(e)}'}, 500)
-
-    @require_system('agent_system')
+        handle_mcp_servers_route(self)
     def handle_mcp_server_action_api(self):
         """Handle /api/mcp/servers/{server_id}/action endpoint."""
-        try:
-
-            # For now, just return success for any action
-            self.send_json_response({
-                'status': 'success',
-                'message': 'MCP server action completed'
-            })
-
-        except Exception as e:
-            print(f"❌ MCP server action API error: {e}")
-            self.send_json_response({'error': f'MCP server action failed: {str(e)}'}, 500)
-
-    @require_system('agent_system')
+        handle_mcp_server_action_route(self)
     def handle_nlp_parse_task_api(self):
         """Handle /api/nlp/parse-task endpoint."""
-        try:
-            # Read request body
-            data = self.get_request_body()
-            if data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            user_input = data.get('user_input', '')
-            if not user_input:
-                self.send_json_response({'error': 'user_input is required'}, 400)
-                return
-
-            # Simple task classification based on keywords
-            task_type = 'general'
-            recommended_agent = 'rag_research_agent'
-            confidence_score = 0.7
-
-            if any(word in user_input.lower() for word in ['search', 'find', 'lookup']):
-                task_type = 'vector_search'
-                confidence_score = 0.9
-            elif any(word in user_input.lower() for word in ['code', 'review', 'security']):
-                task_type = 'code_review'
-                recommended_agent = 'code_review_agent'
-                confidence_score = 0.9
-            elif any(word in user_input.lower() for word in ['analyze', 'data', 'vector']):
-                task_type = 'data_analysis'
-                recommended_agent = 'vector_data_analyst'
-                confidence_score = 0.8
-
-            # Return structured analysis
-            self.send_json_response({
-                'status': 'success',
-                'analysis': {
-                    'task_type': task_type,
-                    'complexity': 'medium',
-                    'estimated_duration_minutes': 5,
-                    'required_capabilities': [task_type],
-                    'recommended_agent': recommended_agent,
-                    'confidence_score': confidence_score,
-                    'extracted_entities': {'input': user_input[:50]},
-                    'mcp_tools_needed': ['ollama_inference', 'chromadb_search'],
-                    'compute_requirements': {
-                        'memory_mb': 512,
-                        'cpu_cores': 2,
-                        'priority': 'medium'
-                    }
-                },
-                'recommendations': {
-                    'agent': recommended_agent,
-                    'tools': ['ollama_inference', 'chromadb_search'],
-                    'priority': 'medium'
-                },
-                'cost': '$0.00'
-            })
-
-        except Exception as e:
-            print(f"❌ NLP parse task API error: {e}")
-            self.send_json_response({'error': f'NLP parse task failed: {str(e)}'}, 500)
-
-    @require_system('agent_system')
+        handle_nlp_parse_task_route(self)
     def handle_nlp_capabilities_api(self):
         """Handle /api/nlp/capabilities endpoint."""
-        try:
-
-            # Return NLP capabilities
-            self.send_json_response({
-                'status': 'success',
-                'capabilities': {
-                    # Top-level fields expected by JavaScript
-                    'accuracy': 1.0,  # 100% as decimal for JavaScript
-                    'response_time_ms': 0.045,  # Expected by JavaScript
-
-                    # Detailed capabilities
-                    'task_parsing': {
-                        'supported': True,
-                        'accuracy': '100%',
-                        'patterns': ['research', 'analysis', 'code_review', 'vector_analysis']
-                    },
-                    'agent_recommendation': {
-                        'supported': True,
-                        'algorithm': 'zero_cost_matching',
-                        'agents_available': 3
-                    },
-                    'natural_language_interface': {
-                        'supported': True,
-                        'languages': ['english'],
-                        'context_aware': True
-                    },
-                    'real_time_processing': {
-                        'supported': True,
-                        'latency_ms': 0.045,
-                        'simd_optimized': True
-                    }
-                },
-                'red_compliance': {
-                    'cost_first': True,
-                    'agent_native': True,
-                    'mojo_optimized': True,
-                    'local_first': True,
-                    'simple_scale': True
-                },
-                'cost': '$0.00'
-            })
-        except Exception as e:
-            print(f"❌ NLP capabilities API error: {e}")
-            self.send_json_response({'error': f'NLP capabilities failed: {str(e)}'}, 500)
-
-    @require_system('agent_system')
+        handle_nlp_capabilities_route(self)
     def handle_mcp_metrics_api(self):
         """Handle /api/mcp/metrics endpoint."""
-        try:
-
-            # Return MCP system metrics
-            self.send_json_response({
-                'status': 'success',
-                'metrics': {
-                    'total_servers': 2,
-                    'active_servers': 2,
-                    'failed_servers': 0,
-                    'total_tools': 6,
-                    'tool_categories': {
-                        'llm_inference': 1,
-                        'vector_search': 2,
-                        'document_processing': 1,
-                        'data_analysis': 2
-                    },
-                    'performance': {
-                        'avg_response_time_ms': 3.2,
-                        'total_requests': 0,
-                        'successful_requests': 0,
-                        'failed_requests': 0,
-                        'uptime_hours': 0.1
-                    },
-                    'resources': {
-                        'memory_usage_mb': 45.2,
-                        'cpu_usage_percent': 2.1,
-                        'storage_used_mb': 12.8
-                    },
-                    'protocol_version': '1.0',
-                    'capabilities': [
-                        'tool_discovery',
-                        'context_sharing',
-                        'streaming_responses',
-                        'error_handling',
-                        'resource_management'
-                    ]
-                },
-                'red_compliance': {
-                    'cost_first': True,
-                    'agent_native': True,
-                    'mojo_optimized': True,
-                    'local_first': True,
-                    'simple_scale': True
-                },
-                'cost': '$0.00',
-                'last_updated': '2025-09-20T00:50:00Z'
-            })
-        except Exception as e:
-            print(f"❌ MCP metrics API error: {e}")
-            self.send_json_response({'error': f'MCP metrics failed: {str(e)}'}, 500)
-
-    # ========== Prompts API Handlers ==========
-
-    @require_system('prompts')
+        handle_mcp_metrics_route(self)
     def handle_prompts_list_api(self):
         """Handle GET /api/prompts - List all prompts."""
-        try:
-
-            # Parse query parameters
-            query_params = {}
-            # For now, just list all prompts
-            result = handle_prompts_list_request(query_params)
-
-            debug_log(f"Prompts list: {result.get('count', 0)} prompts", "📋")
-            self.send_json_response(result)
-
-        except Exception as e:
-            print(f"❌ Prompts list API error: {e}")
-            self.send_json_response({'error': f'Prompts list failed: {str(e)}'}, 500)
-
-    @require_system('prompts')
+        handle_prompts_list_route(self)
     def handle_prompts_create_api(self):
         """Handle POST /api/prompts - Create new prompt."""
-        try:
-            # Read request body
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            result = handle_prompts_create_request(request_data)
-
-            if result.get('status') == 'success':
-                debug_log(f"Created prompt: {request_data.get('name', 'Unknown')}", "✅")
-                self.send_json_response(result, 201)
-            else:
-                print(f"❌ Failed to create prompt: {result.get('message', 'Unknown error')}")
-                self.send_json_response(result, 400)
-
-        except Exception as e:
-            print(f"❌ Prompts create API error: {e}")
-            self.send_json_response({'error': f'Prompts create failed: {str(e)}'}, 500)
-
-    @require_system('prompts')
+        handle_prompts_create_route(self)
     def handle_prompts_detail_api(self):
         """Handle GET /api/prompts/{prompt_id} - Get prompt by ID."""
-        try:
-
-            # Extract prompt ID from path
-            prompt_id = self.path.split('/')[-1]
-
-            result = handle_prompts_get_request(prompt_id)
-
-            if result.get('status') == 'success':
-                self.send_json_response(result)
-            else:
-                self.send_json_response(result, 404)
-
-        except Exception as e:
-            print(f"❌ Prompts detail API error: {e}")
-            self.send_json_response({'error': f'Prompts detail failed: {str(e)}'}, 500)
-
-    @require_system('prompts')
+        handle_prompts_detail_route(self)
     def handle_prompts_update_api(self):
         """Handle PUT/POST /api/prompts/{prompt_id} - Update prompt."""
-        try:
-
-            # Extract prompt ID from path
-            prompt_id = self.path.split('/')[-1]
-
-            # Read request body
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            result = handle_prompts_update_request(prompt_id, request_data)
-
-            if result.get('status') == 'success':
-                debug_log(f"Updated prompt: {prompt_id}", "✅")
-                self.send_json_response(result)
-            else:
-                print(f"❌ Failed to update prompt: {result.get('message', 'Unknown error')}")
-                self.send_json_response(result, 400)
-
-        except Exception as e:
-            print(f"❌ Prompts update API error: {e}")
-            self.send_json_response({'error': f'Prompts update failed: {str(e)}'}, 500)
-
-    @require_system('prompts')
+        handle_prompts_update_route(self)
     def handle_prompts_delete_api(self, prompt_id):
         """Handle DELETE /api/prompts/{prompt_id} - Delete prompt."""
-        try:
-
-            result = handle_prompts_delete_request(prompt_id)
-
-            if result.get('status') == 'success':
-                debug_log(f"Deleted prompt: {prompt_id}", "🗑️")
-                self.send_json_response(result)
-            else:
-                self.send_json_response(result, 404)
-
-        except Exception as e:
-            print(f"❌ Prompts delete API error: {e}")
-            self.send_json_response({'error': f'Prompts delete failed: {str(e)}'}, 500)
-
-    @require_system('prompts')
+        handle_prompts_delete_route(self, prompt_id)
     def handle_prompts_use_api(self):
         """Handle POST /api/prompts/use - Use a prompt (get content)."""
-        try:
-            # Read request body
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            result = handle_prompts_use_request(request_data)
-
-            if result.get('status') == 'success':
-                self.send_json_response(result)
-            else:
-                self.send_json_response(result, 404)
-
-        except Exception as e:
-            print(f"❌ Prompts use API error: {e}")
-            self.send_json_response({'error': f'Prompts use failed: {str(e)}'}, 500)
-
-    @require_system('prompts')
+        handle_prompts_use_route(self)
     def handle_prompts_search_api(self):
         """Handle POST /api/prompts/search - Search prompts."""
-        try:
-            # Read request body
-            request_data = self.get_request_body()
-            if request_data is None:
-                self.send_json_response({'error': 'Invalid JSON'}, 400)
-                return
-
-            result = handle_prompts_search_request(request_data)
-
-            debug_log(f"Prompts search: {result.get('count', 0)} results", "🔍")
-            self.send_json_response(result)
-
-        except Exception as e:
-            print(f"❌ Prompts search API error: {e}")
-            self.send_json_response({'error': f'Prompts search failed: {str(e)}'}, 500)
-
-    # ========== End Prompts API Handlers ==========
+        handle_prompts_search_route(self)
 
 
 def main():
-    """Start the development server."""
-    port = 9090
-    server_address = ('localhost', port)
-    
-    try:
-        # Change to the directory containing the web files
-        web_dir = Path(__file__).parent
-        os.chdir(web_dir)
-        
-        # Verify required files exist
-        if not os.path.exists('index.html'):
-            print("❌ Error: index.html not found in current directory")
-            sys.exit(1)
-        
-        # Create and start the server
-        httpd = HTTPServer(server_address, CustomHTTPRequestHandler)
-        
-        print(f"🚀 Robobrain UI Server starting...")
-        print(f"📁 Serving files from: {web_dir}")
-        print(f"🌐 Server running at: http://localhost:{port}")
-        print(f"🔗 Open in browser: http://localhost:{port}")
-        print(f"⏹️  Press Ctrl+C to stop the server")
-        print(f"💡 Started with: uv run server.py")
-        print(f"🔍 Available files:")
-        
-        # List available files
-        for file in os.listdir('.'):
-            if not file.startswith('.'):
-                print(f"   - {file}")
-        
-        # Start serving
-        httpd.serve_forever()
-        
-    except KeyboardInterrupt:
-        print(f"\n🛑 Server stopped by user")
-        if 'httpd' in locals():
-            httpd.server_close()
-        sys.exit(0)
-    except OSError as e:
-        if e.errno == 98:  # Address already in use
-            print(f"❌ Port {port} is already in use. Please try a different port or stop the existing server.")
-        else:
-            print(f"❌ Network error: {e}")
-        sys.exit(1)
-    except Exception as e:
-        print(f"❌ Server error: {e}")
-        import traceback
-        traceback.print_exc()
-        sys.exit(1)
+    """Start the HTTP server on port 9090."""
+    server_address = ('', 9090)
+    httpd = HTTPServer(server_address, CustomHTTPRequestHandler)
+    print(f'🚀 Server running on http://localhost:9090')
+    print(f'📂 Serving files from: {os.getcwd()}')
+    httpd.serve_forever()
 
 
 if __name__ == '__main__':
