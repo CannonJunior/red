@@ -1056,9 +1056,17 @@ class Navigation {
         navItems.forEach(item => {
             item.addEventListener('click', (e) => {
                 const itemText = item.textContent.trim().toLowerCase();
+
+                // Handle expandable nav items (Lists)
+                if (item.classList.contains('expandable-nav-item')) {
+                    e.stopPropagation();
+                    this.toggleExpandableNavItem(item, itemText);
+                    return;
+                }
+
                 this.navigateTo(itemText);
                 this.setActiveNavItem(item);
-                
+
                 // Show/hide knowledge base list when Knowledge is selected
                 if (itemText === 'knowledge') {
                     this.toggleKnowledgeBaseList(true);
@@ -1067,6 +1075,50 @@ class Navigation {
                 }
             });
         });
+
+        // Setup sub-nav items (Opportunities)
+        const subNavItems = document.querySelectorAll('.sub-nav-item');
+        subNavItems.forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const listType = item.getAttribute('data-list');
+
+                if (item.classList.contains('expandable-nav-item')) {
+                    this.toggleExpandableNavItem(item, listType);
+                    // Also navigate to opportunities area
+                    this.navigateTo('opportunities');
+                    if (window.app?.opportunitiesManager) {
+                        window.app.opportunitiesManager.loadOpportunities();
+                    }
+                }
+            });
+        });
+    }
+
+    toggleExpandableNavItem(item, itemName) {
+        const expandIcon = item.querySelector('.expand-icon');
+        let submenu = null;
+
+        if (itemName === 'lists') {
+            submenu = document.getElementById('lists-submenu');
+        } else if (itemName === 'opportunities') {
+            submenu = document.getElementById('opportunities-list');
+        }
+
+        if (submenu) {
+            const isHidden = submenu.classList.contains('hidden');
+            if (isHidden) {
+                submenu.classList.remove('hidden');
+                if (expandIcon) {
+                    expandIcon.style.transform = 'rotate(180deg)';
+                }
+            } else {
+                submenu.classList.add('hidden');
+                if (expandIcon) {
+                    expandIcon.style.transform = 'rotate(0deg)';
+                }
+            }
+        }
     }
 
     navigateTo(page) {
@@ -1080,6 +1132,7 @@ class Navigation {
         document.getElementById('mcp-area')?.classList.add('hidden');
         document.getElementById('agents-area')?.classList.add('hidden');
         document.getElementById('prompts-area')?.classList.add('hidden');
+        document.getElementById('opportunities-area')?.classList.add('hidden');
 
         // Show the selected area
         const pageTitle = document.getElementById('page-title');
@@ -1143,6 +1196,14 @@ class Navigation {
                 pageTitle.textContent = 'Agents';
                 this.currentPage = 'agents';
                 this.setupAgentsButtonHandlers();
+                break;
+            case 'opportunities':
+                document.getElementById('opportunities-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Opportunities';
+                this.currentPage = 'opportunities';
+                if (window.app?.opportunitiesManager) {
+                    window.app.opportunitiesManager.loadOpportunities();
+                }
                 break;
         }
     }
@@ -2342,6 +2403,261 @@ class VisualizationManager {
     }
 }
 
+// Opportunities Manager
+class OpportunitiesManager {
+    constructor() {
+        this.opportunities = [];
+        this.currentOpportunity = null;
+        this.init();
+    }
+
+    init() {
+        this.setupEventListeners();
+    }
+
+    setupEventListeners() {
+        // Add opportunity button
+        const addBtn = document.getElementById('add-opportunity-btn');
+        if (addBtn) {
+            addBtn.addEventListener('click', () => this.showCreateOpportunityModal());
+        }
+
+        // Modal close buttons
+        const closeModal = document.getElementById('close-opportunity-modal');
+        const cancelBtn = document.getElementById('cancel-opportunity-btn');
+        if (closeModal) {
+            closeModal.addEventListener('click', () => this.hideOpportunityModal());
+        }
+        if (cancelBtn) {
+            cancelBtn.addEventListener('click', () => this.hideOpportunityModal());
+        }
+
+        // Form submission
+        const form = document.getElementById('opportunity-form');
+        if (form) {
+            form.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveOpportunity();
+            });
+        }
+
+        // Detail view buttons
+        const closeDetailBtn = document.getElementById('close-opportunity-detail-btn');
+        const editBtn = document.getElementById('edit-opportunity-btn');
+        const deleteBtn = document.getElementById('delete-opportunity-btn');
+
+        if (closeDetailBtn) {
+            closeDetailBtn.addEventListener('click', () => this.closeOpportunityDetail());
+        }
+        if (editBtn) {
+            editBtn.addEventListener('click', () => this.editCurrentOpportunity());
+        }
+        if (deleteBtn) {
+            deleteBtn.addEventListener('click', () => this.deleteCurrentOpportunity());
+        }
+    }
+
+    async loadOpportunities() {
+        try {
+            const response = await fetch('/api/opportunities', {
+                method: 'GET',
+                headers: { 'Content-Type': 'application/json' }
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                this.opportunities = data.opportunities || [];
+                this.renderOpportunitiesList();
+            }
+        } catch (error) {
+            console.error('Error loading opportunities:', error);
+        }
+    }
+
+    renderOpportunitiesList() {
+        const opportunitiesList = document.getElementById('opportunities-list');
+        if (!opportunitiesList) return;
+
+        opportunitiesList.innerHTML = '';
+
+        if (this.opportunities.length === 0) {
+            opportunitiesList.innerHTML = '<p class="text-sm text-gray-500 dark:text-gray-400 px-3 py-2">No opportunities yet</p>';
+            return;
+        }
+
+        this.opportunities.forEach(opp => {
+            const item = document.createElement('button');
+            item.className = 'w-full text-left px-3 py-2 rounded text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors';
+            item.textContent = opp.name;
+            item.addEventListener('click', () => this.showOpportunityDetail(opp));
+            opportunitiesList.appendChild(item);
+        });
+    }
+
+    showCreateOpportunityModal() {
+        this.currentOpportunity = null;
+        const modal = document.getElementById('opportunity-modal');
+        const modalTitle = document.getElementById('opportunity-modal-title');
+        const form = document.getElementById('opportunity-form');
+
+        if (modalTitle) modalTitle.textContent = 'Create Opportunity';
+        if (form) form.reset();
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    hideOpportunityModal() {
+        const modal = document.getElementById('opportunity-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    async saveOpportunity() {
+        const name = document.getElementById('opportunity-name').value;
+        const description = document.getElementById('opportunity-description').value;
+        const status = document.getElementById('opportunity-status').value;
+        const priority = document.getElementById('opportunity-priority').value;
+        const value = parseFloat(document.getElementById('opportunity-value').value) || 0;
+        const tagsInput = document.getElementById('opportunity-tags').value;
+        const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+
+        const opportunityData = {
+            name,
+            description,
+            status,
+            priority,
+            value,
+            tags
+        };
+
+        try {
+            const url = this.currentOpportunity
+                ? `/api/opportunities/${this.currentOpportunity.id}`
+                : '/api/opportunities';
+
+            const method = 'POST';
+
+            const response = await fetch(url, {
+                method,
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(opportunityData)
+            });
+
+            if (response.ok) {
+                const data = await response.json();
+                debugLog(`Opportunity ${this.currentOpportunity ? 'updated' : 'created'} successfully`);
+                this.hideOpportunityModal();
+                this.loadOpportunities();
+
+                // Show the newly created opportunity
+                if (data.opportunity) {
+                    this.showOpportunityDetail(data.opportunity);
+                }
+            } else {
+                console.error('Failed to save opportunity');
+            }
+        } catch (error) {
+            console.error('Error saving opportunity:', error);
+        }
+    }
+
+    showOpportunityDetail(opportunity) {
+        this.currentOpportunity = opportunity;
+
+        const detailView = document.getElementById('opportunity-detail-view');
+        const emptyState = document.getElementById('opportunities-empty-state');
+
+        if (detailView) detailView.classList.remove('hidden');
+        if (emptyState) emptyState.classList.add('hidden');
+
+        // Populate detail fields
+        document.getElementById('opportunity-detail-name').textContent = opportunity.name;
+        document.getElementById('opportunity-detail-status').textContent = this.formatStatus(opportunity.status);
+        document.getElementById('opportunity-detail-priority').textContent = this.formatPriority(opportunity.priority);
+        document.getElementById('opportunity-detail-value').textContent = `$${opportunity.value.toLocaleString()}`;
+        document.getElementById('opportunity-detail-created').textContent = new Date(opportunity.created_at).toLocaleDateString();
+        document.getElementById('opportunity-detail-description').textContent = opportunity.description || 'No description';
+
+        // Render tags
+        const tagsContainer = document.getElementById('opportunity-detail-tags');
+        tagsContainer.innerHTML = '';
+        if (opportunity.tags && opportunity.tags.length > 0) {
+            opportunity.tags.forEach(tag => {
+                const tagEl = document.createElement('span');
+                tagEl.className = 'px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded';
+                tagEl.textContent = tag;
+                tagsContainer.appendChild(tagEl);
+            });
+        } else {
+            tagsContainer.innerHTML = '<span class="text-gray-500 dark:text-gray-400">No tags</span>';
+        }
+    }
+
+    closeOpportunityDetail() {
+        const detailView = document.getElementById('opportunity-detail-view');
+        const emptyState = document.getElementById('opportunities-empty-state');
+
+        if (detailView) detailView.classList.add('hidden');
+        if (emptyState) emptyState.classList.remove('hidden');
+    }
+
+    editCurrentOpportunity() {
+        if (!this.currentOpportunity) return;
+
+        const modal = document.getElementById('opportunity-modal');
+        const modalTitle = document.getElementById('opportunity-modal-title');
+
+        if (modalTitle) modalTitle.textContent = 'Edit Opportunity';
+
+        // Populate form
+        document.getElementById('opportunity-id').value = this.currentOpportunity.id;
+        document.getElementById('opportunity-name').value = this.currentOpportunity.name;
+        document.getElementById('opportunity-description').value = this.currentOpportunity.description || '';
+        document.getElementById('opportunity-status').value = this.currentOpportunity.status;
+        document.getElementById('opportunity-priority').value = this.currentOpportunity.priority;
+        document.getElementById('opportunity-value').value = this.currentOpportunity.value;
+        document.getElementById('opportunity-tags').value = (this.currentOpportunity.tags || []).join(', ');
+
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    async deleteCurrentOpportunity() {
+        if (!this.currentOpportunity) return;
+
+        if (!confirm(`Are you sure you want to delete "${this.currentOpportunity.name}"?`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/opportunities/${this.currentOpportunity.id}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok) {
+                debugLog('Opportunity deleted successfully');
+                this.closeOpportunityDetail();
+                this.loadOpportunities();
+            } else {
+                console.error('Failed to delete opportunity');
+            }
+        } catch (error) {
+            console.error('Error deleting opportunity:', error);
+        }
+    }
+
+    formatStatus(status) {
+        const statusMap = {
+            'open': 'Open',
+            'in_progress': 'In Progress',
+            'won': 'Won',
+            'lost': 'Lost'
+        };
+        return statusMap[status] || status;
+    }
+
+    formatPriority(priority) {
+        return priority.charAt(0).toUpperCase() + priority.slice(1);
+    }
+}
+
 // App initialization
 class App {
     constructor() {
@@ -2349,6 +2665,7 @@ class App {
         this.chatInterface = new ChatInterface();
         this.navigation = new Navigation();
         this.visualizationManager = new VisualizationManager();
+        this.opportunitiesManager = new OpportunitiesManager();
         this.init();
     }
 

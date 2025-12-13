@@ -85,6 +85,13 @@ from server.routes.visualizations import (
     handle_performance_dashboard_api as handle_performance_dashboard_route,
     handle_search_results_api as handle_search_results_route
 )
+from server.routes.opportunities import (
+    handle_opportunities_list_api as handle_opportunities_list_route,
+    handle_opportunities_create_api as handle_opportunities_create_route,
+    handle_opportunities_detail_api as handle_opportunities_detail_route,
+    handle_opportunities_update_api as handle_opportunities_update_route,
+    handle_opportunities_delete_api as handle_opportunities_delete_route
+)
 
 # Import RAG functionality
 try:
@@ -217,6 +224,13 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
                     self.handle_prompts_detail_api()
                     return
+                # Opportunities API endpoints
+                elif self.path == '/api/opportunities':
+                    self.handle_opportunities_list_api()
+                    return
+                elif self.path.startswith('/api/opportunities/'):
+                    self.handle_opportunities_detail_api()
+                    return
                 else:
                     self.send_error(404, f"API endpoint not found: {self.path}")
                     return
@@ -330,6 +344,12 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_prompts_search_api()
             elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
                 self.handle_prompts_update_api()
+            # Opportunities API endpoints
+            elif self.path == '/api/opportunities':
+                self.handle_opportunities_create_api()
+            elif self.path.startswith('/api/opportunities/'):
+                # Could be PATCH/PUT for update
+                self.handle_opportunities_update_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
                 
@@ -353,6 +373,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract prompt ID from path
                 prompt_id = self.path.split('/')[-1]
                 self.handle_prompts_delete_api(prompt_id)
+            elif self.path.startswith('/api/opportunities/'):
+                # Extract opportunity ID from path
+                opportunity_id = self.path.split('/')[-1]
+                self.handle_opportunities_delete_api(opportunity_id)
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
                 
@@ -1090,6 +1114,28 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_prompts_search_api(self):
         """Handle POST /api/prompts/search - Search prompts."""
         handle_prompts_search_route(self)
+
+    # ========== Opportunities API Handlers ==========
+
+    def handle_opportunities_list_api(self):
+        """Handle GET /api/opportunities - List all opportunities."""
+        handle_opportunities_list_route(self)
+
+    def handle_opportunities_create_api(self):
+        """Handle POST /api/opportunities - Create new opportunity."""
+        handle_opportunities_create_route(self)
+
+    def handle_opportunities_detail_api(self):
+        """Handle GET /api/opportunities/{id} - Get opportunity details."""
+        handle_opportunities_detail_route(self)
+
+    def handle_opportunities_update_api(self):
+        """Handle PUT/PATCH /api/opportunities/{id} - Update opportunity."""
+        handle_opportunities_update_route(self)
+
+    def handle_opportunities_delete_api(self, opportunity_id):
+        """Handle DELETE /api/opportunities/{id} - Delete opportunity."""
+        handle_opportunities_delete_route(self, opportunity_id)
 
 
 def main():
