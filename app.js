@@ -2408,11 +2408,26 @@ class OpportunitiesManager {
     constructor() {
         this.opportunities = [];
         this.currentOpportunity = null;
+        this.calendarManager = null;
+        this.ganttManager = null;
         this.init();
     }
 
     init() {
         this.setupEventListeners();
+        this.initializeVisualizations();
+    }
+
+    initializeVisualizations() {
+        // Initialize Calendar Manager
+        if (typeof SVGCalendarManager !== 'undefined') {
+            this.calendarManager = new SVGCalendarManager('svg-calendar-container');
+        }
+
+        // Initialize Gantt Chart Manager
+        if (typeof GanttChartManager !== 'undefined') {
+            this.ganttManager = new GanttChartManager('gantt-chart-container');
+        }
     }
 
     setupEventListeners() {
@@ -2454,6 +2469,43 @@ class OpportunitiesManager {
         }
         if (deleteBtn) {
             deleteBtn.addEventListener('click', () => this.deleteCurrentOpportunity());
+        }
+
+        // Calendar and Tasks toggle buttons
+        const toggleCalendarBtn = document.getElementById('toggle-calendar-view');
+        const toggleTasksBtn = document.getElementById('toggle-tasks-view');
+        const listViewBtn = document.getElementById('tasks-list-view-btn');
+
+        if (toggleCalendarBtn) {
+            toggleCalendarBtn.addEventListener('click', () => this.showCalendarView());
+        }
+        if (toggleTasksBtn) {
+            toggleTasksBtn.addEventListener('click', () => this.showTasksView());
+        }
+        if (listViewBtn) {
+            listViewBtn.addEventListener('click', () => this.showListView());
+        }
+
+        // Task management buttons
+        const addTaskBtn = document.getElementById('add-task-btn');
+        const closeTaskModal = document.getElementById('close-task-modal');
+        const cancelTaskBtn = document.getElementById('cancel-task-btn');
+        const taskForm = document.getElementById('task-form');
+
+        if (addTaskBtn) {
+            addTaskBtn.addEventListener('click', () => this.showCreateTaskModal());
+        }
+        if (closeTaskModal) {
+            closeTaskModal.addEventListener('click', () => this.hideTaskModal());
+        }
+        if (cancelTaskBtn) {
+            cancelTaskBtn.addEventListener('click', () => this.hideTaskModal());
+        }
+        if (taskForm) {
+            taskForm.addEventListener('submit', (e) => {
+                e.preventDefault();
+                this.saveTask();
+            });
         }
     }
 
@@ -2589,6 +2641,9 @@ class OpportunitiesManager {
         } else {
             tagsContainer.innerHTML = '<span class="text-gray-500 dark:text-gray-400">No tags</span>';
         }
+
+        // Load tasks for this opportunity
+        this.loadTasks(opportunity.id);
     }
 
     closeOpportunityDetail() {
@@ -2641,6 +2696,220 @@ class OpportunitiesManager {
         } catch (error) {
             console.error('Error deleting opportunity:', error);
         }
+    }
+
+    showCalendarView() {
+        const calendarContainer = document.getElementById('svg-calendar-container');
+        const ganttContainer = document.getElementById('gantt-chart-container');
+
+        if (calendarContainer && ganttContainer) {
+            calendarContainer.classList.remove('hidden');
+            ganttContainer.classList.add('hidden');
+
+            // Load opportunities into calendar if manager exists
+            if (this.calendarManager && this.currentOpportunity) {
+                this.calendarManager.setOpportunities([this.currentOpportunity]);
+                this.calendarManager.render();
+            }
+        }
+    }
+
+    showTasksView() {
+        const calendarContainer = document.getElementById('svg-calendar-container');
+        const ganttContainer = document.getElementById('gantt-chart-container');
+
+        if (calendarContainer && ganttContainer) {
+            calendarContainer.classList.add('hidden');
+            ganttContainer.classList.remove('hidden');
+
+            // Load tasks into gantt chart if manager exists
+            if (this.ganttManager && this.currentOpportunity) {
+                this.loadTasksForGantt(this.currentOpportunity.id);
+            }
+        }
+    }
+
+    async loadTasksForGantt(opportunityId) {
+        try {
+            const response = await fetch(`/api/opportunities/${opportunityId}/tasks`);
+            if (response.ok) {
+                const data = await response.json();
+                if (this.ganttManager) {
+                    this.ganttManager.setTasks(data.tasks || []);
+                    this.ganttManager.render();
+                }
+            }
+        } catch (error) {
+            console.error('Error loading tasks for gantt:', error);
+        }
+    }
+
+    showListView() {
+        const listContainer = document.getElementById('tasks-list-container');
+        const calendarContainer = document.getElementById('svg-calendar-container');
+        const ganttContainer = document.getElementById('gantt-chart-container');
+
+        if (listContainer && calendarContainer && ganttContainer) {
+            listContainer.classList.remove('hidden');
+            calendarContainer.classList.add('hidden');
+            ganttContainer.classList.add('hidden');
+        }
+    }
+
+    async loadTasks(opportunityId) {
+        try {
+            const response = await fetch(`/api/opportunities/${opportunityId}/tasks`);
+            if (response.ok) {
+                const data = await response.json();
+                this.renderTasksList(data.tasks || []);
+            }
+        } catch (error) {
+            console.error('Error loading tasks:', error);
+        }
+    }
+
+    renderTasksList(tasks) {
+        const tbody = document.getElementById('tasks-table-body');
+        const emptyState = document.getElementById('tasks-empty-state');
+
+        if (!tbody) return;
+
+        tbody.innerHTML = '';
+
+        if (tasks.length === 0) {
+            document.getElementById('tasks-table-wrapper')?.classList.add('hidden');
+            if (emptyState) emptyState.classList.remove('hidden');
+            return;
+        }
+
+        document.getElementById('tasks-table-wrapper')?.classList.remove('hidden');
+        if (emptyState) emptyState.classList.add('hidden');
+
+        tasks.forEach(task => {
+            const row = document.createElement('tr');
+            row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700';
+            row.innerHTML = `
+                <td class="px-3 py-2 text-gray-900 dark:text-white">${this.escapeHtml(task.name)}</td>
+                <td class="px-3 py-2 text-gray-700 dark:text-gray-300">${task.status}</td>
+                <td class="px-3 py-2 text-gray-700 dark:text-gray-300">${task.progress}%</td>
+                <td class="px-3 py-2 text-gray-700 dark:text-gray-300">${task.start_date}</td>
+                <td class="px-3 py-2 text-gray-700 dark:text-gray-300">${task.end_date}</td>
+                <td class="px-3 py-2">
+                    <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="window.app.opportunitiesManager.editTask('${task.id}')">Edit</button>
+                    <button class="text-red-600 hover:text-red-800" onclick="window.app.opportunitiesManager.deleteTask('${task.id}')">Delete</button>
+                </td>
+            `;
+            tbody.appendChild(row);
+        });
+    }
+
+    showCreateTaskModal() {
+        if (!this.currentOpportunity) {
+            alert('Please select an opportunity first');
+            return;
+        }
+
+        const modal = document.getElementById('task-modal');
+        const form = document.getElementById('task-form');
+
+        if (form) form.reset();
+
+        document.getElementById('task-id').value = '';
+        document.getElementById('task-opportunity-id').value = this.currentOpportunity.id;
+        document.getElementById('task-modal-title').textContent = 'Create Task';
+
+        if (modal) modal.classList.remove('hidden');
+    }
+
+    hideTaskModal() {
+        const modal = document.getElementById('task-modal');
+        if (modal) modal.classList.add('hidden');
+    }
+
+    async saveTask() {
+        const taskId = document.getElementById('task-id').value;
+        const opportunityId = document.getElementById('task-opportunity-id').value;
+
+        const taskData = {
+            name: document.getElementById('task-name').value,
+            description: document.getElementById('task-description').value,
+            start_date: document.getElementById('task-start-date').value,
+            end_date: document.getElementById('task-end-date').value,
+            status: document.getElementById('task-status').value,
+            progress: parseInt(document.getElementById('task-progress').value) || 0,
+            assigned_to: document.getElementById('task-assigned-to').value
+        };
+
+        try {
+            let response;
+            if (taskId) {
+                response = await fetch(`/api/tasks/${taskId}`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(taskData)
+                });
+            } else {
+                response = await fetch(`/api/opportunities/${opportunityId}/tasks`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(taskData)
+                });
+            }
+
+            if (response.ok) {
+                this.hideTaskModal();
+                this.loadTasks(opportunityId);
+            }
+        } catch (error) {
+            console.error('Error saving task:', error);
+        }
+    }
+
+    async editTask(taskId) {
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`);
+            if (response.ok) {
+                const data = await response.json();
+                const task = data.task;
+
+                document.getElementById('task-id').value = task.id;
+                document.getElementById('task-opportunity-id').value = task.opportunity_id;
+                document.getElementById('task-name').value = task.name;
+                document.getElementById('task-description').value = task.description || '';
+                document.getElementById('task-start-date').value = task.start_date;
+                document.getElementById('task-end-date').value = task.end_date;
+                document.getElementById('task-status').value = task.status;
+                document.getElementById('task-progress').value = task.progress;
+                document.getElementById('task-assigned-to').value = task.assigned_to || '';
+
+                document.getElementById('task-modal-title').textContent = 'Edit Task';
+                document.getElementById('task-modal').classList.remove('hidden');
+            }
+        } catch (error) {
+            console.error('Error loading task:', error);
+        }
+    }
+
+    async deleteTask(taskId) {
+        if (!confirm('Are you sure you want to delete this task?')) return;
+
+        try {
+            const response = await fetch(`/api/tasks/${taskId}`, {
+                method: 'DELETE'
+            });
+
+            if (response.ok && this.currentOpportunity) {
+                this.loadTasks(this.currentOpportunity.id);
+            }
+        } catch (error) {
+            console.error('Error deleting task:', error);
+        }
+    }
+
+    escapeHtml(text) {
+        const div = document.createElement('div');
+        div.textContent = text;
+        return div.innerHTML;
     }
 
     formatStatus(status) {

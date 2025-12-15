@@ -1006,6 +1006,64 @@
                                         </div>
                                     </div>
                                 </div>
+
+                                <!-- Tasks Section -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <h5 class="text-lg font-semibold text-gray-900 dark:text-white">Tasks</h5>
+                                        <div class="flex items-center space-x-2">
+                                            <button id="add-task-btn" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">
+                                                <span class="flex items-center">
+                                                    <svg class="w-4 h-4 mr-1" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                                    </svg>
+                                                    New Task
+                                                </span>
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- View Toggle Buttons -->
+                                    <div class="flex space-x-2 mb-4">
+                                        <button id="tasks-list-view-btn" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">List View</button>
+                                        <button id="toggle-calendar-view" class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">Calendar View</button>
+                                        <button id="toggle-tasks-view" class="px-3 py-1 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600">Gantt Chart</button>
+                                    </div>
+
+                                    <!-- Tasks List View (default) -->
+                                    <div id="tasks-list-container">
+                                        <div id="tasks-table-wrapper" class="overflow-x-auto">
+                                            <table class="w-full text-sm">
+                                                <thead class="bg-gray-50 dark:bg-gray-700">
+                                                    <tr>
+                                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Task Name</th>
+                                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Status</th>
+                                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Progress</th>
+                                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Start Date</th>
+                                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">End Date</th>
+                                                        <th class="px-3 py-2 text-left text-xs font-medium text-gray-700 dark:text-gray-300">Actions</th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody id="tasks-table-body" class="divide-y divide-gray-200 dark:divide-gray-600">
+                                                    <!-- Tasks will be populated here -->
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                        <div id="tasks-empty-state" class="text-center py-8 hidden">
+                                            <p class="text-gray-500 dark:text-gray-400">No tasks yet. Create your first task to get started.</p>
+                                        </div>
+                                    </div>
+
+                                    <!-- SVG Calendar Container -->
+                                    <div id="svg-calendar-container" class="mb-6 hidden">
+                                        <!-- Calendar will be rendered here -->
+                                    </div>
+
+                                    <!-- Gantt Chart Container -->
+                                    <div id="gantt-chart-container" class="mb-6 hidden">
+                                        <!-- Gantt chart will be rendered here -->
+                                    </div>
+                                </div>
                             </div>
 
                             <!-- Empty State -->
@@ -1159,6 +1217,86 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Task Modal -->
+                <div id="task-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full m-4">
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 id="task-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white">Create Task</h3>
+                                <button id="close-task-modal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <form id="task-form" class="space-y-4">
+                                <input type="hidden" id="task-id">
+                                <input type="hidden" id="task-opportunity-id">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Task Name <span class="text-red-500">*</span>
+                                    </label>
+                                    <input type="text" id="task-name" required
+                                        placeholder="e.g., Complete requirements gathering"
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Description
+                                    </label>
+                                    <textarea id="task-description" rows="3"
+                                        placeholder="Describe the task..."
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Start Date <span class="text-red-500">*</span></label>
+                                        <input type="date" id="task-start-date" required
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">End Date <span class="text-red-500">*</span></label>
+                                        <input type="date" id="task-end-date" required
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                                        <select id="task-status"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                            <option value="pending">Pending</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="completed">Completed</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Progress (%)</label>
+                                        <input type="number" id="task-progress" min="0" max="100" value="0"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
+                                        Assigned To
+                                    </label>
+                                    <input type="text" id="task-assigned-to"
+                                        placeholder="e.g., John Doe"
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div class="flex justify-end space-x-3 pt-4">
+                                    <button type="button" id="cancel-task-btn" class="px-4 py-2 text-gray-700 dark:text-gray-300 hover:text-gray-900 dark:hover:text-white">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                        Save Task
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1167,5 +1305,7 @@
     <script src="cag_manager.js"></script>
     <script src="mcp_agents.js"></script>
     <script src="prompts_manager.js"></script>
+    <script src="svg_calendar_manager.js"></script>
+    <script src="gantt_chart_manager.js"></script>
 </body>
 </html>

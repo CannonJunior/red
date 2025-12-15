@@ -1,0 +1,13 @@
+RAG system not available: No module named 'chromadb'
+INFO:search_system:Database initialized successfully
+INFO:search_api:Search system initialized
+INFO:search_system:Added object: chat_sample_1 (chat)
+INFO:search_api:Synced sample chat: Introduction to Machine Learning
+INFO:search_system:Added object: chat_sample_2 (chat)
+INFO:search_api:Synced sample chat: Project Planning Discussion
+ERROR:search_system:Error creating folder: UNIQUE constraint failed: folders.id
+INFO:search_api:Created sample folder: Work Projects
+ERROR:search_system:Error creating folder: UNIQUE constraint failed: folders.id
+INFO:search_api:Created sample folder: Personal
+INFO:search_api:Data synchronization completed
+INFO:search_api:Search API initialized successfully

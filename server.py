@@ -90,7 +90,13 @@ from server.routes.opportunities import (
     handle_opportunities_create_api as handle_opportunities_create_route,
     handle_opportunities_detail_api as handle_opportunities_detail_route,
     handle_opportunities_update_api as handle_opportunities_update_route,
-    handle_opportunities_delete_api as handle_opportunities_delete_route
+    handle_opportunities_delete_api as handle_opportunities_delete_route,
+    handle_tasks_list_api as handle_tasks_list_route,
+    handle_tasks_create_api as handle_tasks_create_route,
+    handle_task_get_api as handle_task_get_route,
+    handle_task_update_api as handle_task_update_route,
+    handle_task_delete_api as handle_task_delete_route,
+    handle_task_history_api as handle_task_history_route
 )
 
 # Import RAG functionality
@@ -228,6 +234,18 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 elif self.path == '/api/opportunities':
                     self.handle_opportunities_list_api()
                     return
+                elif self.path.startswith('/api/opportunities/') and '/tasks' in self.path:
+                    # Handle /api/opportunities/{id}/tasks
+                    self.handle_tasks_list_api()
+                    return
+                elif self.path.startswith('/api/tasks/') and self.path.endswith('/history'):
+                    # Handle /api/tasks/{id}/history
+                    self.handle_task_history_api()
+                    return
+                elif self.path.startswith('/api/tasks/'):
+                    # Handle /api/tasks/{id}
+                    self.handle_task_get_api()
+                    return
                 elif self.path.startswith('/api/opportunities/'):
                     self.handle_opportunities_detail_api()
                     return
@@ -347,6 +365,12 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             # Opportunities API endpoints
             elif self.path == '/api/opportunities':
                 self.handle_opportunities_create_api()
+            elif self.path.startswith('/api/opportunities/') and '/tasks' in self.path:
+                # Handle POST /api/opportunities/{id}/tasks - create task
+                self.handle_tasks_create_api()
+            elif self.path.startswith('/api/tasks/'):
+                # Handle POST /api/tasks/{id} - update task
+                self.handle_task_update_api()
             elif self.path.startswith('/api/opportunities/'):
                 # Could be PATCH/PUT for update
                 self.handle_opportunities_update_api()
@@ -373,6 +397,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract prompt ID from path
                 prompt_id = self.path.split('/')[-1]
                 self.handle_prompts_delete_api(prompt_id)
+            elif self.path.startswith('/api/tasks/'):
+                # Extract task ID from path
+                task_id = self.path.split('/')[-1]
+                self.handle_task_delete_api(task_id)
             elif self.path.startswith('/api/opportunities/'):
                 # Extract opportunity ID from path
                 opportunity_id = self.path.split('/')[-1]
@@ -1136,6 +1164,44 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_opportunities_delete_api(self, opportunity_id):
         """Handle DELETE /api/opportunities/{id} - Delete opportunity."""
         handle_opportunities_delete_route(self, opportunity_id)
+
+    # ========== Tasks API Handlers ==========
+
+    def handle_tasks_list_api(self):
+        """Handle GET /api/opportunities/{id}/tasks - List tasks for opportunity."""
+        # Extract opportunity ID from path: /api/opportunities/{id}/tasks
+        path_parts = self.path.split('/')
+        opportunity_id = path_parts[3]  # /api/opportunities/{id}/tasks
+        handle_tasks_list_route(self, opportunity_id)
+
+    def handle_tasks_create_api(self):
+        """Handle POST /api/opportunities/{id}/tasks - Create new task."""
+        # Extract opportunity ID from path: /api/opportunities/{id}/tasks
+        path_parts = self.path.split('/')
+        opportunity_id = path_parts[3]  # /api/opportunities/{id}/tasks
+        handle_tasks_create_route(self, opportunity_id)
+
+    def handle_task_get_api(self):
+        """Handle GET /api/tasks/{id} - Get task details."""
+        # Extract task ID from path: /api/tasks/{id}
+        task_id = self.path.split('/')[-1]
+        handle_task_get_route(self, task_id)
+
+    def handle_task_update_api(self):
+        """Handle POST /api/tasks/{id} - Update task."""
+        # Extract task ID from path: /api/tasks/{id}
+        task_id = self.path.split('/')[-1]
+        handle_task_update_route(self, task_id)
+
+    def handle_task_delete_api(self, task_id):
+        """Handle DELETE /api/tasks/{id} - Delete task."""
+        handle_task_delete_route(self, task_id)
+
+    def handle_task_history_api(self):
+        """Handle GET /api/tasks/{id}/history - Get task history."""
+        # Extract task ID from path: /api/tasks/{id}/history
+        task_id = self.path.split('/')[-2]  # /api/tasks/{id}/history
+        handle_task_history_route(self, task_id)
 
 
 def main():
