@@ -99,6 +99,47 @@ from server.routes.opportunities import (
     handle_task_history_api as handle_task_history_route
 )
 
+# Import TODO functionality
+try:
+    from server.routes.todos import (
+        handle_users_list_api as handle_users_list_route,
+        handle_users_create_api as handle_users_create_route,
+        handle_users_detail_api as handle_users_detail_route,
+        handle_users_update_api as handle_users_update_route,
+        handle_users_delete_api as handle_users_delete_route,
+        handle_lists_list_api as handle_lists_list_route,
+        handle_lists_create_api as handle_lists_create_route,
+        handle_lists_detail_api as handle_lists_detail_route,
+        handle_lists_update_api as handle_lists_update_route,
+        handle_lists_delete_api as handle_lists_delete_route,
+        handle_lists_share_api as handle_lists_share_route,
+        handle_lists_unshare_api as handle_lists_unshare_route,
+        handle_lists_shares_api as handle_lists_shares_route,
+        handle_shared_lists_api as handle_shared_lists_route,
+        handle_todos_list_api as handle_todos_list_route,
+        handle_todos_create_api as handle_todos_create_route,
+        handle_todos_detail_api as handle_todos_detail_route,
+        handle_todos_update_api as handle_todos_update_route,
+        handle_todos_delete_api as handle_todos_delete_route,
+        handle_todos_complete_api as handle_todos_complete_route,
+        handle_todos_archive_api as handle_todos_archive_route,
+        handle_todos_today_api as handle_todos_today_route,
+        handle_todos_upcoming_api as handle_todos_upcoming_route,
+        handle_todos_search_api as handle_todos_search_route,
+        handle_todos_parse_api as handle_todos_parse_route,
+        handle_tags_list_api as handle_tags_list_route,
+        handle_tags_create_api as handle_tags_create_route,
+        handle_tags_detail_api as handle_tags_detail_route,
+        handle_tags_update_api as handle_tags_update_route,
+        handle_tags_delete_api as handle_tags_delete_route,
+        handle_todos_history_api as handle_todos_history_route
+    )
+    TODOS_AVAILABLE = True
+    print("✅ TODO system loaded successfully")
+except ImportError as e:
+    TODOS_AVAILABLE = False
+    print(f"⚠️  TODO system not available: {e}")
+
 # Import RAG functionality
 try:
     from rag_api import handle_rag_status_request, handle_rag_search_request, handle_rag_query_request, handle_rag_ingest_request, handle_rag_documents_request, handle_rag_analytics_request, handle_rag_document_delete_request, handle_rag_vector_chunks_request
@@ -229,6 +270,49 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     return
                 elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
                     self.handle_prompts_detail_api()
+                    return
+                # TODO API endpoints - specific routes first, then generic
+                elif self.path == '/api/todos/users' and TODOS_AVAILABLE:
+                    self.handle_users_list_api()
+                    return
+                elif (self.path == '/api/todos/lists' or self.path.startswith('/api/todos/lists?')) and TODOS_AVAILABLE:
+                    self.handle_lists_list_api()
+                    return
+                elif self.path == '/api/todos/shared' and TODOS_AVAILABLE:
+                    self.handle_shared_lists_api()
+                    return
+                elif self.path == '/api/todos/today' and TODOS_AVAILABLE:
+                    self.handle_todos_today_api()
+                    return
+                elif self.path == '/api/todos/upcoming' and TODOS_AVAILABLE:
+                    self.handle_todos_upcoming_api()
+                    return
+                elif self.path == '/api/todos/search' and TODOS_AVAILABLE:
+                    self.handle_todos_search_api()
+                    return
+                elif self.path == '/api/todos/tags' and TODOS_AVAILABLE:
+                    self.handle_tags_list_api()
+                    return
+                elif (self.path == '/api/todos' or self.path.startswith('/api/todos?')) and TODOS_AVAILABLE:
+                    self.handle_todos_list_api()
+                    return
+                elif self.path.startswith('/api/todos/lists/') and self.path.endswith('/shares') and TODOS_AVAILABLE:
+                    self.handle_lists_shares_api()
+                    return
+                elif self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
+                    self.handle_users_detail_api()
+                    return
+                elif self.path.startswith('/api/todos/lists/') and TODOS_AVAILABLE:
+                    self.handle_lists_detail_api()
+                    return
+                elif self.path.startswith('/api/todos/tags/') and TODOS_AVAILABLE:
+                    self.handle_tags_detail_api()
+                    return
+                elif self.path.startswith('/api/todos/') and self.path.endswith('/history') and TODOS_AVAILABLE:
+                    self.handle_todos_history_api()
+                    return
+                elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
+                    self.handle_todos_detail_api()
                     return
                 # Opportunities API endpoints
                 elif self.path == '/api/opportunities':
@@ -362,6 +446,27 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_prompts_search_api()
             elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
                 self.handle_prompts_update_api()
+            # TODO API endpoints - specific routes first, then generic
+            elif self.path == '/api/todos/users' and TODOS_AVAILABLE:
+                self.handle_users_create_api()
+            elif self.path == '/api/todos/lists' and TODOS_AVAILABLE:
+                self.handle_lists_create_api()
+            elif self.path == '/api/todos/tags' and TODOS_AVAILABLE:
+                self.handle_tags_create_api()
+            elif self.path == '/api/todos/parse' and TODOS_AVAILABLE:
+                self.handle_todos_parse_api()
+            elif self.path == '/api/todos/search' and TODOS_AVAILABLE:
+                self.handle_todos_search_api()
+            elif self.path == '/api/todos' and TODOS_AVAILABLE:
+                self.handle_todos_create_api()
+            elif self.path.startswith('/api/todos/lists/') and self.path.endswith('/share') and TODOS_AVAILABLE:
+                self.handle_lists_share_api()
+            elif self.path.startswith('/api/todos/') and self.path.endswith('/complete') and TODOS_AVAILABLE:
+                self.handle_todos_complete_api()
+            elif self.path.startswith('/api/todos/') and self.path.endswith('/archive') and TODOS_AVAILABLE:
+                self.handle_todos_archive_api()
+            elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
+                self.handle_todos_update_api()
             # Opportunities API endpoints
             elif self.path == '/api/opportunities':
                 self.handle_opportunities_create_api()
@@ -397,6 +502,23 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract prompt ID from path
                 prompt_id = self.path.split('/')[-1]
                 self.handle_prompts_delete_api(prompt_id)
+            # TODO API endpoints - specific routes first, then generic
+            elif self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
+                user_id = self.path.split('/')[-1]
+                self.handle_users_delete_api(user_id)
+            elif self.path.startswith('/api/todos/lists/') and '/share' in self.path and TODOS_AVAILABLE:
+                list_id = self.path.split('/')[-2]
+                self.handle_lists_unshare_api(list_id)
+            elif self.path.startswith('/api/todos/lists/') and TODOS_AVAILABLE:
+                list_id = self.path.split('/')[-1]
+                self.handle_lists_delete_api(list_id)
+            elif self.path.startswith('/api/todos/tags/') and TODOS_AVAILABLE:
+                tag_id = self.path.split('/')[-1]
+                self.handle_tags_delete_api(tag_id)
+            elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
+                # Extract todo ID from path
+                todo_id = self.path.split('/')[-1]
+                self.handle_todos_delete_api(todo_id)
             elif self.path.startswith('/api/tasks/'):
                 # Extract task ID from path
                 task_id = self.path.split('/')[-1]
@@ -407,11 +529,30 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_opportunities_delete_api(opportunity_id)
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
-                
+
         except Exception as e:
             print(f"❌ Error handling DELETE {self.path}: {e}")
             self.send_error(500, f"Internal server error: {e}")
-    
+
+    def do_PUT(self):
+        """Handle PUT requests for API endpoints."""
+        try:
+            # TODO API endpoints - specific routes first, then generic
+            if self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
+                user_id = self.path.split('/')[-1]
+                self.handle_users_update_api(user_id)
+            elif self.path.startswith('/api/todos/lists/') and not '/share' in self.path and TODOS_AVAILABLE:
+                list_id = self.path.split('/')[-1]
+                self.handle_lists_update_api(list_id)
+            elif self.path.startswith('/api/todos/tags/') and TODOS_AVAILABLE:
+                tag_id = self.path.split('/')[-1]
+                self.handle_tags_update_api(tag_id)
+            else:
+                self.send_error(404, f"API endpoint not found: {self.path}")
+        except Exception as e:
+            print(f"❌ Error handling PUT {self.path}: {e}")
+            self.send_error(500, f"Internal server error: {e}")
+
     def handle_chat_api(self):
         """Handle chat API requests with MCP-style RAG tool integration."""
         handle_chat_route(self)
@@ -1057,6 +1198,14 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Parse JSON request body safely."""
         return get_request_body_util(self)
 
+    def get_query_params(self):
+        """Parse URL query parameters."""
+        from urllib.parse import urlparse, parse_qs
+        parsed_url = urlparse(self.path)
+        # parse_qs returns lists for each value, get first value for each param
+        query_params = {k: v[0] for k, v in parse_qs(parsed_url.query).items()}
+        return query_params
+
     def log_message(self, format, *args):
         """Override to provide cleaner logging."""
         return  # Disable default logging to reduce noise
@@ -1202,6 +1351,143 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         # Extract task ID from path: /api/tasks/{id}/history
         task_id = self.path.split('/')[-2]  # /api/tasks/{id}/history
         handle_task_history_route(self, task_id)
+
+    # TODO API handlers
+    def handle_users_list_api(self):
+        """Handle GET /api/todos/users - List users."""
+        handle_users_list_route(self)
+
+    def handle_users_create_api(self):
+        """Handle POST /api/todos/users - Create user."""
+        handle_users_create_route(self)
+
+    def handle_users_detail_api(self):
+        """Handle GET /api/todos/users/{id} - Get user details."""
+        user_id = self.path.split('/')[-1]
+        handle_users_detail_route(self, user_id)
+
+    def handle_lists_list_api(self):
+        """Handle GET /api/todos/lists - List todo lists."""
+        handle_lists_list_route(self)
+
+    def handle_lists_create_api(self):
+        """Handle POST /api/todos/lists - Create todo list."""
+        handle_lists_create_route(self)
+
+    def handle_lists_detail_api(self):
+        """Handle GET /api/todos/lists/{id} - Get list details."""
+        list_id = self.path.split('/')[-1]
+        handle_lists_detail_route(self, list_id)
+
+    def handle_todos_list_api(self):
+        """Handle GET /api/todos - List todos."""
+        handle_todos_list_route(self)
+
+    def handle_todos_create_api(self):
+        """Handle POST /api/todos - Create todo."""
+        handle_todos_create_route(self)
+
+    def handle_todos_detail_api(self):
+        """Handle GET /api/todos/{id} - Get todo details."""
+        todo_id = self.path.split('/')[-1]
+        handle_todos_detail_route(self, todo_id)
+
+    def handle_todos_update_api(self):
+        """Handle POST /api/todos/{id} - Update todo."""
+        todo_id = self.path.split('/')[-1]
+        handle_todos_update_route(self, todo_id)
+
+    def handle_todos_delete_api(self, todo_id):
+        """Handle DELETE /api/todos/{id} - Delete todo."""
+        handle_todos_delete_route(self, todo_id)
+
+    def handle_todos_complete_api(self):
+        """Handle POST /api/todos/{id}/complete - Complete todo."""
+        todo_id = self.path.split('/')[-2]  # /api/todos/{id}/complete
+        handle_todos_complete_route(self, todo_id)
+
+    def handle_todos_archive_api(self):
+        """Handle POST /api/todos/{id}/archive - Archive todo."""
+        todo_id = self.path.split('/')[-2]  # /api/todos/{id}/archive
+        handle_todos_archive_route(self, todo_id)
+
+    def handle_todos_today_api(self):
+        """Handle GET /api/todos/today - Get today's todos."""
+        handle_todos_today_route(self)
+
+    def handle_todos_upcoming_api(self):
+        """Handle GET /api/todos/upcoming - Get upcoming todos."""
+        handle_todos_upcoming_route(self)
+
+    def handle_todos_search_api(self):
+        """Handle GET /api/todos/search - Search todos."""
+        handle_todos_search_route(self)
+
+    def handle_todos_parse_api(self):
+        """Handle POST /api/todos/parse - Parse natural language input."""
+        handle_todos_parse_route(self)
+
+    def handle_tags_list_api(self):
+        """Handle GET /api/todos/tags - List tags."""
+        handle_tags_list_route(self)
+
+    def handle_tags_create_api(self):
+        """Handle POST /api/todos/tags - Create tag."""
+        handle_tags_create_route(self)
+
+    def handle_todos_history_api(self):
+        """Handle GET /api/todos/{id}/history - Get todo history."""
+        todo_id = self.path.split('/')[-2]  # /api/todos/{id}/history
+        handle_todos_history_route(self, todo_id)
+
+    # Phase 2 TODO API handlers
+
+    def handle_users_update_api(self, user_id):
+        """Handle PUT /api/todos/users/{id} - Update user."""
+        handle_users_update_route(self, user_id)
+
+    def handle_users_delete_api(self, user_id):
+        """Handle DELETE /api/todos/users/{id} - Delete user."""
+        handle_users_delete_route(self, user_id)
+
+    def handle_lists_update_api(self, list_id):
+        """Handle PUT /api/todos/lists/{id} - Update list."""
+        handle_lists_update_route(self, list_id)
+
+    def handle_lists_delete_api(self, list_id):
+        """Handle DELETE /api/todos/lists/{id} - Delete list."""
+        handle_lists_delete_route(self, list_id)
+
+    def handle_lists_share_api(self):
+        """Handle POST /api/todos/lists/{id}/share - Share list with user."""
+        list_id = self.path.split('/')[-2]
+        handle_lists_share_route(self, list_id)
+
+    def handle_lists_unshare_api(self, list_id):
+        """Handle DELETE /api/todos/lists/{id}/share - Unshare list."""
+        handle_lists_unshare_route(self, list_id)
+
+    def handle_lists_shares_api(self):
+        """Handle GET /api/todos/lists/{id}/shares - Get list collaborators."""
+        list_id = self.path.split('/')[-2]
+        handle_lists_shares_route(self, list_id)
+
+    def handle_shared_lists_api(self):
+        """Handle GET /api/todos/shared - Get lists shared with user."""
+        handle_shared_lists_route(self)
+
+    def handle_tags_detail_api(self):
+        """Handle GET /api/todos/tags/{id} - Get tag details."""
+        tag_id = self.path.split('/')[-1]
+        handle_tags_detail_route(self, tag_id)
+
+    def handle_tags_update_api(self, tag_id):
+        """Handle PUT /api/todos/tags/{id} - Update tag."""
+        handle_tags_update_route(self, tag_id)
+
+    def handle_tags_delete_api(self, tag_id):
+        """Handle DELETE /api/todos/tags/{id} - Delete tag."""
+        handle_tags_delete_route(self, tag_id)
 
 
 def main():

@@ -1,0 +1,250 @@
+{
+  "mcpServers": {
+    "todo-server": {
+      "command": "uv",
+      "args": [
+        "run",
+        "python",
+        "-m",
+        "todos.mcp_server"
+      ],
+      "description": "TODO System MCP Server - Natural language task management",
+      "enabled": true,
+      "tools": [
+        {
+          "name": "create_todo",
+          "description": "Create a new todo with natural language or structured input",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "user_id": {
+                "type": "string",
+                "description": "User ID creating the todo"
+              },
+              "input": {
+                "type": "string",
+                "description": "Natural language description (e.g., 'Submit report by Friday 3pm @high #work')"
+              },
+              "title": {
+                "type": "string",
+                "description": "Todo title (alternative to 'input')"
+              },
+              "list_id": {
+                "type": "string",
+                "description": "Optional list ID"
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "urgent"],
+                "description": "Priority level"
+              },
+              "due_date": {
+                "type": "string",
+                "description": "Due date (YYYY-MM-DD)"
+              },
+              "due_time": {
+                "type": "string",
+                "description": "Due time (HH:MM)"
+              },
+              "tags": {
+                "type": "array",
+                "items": {"type": "string"},
+                "description": "List of tags"
+              }
+            },
+            "required": ["user_id"]
+          }
+        },
+        {
+          "name": "list_todos",
+          "description": "List todos with optional filtering",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "user_id": {
+                "type": "string",
+                "description": "User ID to list todos for"
+              },
+              "list_id": {
+                "type": "string",
+                "description": "Filter by list ID"
+              },
+              "bucket": {
+                "type": "string",
+                "enum": ["inbox", "today", "upcoming", "someday"],
+                "description": "Filter by bucket"
+              },
+              "status": {
+                "type": "string",
+                "enum": ["pending", "in_progress", "completed", "archived"],
+                "description": "Filter by status"
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "urgent"],
+                "description": "Filter by priority"
+              },
+              "limit": {
+                "type": "integer",
+                "description": "Maximum number of todos to return",
+                "default": 50
+              }
+            },
+            "required": ["user_id"]
+          }
+        },
+        {
+          "name": "get_todo",
+          "description": "Get details of a specific todo",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "todo_id": {
+                "type": "string",
+                "description": "Todo ID to retrieve"
+              }
+            },
+            "required": ["todo_id"]
+          }
+        },
+        {
+          "name": "update_todo",
+          "description": "Update an existing todo",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "todo_id": {
+                "type": "string",
+                "description": "Todo ID to update"
+              },
+              "title": {"type": "string"},
+              "status": {
+                "type": "string",
+                "enum": ["pending", "in_progress", "completed", "archived"]
+              },
+              "priority": {
+                "type": "string",
+                "enum": ["low", "medium", "high", "urgent"]
+              },
+              "due_date": {"type": "string"},
+              "due_time": {"type": "string"},
+              "bucket": {
+                "type": "string",
+                "enum": ["inbox", "today", "upcoming", "someday"]
+              },
+              "tags": {
+                "type": "array",
+                "items": {"type": "string"}
+              }
+            },
+            "required": ["todo_id"]
+          }
+        },
+        {
+          "name": "complete_todo",
+          "description": "Mark a todo as complete",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "todo_id": {
+                "type": "string",
+                "description": "Todo ID to complete"
+              }
+            },
+            "required": ["todo_id"]
+          }
+        },
+        {
+          "name": "delete_todo",
+          "description": "Delete a todo",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "todo_id": {
+                "type": "string",
+                "description": "Todo ID to delete"
+              }
+            },
+            "required": ["todo_id"]
+          }
+        },
+        {
+          "name": "create_list",
+          "description": "Create a new todo list",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "user_id": {
+                "type": "string",
+                "description": "User ID creating the list"
+              },
+              "name": {
+                "type": "string",
+                "description": "List name"
+              },
+              "description": {"type": "string"},
+              "color": {"type": "string"},
+              "icon": {"type": "string"}
+            },
+            "required": ["user_id", "name"]
+          }
+        },
+        {
+          "name": "share_list",
+          "description": "Share a list with another user",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "list_id": {
+                "type": "string",
+                "description": "List ID to share"
+              },
+              "user_id": {
+                "type": "string",
+                "description": "User ID to share with"
+              },
+              "permission": {
+                "type": "string",
+                "enum": ["view", "edit", "admin"],
+                "default": "view",
+                "description": "Permission level"
+              }
+            },
+            "required": ["list_id", "user_id"]
+          }
+        },
+        {
+          "name": "parse_todo",
+          "description": "Parse natural language input into structured todo data",
+          "input_schema": {
+            "type": "object",
+            "properties": {
+              "input": {
+                "type": "string",
+                "description": "Natural language todo description"
+              }
+            },
+            "required": ["input"]
+          }
+        }
+      ],
+      "resources": [
+        {
+          "uri": "todo://buckets",
+          "name": "TODO Buckets",
+          "description": "Available todo bucket categories"
+        },
+        {
+          "uri": "todo://priorities",
+          "name": "Priority Levels",
+          "description": "Available priority levels"
+        },
+        {
+          "uri": "todo://nlp-patterns",
+          "name": "NLP Patterns",
+          "description": "Supported natural language patterns"
+        }
+      ]
+    }
+  }
+}

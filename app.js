@@ -1085,10 +1085,18 @@ class Navigation {
 
                 if (item.classList.contains('expandable-nav-item')) {
                     this.toggleExpandableNavItem(item, listType);
-                    // Also navigate to opportunities area
-                    this.navigateTo('opportunities');
-                    if (window.app?.opportunitiesManager) {
-                        window.app.opportunitiesManager.loadOpportunities();
+                    // Navigate to appropriate area based on list type
+                    if (listType === 'todos') {
+                        // Show TODO area
+                        if (window.todoUI) {
+                            window.todoUI.showTodoArea();
+                        }
+                    } else {
+                        // Navigate to opportunities area for other expandable items
+                        this.navigateTo('opportunities');
+                        if (window.app?.opportunitiesManager) {
+                            window.app.opportunitiesManager.loadOpportunities();
+                        }
                     }
                 }
             });
@@ -1103,6 +1111,8 @@ class Navigation {
             submenu = document.getElementById('lists-submenu');
         } else if (itemName === 'opportunities') {
             submenu = document.getElementById('opportunities-list');
+        } else if (itemName === 'todos') {
+            submenu = document.getElementById('todo-lists-dropdown');
         }
 
         if (submenu) {

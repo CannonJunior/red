@@ -147,6 +147,26 @@
                             <div id="opportunities-list" class="ml-6 mt-1 space-y-1 hidden">
                                 <!-- Opportunities will be populated here -->
                             </div>
+
+                            <!-- TODO Lists (Phase 5) -->
+                            <button class="sub-nav-item expandable-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-list="todos">
+                                <span class="flex items-center justify-between">
+                                    <span class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                        </svg>
+                                        TODO Lists
+                                    </span>
+                                    <svg class="w-3 h-3 expand-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </span>
+                            </button>
+
+                            <!-- TODO Lists Dropdown (hidden by default) -->
+                            <div id="todo-lists-dropdown" class="ml-6 mt-1 space-y-1 hidden">
+                                <!-- User's todo lists will be populated here dynamically -->
+                            </div>
                         </div>
 
                         <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
@@ -1077,6 +1097,276 @@
                         </div>
                     </div>
                 </main>
+                <!-- TODO Lists Area (Phase 5) -->
+                <main id="todos-area" class="flex-1 flex flex-col hidden">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-6xl mx-auto">
+                            <!-- Header -->
+                            <div class="mb-6 flex items-center justify-between">
+                                <div>
+                                    <h3 id="todos-header-title" class="text-xl font-semibold text-gray-900 dark:text-white mb-2">TODO Lists</h3>
+                                    <p id="todos-header-subtitle" class="text-gray-600 dark:text-gray-400">Manage your tasks with natural language input and smart organization</p>
+                                </div>
+                                <div class="flex items-center space-x-2">
+                                    <button id="back-to-all-lists-btn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-lg hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors hidden">
+                                        ← Back to All Lists
+                                    </button>
+                                    <button id="new-list-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                        </svg>
+                                        New List
+                                    </button>
+                                </div>
+                            </div>
+
+                            <!-- Bucket Tabs -->
+                            <div class="mb-6 flex space-x-2 border-b border-gray-200 dark:border-gray-700">
+                                <button class="bucket-tab px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:text-blue-400" data-bucket="today">
+                                    <span class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
+                                        </svg>
+                                        Today
+                                    </span>
+                                </button>
+                                <button class="bucket-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white" data-bucket="upcoming">
+                                    <span class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M13 7l5 5m0 0l-5 5m5-5H6"></path>
+                                        </svg>
+                                        Upcoming
+                                    </span>
+                                </button>
+                                <button class="bucket-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white" data-bucket="inbox">
+                                    <span class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M20 13V6a2 2 0 00-2-2H6a2 2 0 00-2 2v7m16 0v5a2 2 0 01-2 2H6a2 2 0 01-2-2v-5m16 0h-2.586a1 1 0 00-.707.293l-2.414 2.414a1 1 0 01-.707.293h-3.172a1 1 0 01-.707-.293l-2.414-2.414A1 1 0 006.586 13H4"></path>
+                                        </svg>
+                                        Inbox
+                                    </span>
+                                </button>
+                                <button class="bucket-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white" data-bucket="someday">
+                                    <span class="flex items-center">
+                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Someday
+                                    </span>
+                                </button>
+                            </div>
+
+                            <!-- Quick Add Input with Natural Language -->
+                            <div class="mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4">
+                                <div class="flex items-center space-x-3">
+                                    <svg class="w-5 h-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                    </svg>
+                                    <input type="text" id="quick-add-input" placeholder="Add a task... (e.g., 'Call mom tomorrow @high #personal')"
+                                        class="flex-1 bg-transparent text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none text-sm">
+                                    <button id="quick-add-btn" class="px-3 py-1 bg-blue-600 text-white rounded text-sm hover:bg-blue-700 transition-colors">
+                                        Add
+                                    </button>
+                                </div>
+                                <div class="mt-2 text-xs text-gray-500 dark:text-gray-400">
+                                    <span class="font-medium">Tips:</span> Use @high/@urgent for priority, #tag for labels, "tomorrow"/"Friday" for dates, "3pm" for times
+                                </div>
+                            </div>
+
+                            <!-- Todos Container -->
+                            <div id="todos-container" class="space-y-3">
+                                <!-- Todos will be rendered here dynamically -->
+                                <div id="todos-empty-state" class="text-center py-12">
+                                    <svg class="w-16 h-16 mx-auto text-gray-400 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                    </svg>
+                                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-2">No todos yet</h4>
+                                    <p class="text-gray-600 dark:text-gray-400">Add your first task using the input above or try natural language like "Review PR tomorrow @high"</p>
+                                </div>
+                            </div>
+
+                            <!-- Stats Bar -->
+                            <div class="mt-6 grid grid-cols-4 gap-4">
+                                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 bg-blue-100 dark:bg-blue-900/50 rounded-lg p-3">
+                                            <svg class="w-6 h-6 text-blue-600 dark:text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="ml-4">
+                                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="todos-total-count">0</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">Total Tasks</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 bg-green-100 dark:bg-green-900/50 rounded-lg p-3">
+                                            <svg class="w-6 h-6 text-green-600 dark:text-green-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="ml-4">
+                                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="todos-completed-count">0</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">Completed</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 bg-yellow-100 dark:bg-yellow-900/50 rounded-lg p-3">
+                                            <svg class="w-6 h-6 text-yellow-600 dark:text-yellow-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="ml-4">
+                                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="todos-pending-count">0</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">Pending</p>
+                                        </div>
+                                    </div>
+                                </div>
+                                <div class="bg-gray-50 dark:bg-gray-800 rounded-lg p-4 border border-gray-200 dark:border-gray-700">
+                                    <div class="flex items-center">
+                                        <div class="flex-shrink-0 bg-red-100 dark:bg-red-900/50 rounded-lg p-3">
+                                            <svg class="w-6 h-6 text-red-600 dark:text-red-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+                                            </svg>
+                                        </div>
+                                        <div class="ml-4">
+                                            <p class="text-2xl font-bold text-gray-900 dark:text-white" id="todos-urgent-count">0</p>
+                                            <p class="text-sm text-gray-600 dark:text-gray-400">Urgent</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- TODO Detail/Edit Modal -->
+                <div id="todo-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-2xl w-full m-4 max-h-[90vh] overflow-y-auto">
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 id="todo-modal-title" class="text-lg font-semibold text-gray-900 dark:text-white">Edit Task</h3>
+                                <button id="close-todo-modal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <form id="todo-form" class="space-y-4">
+                                <input type="hidden" id="todo-id">
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Title</label>
+                                    <input type="text" id="todo-title" required class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                                    <textarea id="todo-description" rows="3" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Priority</label>
+                                        <select id="todo-priority" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="low">Low</option>
+                                            <option value="medium">Medium</option>
+                                            <option value="high">High</option>
+                                            <option value="urgent">Urgent</option>
+                                        </select>
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
+                                        <select id="todo-status" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                            <option value="pending">Pending</option>
+                                            <option value="in_progress">In Progress</option>
+                                            <option value="completed">Completed</option>
+                                            <option value="archived">Archived</option>
+                                        </select>
+                                    </div>
+                                </div>
+
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Due Date</label>
+                                        <input type="date" id="todo-due-date" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Due Time</label>
+                                        <input type="time" id="todo-due-time" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags (comma-separated)</label>
+                                    <input type="text" id="todo-tags" placeholder="work, personal, urgent" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+
+                                <div class="flex justify-end space-x-3 pt-4">
+                                    <button type="button" id="delete-todo-btn" class="px-4 py-2 bg-red-600 text-white rounded-md hover:bg-red-700 transition-colors">
+                                        Delete
+                                    </button>
+                                    <button type="button" id="cancel-todo-btn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" id="save-todo-btn" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                        Save
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Create List Modal -->
+                <div id="create-list-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-md w-full m-4">
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-4">
+                                <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Create New List</h3>
+                                <button id="close-create-list-modal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+                            <form id="create-list-form" class="space-y-4">
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">List Name</label>
+                                    <input type="text" id="list-name" required placeholder="e.g., Work Projects" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description (optional)</label>
+                                    <textarea id="list-description" rows="2" placeholder="What is this list for?" class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Color</label>
+                                    <div class="flex space-x-2">
+                                        <button type="button" class="list-color-btn w-8 h-8 rounded-full bg-blue-500 border-2 border-blue-500" data-color="#3B82F6"></button>
+                                        <button type="button" class="list-color-btn w-8 h-8 rounded-full bg-green-500 border-2 border-transparent" data-color="#10B981"></button>
+                                        <button type="button" class="list-color-btn w-8 h-8 rounded-full bg-yellow-500 border-2 border-transparent" data-color="#F59E0B"></button>
+                                        <button type="button" class="list-color-btn w-8 h-8 rounded-full bg-red-500 border-2 border-transparent" data-color="#EF4444"></button>
+                                        <button type="button" class="list-color-btn w-8 h-8 rounded-full bg-purple-500 border-2 border-transparent" data-color="#8B5CF6"></button>
+                                        <button type="button" class="list-color-btn w-8 h-8 rounded-full bg-pink-500 border-2 border-transparent" data-color="#EC4899"></button>
+                                    </div>
+                                    <input type="hidden" id="list-color" value="#3B82F6">
+                                </div>
+                                <div class="flex justify-end space-x-3 pt-4">
+                                    <button type="button" id="cancel-create-list-btn" class="px-4 py-2 bg-gray-200 dark:bg-gray-700 text-gray-900 dark:text-white rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" class="px-4 py-2 bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                        Create List
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </div>
 
                 <!-- Create/Edit Prompt Modal -->
                 <div id="prompt-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
@@ -1307,5 +1597,6 @@
     <script src="prompts_manager.js"></script>
     <script src="svg_calendar_manager.js"></script>
     <script src="gantt_chart_manager.js"></script>
+    <script src="todos.js"></script>
 </body>
 </html>
