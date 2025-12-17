@@ -73,6 +73,13 @@ from server.routes.agents import (
     handle_agents_metrics_api as handle_agents_metrics_route,
     handle_agents_detail_api as handle_agents_detail_route
 )
+from server.routes.ollama_agents import (
+    handle_ollama_agents_api as handle_ollama_agents_route,
+    handle_ollama_agent_detail_api as handle_ollama_agent_detail_route,
+    handle_ollama_agent_invoke_api as handle_ollama_agent_invoke_route,
+    handle_ollama_skills_api as handle_ollama_skills_route,
+    handle_ollama_status_api as handle_ollama_status_route
+)
 from server.routes.mcp import (
     handle_mcp_servers_api as handle_mcp_servers_route,
     handle_mcp_server_action_api as handle_mcp_server_action_route,
@@ -252,6 +259,19 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 elif self.path.startswith('/api/agents/') and AGENT_SYSTEM_AVAILABLE:
                     self.handle_agents_detail_api()
                     return
+                # Ollama Agent System API endpoints
+                elif self.path == '/api/ollama/status':
+                    self.handle_ollama_status_api()
+                    return
+                elif self.path == '/api/ollama/agents':
+                    self.handle_ollama_agents_api()
+                    return
+                elif self.path == '/api/ollama/skills':
+                    self.handle_ollama_skills_api()
+                    return
+                elif self.path.startswith('/api/ollama/agents/'):
+                    self.handle_ollama_agent_detail_api()
+                    return
                 elif self.path == '/api/mcp/servers' and AGENT_SYSTEM_AVAILABLE:
                     self.handle_mcp_servers_api()
                     return
@@ -424,6 +444,13 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_agents_api()
             elif self.path.startswith('/api/agents/') and AGENT_SYSTEM_AVAILABLE:
                 self.handle_agents_detail_api()
+            # Ollama Agent API endpoints
+            elif self.path == '/api/ollama/agents':
+                self.handle_ollama_agents_api()
+            elif self.path.startswith('/api/ollama/agents/') and '/invoke' in self.path:
+                self.handle_ollama_agent_invoke_api()
+            elif self.path.startswith('/api/ollama/agents/'):
+                self.handle_ollama_agent_detail_api()
             elif self.path == '/api/mcp/servers' and AGENT_SYSTEM_AVAILABLE:
                 self.handle_mcp_servers_api()
             elif self.path.startswith('/api/mcp/servers/') and AGENT_SYSTEM_AVAILABLE:
@@ -1255,6 +1282,24 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_agents_detail_api(self):
         """Handle /api/agents/{agent_id} endpoint."""
         handle_agents_detail_route(self)
+
+    # Ollama Agent handlers
+    def handle_ollama_agents_api(self):
+        """Handle /api/ollama/agents endpoint."""
+        handle_ollama_agents_route(self)
+    def handle_ollama_agent_detail_api(self):
+        """Handle /api/ollama/agents/{agent_id} endpoint."""
+        handle_ollama_agent_detail_route(self)
+    def handle_ollama_agent_invoke_api(self):
+        """Handle /api/ollama/agents/{agent_id}/invoke endpoint."""
+        handle_ollama_agent_invoke_route(self)
+    def handle_ollama_skills_api(self):
+        """Handle /api/ollama/skills endpoint."""
+        handle_ollama_skills_route(self)
+    def handle_ollama_status_api(self):
+        """Handle /api/ollama/status endpoint."""
+        handle_ollama_status_route(self)
+
     def handle_mcp_servers_api(self):
         """Handle /api/mcp/servers endpoint."""
         handle_mcp_servers_route(self)

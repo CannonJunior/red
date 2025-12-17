@@ -49,6 +49,9 @@ class MCPAgentManager {
             // Initialize agents
             await this.loadAgents();
 
+            // Initialize Ollama agents
+            await this.loadOllamaAgents();
+
             // Initialize NLP task parser
             await this.initNLPParser();
 
@@ -501,15 +504,33 @@ class MCPAgentManager {
     }
 
     updateAgentsUI() {
-        const container = document.getElementById('agents-list');
-        if (!container) return;
+        // Try both possible container IDs (agents-list and agents-grid)
+        let container = document.getElementById('agents-grid');
+        if (!container) {
+            container = document.getElementById('agents-list');
+        }
+        if (!container) {
+            console.warn('No agents container found (tried agents-grid and agents-list)');
+            return;
+        }
 
         container.innerHTML = '';
+
+        if (this.agents.size === 0) {
+            container.innerHTML = `
+                <div class="text-center py-8 text-gray-500 dark:text-gray-400">
+                    <p class="text-sm">No agents yet. Click "Create Agent" to get started.</p>
+                </div>
+            `;
+            return;
+        }
 
         for (const [agentId, agent] of this.agents) {
             const agentElement = this.createAgentElement(agent);
             container.appendChild(agentElement);
         }
+
+        console.log(`✅ Updated agents UI with ${this.agents.size} agents`);
     }
 
     createAgentElement(agent) {
@@ -755,16 +776,20 @@ class MCPAgentManager {
     }
 
     async showCreateAgentDialog() {
+        // Load available skills first
+        const skillsResponse = await this.apiCall('/api/ollama/skills');
+        const availableSkills = skillsResponse.skills || [];
+
         // Create modal dialog for agent creation
         const modal = document.createElement('div');
         modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
         modal.innerHTML = `
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Create New Agent</h3>
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Create New Ollama Agent</h3>
                 <form id="create-agent-form">
                     <div class="space-y-4">
                         <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Name</label>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Name *</label>
                             <input type="text" id="agent-name" required
                                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                                 placeholder="Enter agent name">
@@ -774,6 +799,31 @@ class MCPAgentManager {
                             <textarea id="agent-description" rows="3"
                                 class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
                                 placeholder="Describe what this agent does"></textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model</label>
+                            <select id="agent-model"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                                <option value="qwen2.5:3b">qwen2.5:3b (recommended - fast & free)</option>
+                                <option value="llama3.1:latest">llama3.1:latest</option>
+                                <option value="llama3.2:latest">llama3.2:latest</option>
+                                <option value="mistral:latest">mistral:latest</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
+                            <div class="border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                                ${availableSkills.length > 0 ? availableSkills.map(skill => `
+                                    <label class="flex items-start">
+                                        <input type="checkbox" class="agent-skill mt-1" value="${skill.name}"
+                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <div class="ml-2">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                                            <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
+                                        </div>
+                                    </label>
+                                `).join('') : '<div class="text-sm text-gray-500">No skills available</div>'}
+                            </div>
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Capabilities</label>
@@ -815,15 +865,21 @@ class MCPAgentManager {
             e.preventDefault();
             const name = modal.querySelector('#agent-name').value;
             const description = modal.querySelector('#agent-description').value;
+            const model = modal.querySelector('#agent-model').value;
             const capabilities = Array.from(modal.querySelector('#agent-capabilities').selectedOptions).map(o => o.value);
 
+            // Get selected skills
+            const skillCheckboxes = modal.querySelectorAll('.agent-skill:checked');
+            const skills = Array.from(skillCheckboxes).map(cb => cb.value);
+
             try {
-                await this.createAgent({ name, description, capabilities });
+                await this.createAgent({ name, description, model, capabilities, skills });
                 if (modal && modal.parentNode) {
                     modal.parentNode.removeChild(modal);
                 }
             } catch (error) {
                 console.error('Failed to create agent:', error);
+                alert('Failed to create agent: ' + error.message);
             }
         });
 
@@ -1545,16 +1601,39 @@ class MCPAgentManager {
 
     async createAgent(agentData) {
         try {
-            const response = await this.apiCall('/api/agents', 'POST', agentData);
+            // Use Ollama agent API endpoint
+            const response = await this.apiCall('/api/ollama/agents', 'POST', agentData);
             if (response.status === 'success') {
-                console.log('✅ Agent created successfully:', response.data);
-                await this.loadAgents(); // Refresh the agents list
-                this.updateAgentsUI();
+                console.log('✅ Ollama agent created successfully:', response.data);
+                await this.loadOllamaAgents(); // Refresh the Ollama agents list
                 return response.data;
+            } else {
+                throw new Error(response.message || 'Failed to create agent');
             }
         } catch (error) {
-            console.error('❌ Failed to create agent:', error);
+            console.error('❌ Failed to create Ollama agent:', error);
             throw error;
+        }
+    }
+
+    async loadOllamaAgents() {
+        console.log('🤖 Loading Ollama agents...');
+
+        try {
+            const response = await this.apiCall('/api/ollama/agents');
+
+            if (response.status === 'success') {
+                // Merge with existing agents
+                response.agents.forEach(agent => {
+                    this.agents.set(agent.agent_id, agent);
+                });
+
+                this.updateAgentsUI();
+                console.log(`✅ Loaded ${response.agents.length} Ollama agents`);
+            }
+
+        } catch (error) {
+            console.error('Failed to load Ollama agents:', error);
         }
     }
 

@@ -37,10 +37,26 @@ class TodoUI {
         // Quick add
         const quickAddBtn = document.getElementById('quick-add-btn');
         const quickAddInput = document.getElementById('quick-add-input');
-        if (quickAddBtn) quickAddBtn.addEventListener('click', () => this.quickAddTodo());
+
+        console.log('Quick add button found:', !!quickAddBtn);
+        console.log('Quick add input found:', !!quickAddInput);
+
+        if (quickAddBtn) {
+            quickAddBtn.addEventListener('click', () => {
+                console.log('Quick add button clicked');
+                this.quickAddTodo();
+            });
+            console.log('Click listener attached to quick-add-btn');
+        } else {
+            console.error('quick-add-btn element not found during initialization');
+        }
+
         if (quickAddInput) {
             quickAddInput.addEventListener('keypress', (e) => {
-                if (e.key === 'Enter') this.quickAddTodo();
+                if (e.key === 'Enter') {
+                    console.log('Enter key pressed in quick-add-input');
+                    this.quickAddTodo();
+                }
             });
         }
 
@@ -143,12 +159,24 @@ class TodoUI {
      * Quick add todo with natural language
      */
     async quickAddTodo() {
+        console.log('quickAddTodo called');
         const input = document.getElementById('quick-add-input');
-        const text = input.value.trim();
 
-        if (!text) return;
+        if (!input) {
+            console.error('quick-add-input element not found');
+            return;
+        }
+
+        const text = input.value.trim();
+        console.log('Input text:', text);
+
+        if (!text) {
+            console.log('No text entered');
+            return;
+        }
 
         try {
+            console.log('Sending request to create todo...');
             const response = await fetch('/api/todos', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
@@ -160,13 +188,26 @@ class TodoUI {
             });
 
             const result = await response.json();
+            console.log('Response:', result);
 
             if (result.status === 'success') {
                 input.value = '';
-                this.loadTodos(); // Reload to show new todo
+
+                // Add the new todo to the array immediately
+                if (result.todo) {
+                    this.todos.unshift(result.todo); // Add to beginning of array
+                    console.log('Added new todo to array:', result.todo);
+                }
+
+                // Update UI immediately
+                this.updateStats();
+                this.renderTodos();
+
                 this.showNotification('Todo created successfully', 'success');
+                console.log('Todo created successfully');
             } else {
                 this.showNotification(result.message || 'Failed to create todo', 'error');
+                console.error('Failed to create todo:', result);
             }
         } catch (error) {
             console.error('Error creating todo:', error);
@@ -271,7 +312,10 @@ class TodoUI {
      */
     renderTodos() {
         const container = document.getElementById('todos-container');
-        if (!container) return;
+        if (!container) {
+            console.warn('todos-container not found');
+            return;
+        }
 
         // Filter todos by current bucket
         const filteredTodos = this.todos.filter(todo => {
@@ -279,14 +323,16 @@ class TodoUI {
             return todo.bucket === this.currentBucket;
         });
 
+        console.log(`Rendering ${filteredTodos.length} todos (total: ${this.todos.length}, bucket: ${this.currentBucket})`);
+
         if (filteredTodos.length === 0) {
             container.innerHTML = `
                 <div class="text-center py-12">
                     <svg class="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600 mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2"></path>
                     </svg>
-                    <p class="text-gray-500 dark:text-gray-400 text-sm">No todos in ${this.currentBucket}</p>
-                    <p class="text-gray-400 dark:text-gray-500 text-xs mt-2">Add one using the input above</p>
+                    <p class="text-gray-500 dark:text-gray-400 text-sm">No todos in "${this.currentBucket}"</p>
+                    <p class="text-gray-400 dark:text-gray-500 text-xs mt-2">Add one using the input above or switch to "all" to see all todos</p>
                 </div>
             `;
             return;
@@ -715,6 +761,14 @@ class TodoUI {
 }
 
 // Initialize TODO UI when DOM is ready
-document.addEventListener('DOMContentLoaded', () => {
+// Handle both cases: if DOM is already loaded or if it's still loading
+if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', () => {
+        console.log('Initializing TodoUI via DOMContentLoaded event');
+        window.todoUI = new TodoUI();
+    });
+} else {
+    // DOM is already loaded (script is at bottom of page)
+    console.log('Initializing TodoUI immediately (DOM already loaded)');
     window.todoUI = new TodoUI();
-});
+}

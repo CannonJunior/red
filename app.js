@@ -1143,6 +1143,17 @@ class Navigation {
         document.getElementById('agents-area')?.classList.add('hidden');
         document.getElementById('prompts-area')?.classList.add('hidden');
         document.getElementById('opportunities-area')?.classList.add('hidden');
+        document.getElementById('todos-area')?.classList.add('hidden');
+
+        // Hide all expandable submenu panels
+        document.getElementById('opportunities-list')?.classList.add('hidden');
+        document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
+        document.getElementById('lists-submenu')?.classList.add('hidden');
+
+        // Reset expand icons for all expandable nav items
+        document.querySelectorAll('.expandable-nav-item .expand-icon').forEach(icon => {
+            icon.style.transform = 'rotate(0deg)';
+        });
 
         // Show the selected area
         const pageTitle = document.getElementById('page-title');
