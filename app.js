@@ -3013,11 +3013,30 @@ class OpportunitiesManager {
         }
 
         this.opportunities.forEach(opp => {
+            const wrapper = document.createElement('div');
+            wrapper.className = 'flex items-center gap-1 group';
+
             const item = document.createElement('button');
-            item.className = 'w-full text-left px-3 py-2 rounded text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors';
+            item.className = 'flex-1 text-left px-3 py-2 rounded text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors';
             item.textContent = opp.name;
             item.addEventListener('click', () => this.showOpportunityDetail(opp));
-            opportunitiesList.appendChild(item);
+
+            const deleteBtn = document.createElement('button');
+            deleteBtn.className = 'p-2 text-gray-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity';
+            deleteBtn.title = 'Delete opportunity';
+            deleteBtn.innerHTML = `
+                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+                </svg>
+            `;
+            deleteBtn.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteOpportunityFromList(opp.id, opp.name);
+            });
+
+            wrapper.appendChild(item);
+            wrapper.appendChild(deleteBtn);
+            opportunitiesList.appendChild(wrapper);
         });
     }
 
@@ -3167,6 +3186,29 @@ class OpportunitiesManager {
                 this.loadOpportunities();
             } else {
                 console.error('Failed to delete opportunity');
+            }
+        } catch (error) {
+            console.error('Error deleting opportunity:', error);
+        }
+    }
+
+    async deleteOpportunityFromList(opportunityId, opportunityName) {
+        if (!confirm(`Are you sure you want to delete "${opportunityName}"? This will also delete all associated tasks.`)) {
+            return;
+        }
+
+        try {
+            const response = await fetch(`/api/opportunities/${opportunityId}`, {
+                method: 'DELETE'
+            });
+
+            const result = await response.json();
+
+            if (result.status === 'success') {
+                debugLog('Opportunity deleted from list successfully');
+                this.loadOpportunities();
+            } else {
+                console.error('Failed to delete opportunity:', result.message);
             }
         } catch (error) {
             console.error('Error deleting opportunity:', error);

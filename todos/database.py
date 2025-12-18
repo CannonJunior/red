@@ -287,9 +287,14 @@ class TodoDatabase:
         cursor = conn.cursor()
 
         cursor.execute("""
-            SELECT * FROM todo_lists
-            WHERE user_id = ?
-            ORDER BY created_at DESC
+            SELECT
+                tl.*,
+                COUNT(t.id) as total_tasks
+            FROM todo_lists tl
+            LEFT JOIN todos t ON t.list_id = tl.id
+            WHERE tl.user_id = ?
+            GROUP BY tl.id
+            ORDER BY tl.created_at DESC
         """, (user_id,))
         rows = cursor.fetchall()
         conn.close()
