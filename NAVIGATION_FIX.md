@@ -1,8 +1,12 @@
 # Navigation Fix - Lists Panels Visibility Issue
 
-## Issue Fixed
+## Issues Fixed
 
+### Issue 1: Lists panels stayed visible when navigating to other interfaces
 **Problem**: The "Lists" panels (specifically "Opportunities" and "TODO Lists" expandable submenus in the sidebar) remained visible when switching to other interfaces like "Models", "Prompts", "MCP", etc.
+
+### Issue 2: Clicking "Opportunities" closed the lists without showing opportunities
+**Problem**: After initial fix, clicking "Opportunities" would close the entire Lists submenu instead of expanding to show the opportunities list.
 
 ## Root Cause
 
@@ -16,7 +20,7 @@ This meant that if a user expanded "Opportunities" or "TODO Lists" in the sideba
 
 ## Solution
 
-Updated the `navigateTo(page)` function in `/home/junior/src/red/app.js` (lines 1134-1156) to:
+Updated the `navigateTo(page)` function in `/home/junior/src/red/app.js` (lines 1134-1162) with a **conditional approach**:
 
 ### 1. Hide the `todos-area`
 
@@ -26,27 +30,33 @@ Added `todos-area` to the list of areas to hide:
 document.getElementById('todos-area')?.classList.add('hidden');
 ```
 
-### 2. Hide all expandable submenu panels
+### 2. Conditionally hide expandable submenu panels
 
-Added code to explicitly hide all sidebar submenu panels when navigating:
+Key insight: The submenu panels should ONLY be hidden when navigating to pages that don't use them.
 
-```javascript
-// Hide all expandable submenu panels
-document.getElementById('opportunities-list')?.classList.add('hidden');
-document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
-document.getElementById('lists-submenu')?.classList.add('hidden');
-```
-
-### 3. Reset expand icons
-
-Added code to reset all expand/collapse icons to their default state:
+Added conditional logic to hide sidebar submenu panels when navigating to non-Lists pages:
 
 ```javascript
-// Reset expand icons for all expandable nav items
-document.querySelectorAll('.expandable-nav-item .expand-icon').forEach(icon => {
-    icon.style.transform = 'rotate(0deg)';
-});
+// Hide expandable submenu panels ONLY when navigating away from Lists-related pages
+// Don't hide them when navigating TO opportunities or todos pages
+if (page !== 'opportunities' && page !== 'todos') {
+    document.getElementById('opportunities-list')?.classList.add('hidden');
+    document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
+    document.getElementById('lists-submenu')?.classList.add('hidden');
+
+    // Reset expand icons for all expandable nav items
+    document.querySelectorAll('.expandable-nav-item .expand-icon').forEach(icon => {
+        icon.style.transform = 'rotate(0deg)';
+    });
+}
 ```
+
+### 3. Why the conditional?
+
+- When clicking "Opportunities", the code calls `toggleExpandableNavItem()` to expand the panel, then `navigateTo('opportunities')`
+- If we hide panels unconditionally, the panel gets expanded then immediately hidden
+- By checking `if (page !== 'opportunities' && page !== 'todos')`, we preserve the panels for their respective pages
+- Panels are still hidden when navigating to unrelated pages like "Models", "Chat", "Prompts", etc.
 
 ## Complete Code Change
 
@@ -69,7 +79,7 @@ navigateTo(page) {
     const pageTitle = document.getElementById('page-title');
 ```
 
-**After:**
+**After (Final Fix):**
 ```javascript
 navigateTo(page) {
     // Hide all areas
@@ -85,15 +95,18 @@ navigateTo(page) {
     document.getElementById('opportunities-area')?.classList.add('hidden');
     document.getElementById('todos-area')?.classList.add('hidden');
 
-    // Hide all expandable submenu panels
-    document.getElementById('opportunities-list')?.classList.add('hidden');
-    document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
-    document.getElementById('lists-submenu')?.classList.add('hidden');
+    // Hide expandable submenu panels ONLY when navigating away from Lists-related pages
+    // Don't hide them when navigating TO opportunities or todos pages
+    if (page !== 'opportunities' && page !== 'todos') {
+        document.getElementById('opportunities-list')?.classList.add('hidden');
+        document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
+        document.getElementById('lists-submenu')?.classList.add('hidden');
 
-    // Reset expand icons for all expandable nav items
-    document.querySelectorAll('.expandable-nav-item .expand-icon').forEach(icon => {
-        icon.style.transform = 'rotate(0deg)';
-    });
+        // Reset expand icons for all expandable nav items
+        document.querySelectorAll('.expandable-nav-item .expand-icon').forEach(icon => {
+            icon.style.transform = 'rotate(0deg)';
+        });
+    }
 
     // Show the selected area
     const pageTitle = document.getElementById('page-title');
@@ -101,18 +114,31 @@ navigateTo(page) {
 
 ## Files Modified
 
-- `/home/junior/src/red/app.js` (lines 1134-1156)
+- `/home/junior/src/red/app.js` (lines 1134-1162)
 
 ## Testing
 
 ### Manual Testing Steps
 
+**Test 1: Lists panels hide when navigating away**
 1. Open the application at http://localhost:9090
-2. In the sidebar, expand "Opportunities" (should show opportunities list)
-3. Click on a different interface like "Models" or "Chat"
-4. **Expected**: Opportunities list panel should disappear
-5. Repeat with "TODO Lists" submenu
-6. **Expected**: TODO Lists dropdown should disappear when switching pages
+2. In the sidebar, click "Lists" to expand it
+3. Click "Opportunities" to expand the opportunities list
+4. Click on a different interface like "Models" or "Chat"
+5. **Expected**: All Lists panels should disappear (Lists submenu, Opportunities list, etc.)
+
+**Test 2: Opportunities panel shows and stays visible**
+1. In the sidebar, click "Lists" to expand it
+2. Click "Opportunities"
+3. **Expected**: Opportunities list panel should appear and show opportunities
+4. Click on an opportunity in the list
+5. **Expected**: Opportunities list should remain visible while on opportunities page
+
+**Test 3: TODO Lists panel shows and stays visible**
+1. In the sidebar, click "Lists" to expand it (if not already expanded)
+2. Click "TODO Lists"
+3. **Expected**: TODO Lists dropdown should appear and show todo lists
+4. The lists should remain visible while on the todos page
 
 ### Automated Testing
 

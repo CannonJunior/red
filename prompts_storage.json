@@ -10,5 +10,41 @@
     "updated_at": "2025-12-06T22:57:43.738227",
     "usage_count": 1,
     "last_used": "2025-12-06T23:12:33.427528"
+  },
+  "6b67ec0d-56de-427b-aa45-4b2c15c48fa1": {
+    "id": "6b67ec0d-56de-427b-aa45-4b2c15c48fa1",
+    "name": "explain",
+    "content": "Please explain the following concept in simple, easy-to-understand terms:",
+    "description": "Explain a concept in simple terms",
+    "tags": [],
+    "mcp_enabled": true,
+    "created_at": "2025-12-17T22:19:32.759455",
+    "updated_at": "2025-12-17T22:19:32.759462",
+    "usage_count": 0,
+    "last_used": null
+  },
+  "fc5d6c31-a876-474f-b6dd-683e698c96ca": {
+    "id": "fc5d6c31-a876-474f-b6dd-683e698c96ca",
+    "name": "summarize",
+    "content": "Please provide a concise summary of the following text:",
+    "description": "Summarize text concisely",
+    "tags": [],
+    "mcp_enabled": true,
+    "created_at": "2025-12-17T22:19:37.658332",
+    "updated_at": "2025-12-17T22:19:37.658341",
+    "usage_count": 0,
+    "last_used": null
+  },
+  "1661e6c3-cb3d-437c-8e16-d7897ebe9a97": {
+    "id": "1661e6c3-cb3d-437c-8e16-d7897ebe9a97",
+    "name": "debug",
+    "content": "Please help debug the following code and identify any issues:",
+    "description": "Debug code and find issues",
+    "tags": [],
+    "mcp_enabled": true,
+    "created_at": "2025-12-17T22:19:42.573676",
+    "updated_at": "2025-12-17T22:19:42.573686",
+    "usage_count": 0,
+    "last_used": null
   }
 }

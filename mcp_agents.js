@@ -552,12 +552,16 @@ class MCPAgentManager {
                     <div class="mt-2">
                         <div class="flex flex-wrap gap-1">
                             ${capabilities.map(cap =>
-                                `<span class="px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded">${cap}</span>`
+                                `<span class="px-2 py-1 text-xs bg-blue-100 text-blue-800 dark:bg-blue-800 dark:text-blue-100 rounded">${cap}</span>`
                             ).join('')}
                         </div>
                     </div>
                 </div>
-                <div class="ml-4 space-x-2">
+                <div class="ml-4 flex gap-2">
+                    <button class="edit-agent px-3 py-1 text-sm bg-blue-600 text-white rounded hover:bg-blue-700"
+                            data-agent-id="${agent.agent_id}">
+                        Edit
+                    </button>
                     <button class="delete-agent px-3 py-1 text-sm bg-red-600 text-white rounded hover:bg-red-700"
                             data-agent-id="${agent.agent_id}">
                         Delete
@@ -565,6 +569,17 @@ class MCPAgentManager {
                 </div>
             </div>
         `;
+
+        // Add event listeners
+        const editBtn = div.querySelector('.edit-agent');
+        const deleteBtn = div.querySelector('.delete-agent');
+
+        editBtn.addEventListener('click', () => this.showEditAgentDialog(agent));
+        deleteBtn.addEventListener('click', () => {
+            if (confirm(`Are you sure you want to delete "${agent.name}"?`)) {
+                this.deleteAgent(agent.agent_id);
+            }
+        });
 
         return div;
     }
@@ -773,6 +788,135 @@ class MCPAgentManager {
     updateMetricsDashboard() {
         // Refresh metrics dashboard
         this.updateUIPerformanceMetrics();
+    }
+
+    async showEditAgentDialog(agent) {
+        // Load available skills first
+        const skillsResponse = await this.apiCall('/api/ollama/skills');
+        const availableSkills = skillsResponse.skills || [];
+
+        // Create modal dialog for agent editing
+        const modal = document.createElement('div');
+        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
+        modal.innerHTML = `
+            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
+                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Edit Agent: ${agent.name}</h3>
+                <form id="edit-agent-form">
+                    <input type="hidden" id="edit-agent-id" value="${agent.agent_id}">
+                    <div class="space-y-4">
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Name *</label>
+                            <input type="text" id="edit-agent-name" required value="${agent.name || ''}"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                placeholder="Enter agent name">
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                            <textarea id="edit-agent-description" rows="3"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                placeholder="Describe what this agent does">${agent.description || ''}</textarea>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model</label>
+                            <select id="edit-agent-model"
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                                <option value="qwen2.5:3b" ${agent.model === 'qwen2.5:3b' ? 'selected' : ''}>qwen2.5:3b (recommended - fast & free)</option>
+                                <option value="llama3.1:latest" ${agent.model === 'llama3.1:latest' ? 'selected' : ''}>llama3.1:latest</option>
+                                <option value="llama3.2:latest" ${agent.model === 'llama3.2:latest' ? 'selected' : ''}>llama3.2:latest</option>
+                                <option value="mistral:latest" ${agent.model === 'mistral:latest' ? 'selected' : ''}>mistral:latest</option>
+                            </select>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
+                            <div class="border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
+                                ${availableSkills.length > 0 ? availableSkills.map(skill => `
+                                    <label class="flex items-start">
+                                        <input type="checkbox" class="edit-agent-skill mt-1" value="${skill.name}"
+                                            ${agent.skills && agent.skills.includes(skill.name) ? 'checked' : ''}
+                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <div class="ml-2">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                                            <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
+                                        </div>
+                                    </label>
+                                `).join('') : '<div class="text-sm text-gray-500">No skills available</div>'}
+                            </div>
+                        </div>
+                        <div>
+                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Capabilities</label>
+                            <select id="edit-agent-capabilities" multiple
+                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                                <option value="general" ${agent.capabilities && agent.capabilities.includes('general') ? 'selected' : ''}>General</option>
+                                <option value="nlp" ${agent.capabilities && agent.capabilities.includes('nlp') ? 'selected' : ''}>Natural Language Processing</option>
+                                <option value="data-analysis" ${agent.capabilities && agent.capabilities.includes('data-analysis') ? 'selected' : ''}>Data Analysis</option>
+                                <option value="automation" ${agent.capabilities && agent.capabilities.includes('automation') ? 'selected' : ''}>Automation</option>
+                                <option value="monitoring" ${agent.capabilities && agent.capabilities.includes('monitoring') ? 'selected' : ''}>Monitoring</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="flex gap-3 mt-6">
+                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
+                            Save Changes
+                        </button>
+                        <button type="button" id="cancel-edit-agent" class="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500">
+                            Cancel
+                        </button>
+                    </div>
+                </form>
+            </div>
+        `;
+
+        document.body.appendChild(modal);
+
+        // Prevent clicks on modal content from closing the modal
+        const modalContent = modal.querySelector('div.bg-white');
+        if (modalContent) {
+            modalContent.addEventListener('click', (e) => {
+                e.stopPropagation();
+            });
+        }
+
+        // Handle form submission
+        const form = modal.querySelector('#edit-agent-form');
+        form.addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const agentId = modal.querySelector('#edit-agent-id').value;
+            const name = modal.querySelector('#edit-agent-name').value;
+            const description = modal.querySelector('#edit-agent-description').value;
+            const model = modal.querySelector('#edit-agent-model').value;
+            const capabilities = Array.from(modal.querySelector('#edit-agent-capabilities').selectedOptions).map(o => o.value);
+
+            // Get selected skills
+            const skillCheckboxes = modal.querySelectorAll('.edit-agent-skill:checked');
+            const skills = Array.from(skillCheckboxes).map(cb => cb.value);
+
+            try {
+                await this.updateAgent(agentId, { name, description, model, capabilities, skills });
+                if (modal && modal.parentNode) {
+                    modal.parentNode.removeChild(modal);
+                }
+            } catch (error) {
+                console.error('Failed to update agent:', error);
+                alert('Failed to update agent: ' + error.message);
+            }
+        });
+
+        // Handle cancel
+        const cancelButton = modal.querySelector('#cancel-edit-agent');
+        if (cancelButton) {
+            cancelButton.addEventListener('click', () => {
+                if (modal && modal.parentNode) {
+                    modal.parentNode.removeChild(modal);
+                }
+            });
+        }
+
+        // Click outside to close
+        modal.addEventListener('click', (e) => {
+            if (e.target === modal) {
+                modal.parentNode.removeChild(modal);
+            }
+        });
     }
 
     async showCreateAgentDialog() {
@@ -1652,9 +1796,29 @@ class MCPAgentManager {
         }
     }
 
+    async updateAgent(agentId, agentData) {
+        try {
+            // Use Ollama agent API endpoint for update
+            const response = await this.apiCall(`/api/ollama/agents/${agentId}`, 'PUT', agentData);
+            if (response.status === 'success') {
+                console.log('✅ Ollama agent updated successfully:', response.data);
+                // Update local agent data
+                this.agents.set(agentId, response.data);
+                this.updateAgentsUI();
+                return response.data;
+            } else {
+                throw new Error(response.message || 'Failed to update agent');
+            }
+        } catch (error) {
+            console.error('❌ Failed to update Ollama agent:', error);
+            throw error;
+        }
+    }
+
     async deleteAgent(agentId) {
         try {
-            const response = await this.apiCall(`/api/agents/${agentId}`, 'DELETE');
+            // Try Ollama API first
+            const response = await this.apiCall(`/api/ollama/agents/${agentId}`, 'DELETE');
             if (response.status === 'success') {
                 this.agents.delete(agentId);
                 this.updateAgentsUI();

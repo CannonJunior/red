@@ -139,6 +139,14 @@ class ChatInterface {
         this.setupAutoResize();
         this.setupMessagesContainer();
         this.loadAvailableModels();
+        this.setupAgentMentions();
+    }
+
+    setupAgentMentions() {
+        // Initialize agent mention autocomplete
+        if (typeof AgentMentionAutocomplete !== 'undefined') {
+            this.agentMentionAutocomplete = new AgentMentionAutocomplete(this);
+        }
     }
 
     setupMessagesContainer() {
@@ -189,6 +197,53 @@ class ChatInterface {
 
         // Enhanced key handling for Enter and arrow keys
         this.messageInput?.addEventListener('keydown', (e) => {
+            // Check if Prompt autocomplete is visible
+            if (this.isPromptAutocompleteVisible()) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.navigatePromptAutocomplete(1);
+                    return;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.navigatePromptAutocomplete(-1);
+                    return;
+                } else if (e.key === 'Tab' || e.key === 'Enter') {
+                    if (this.promptSelectedIndex >= 0) {
+                        e.preventDefault();
+                        this.selectCurrentPrompt();
+                        return;
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.hidePromptAutocomplete();
+                    return;
+                }
+            }
+
+            // Check if MCP autocomplete is visible
+            if (this.isMCPAutocompleteVisible()) {
+                if (e.key === 'ArrowDown') {
+                    e.preventDefault();
+                    this.navigateMCPAutocomplete(1);
+                    return;
+                } else if (e.key === 'ArrowUp') {
+                    e.preventDefault();
+                    this.navigateMCPAutocomplete(-1);
+                    return;
+                } else if (e.key === 'Tab' || e.key === 'Enter') {
+                    if (this.mcpSelectedIndex >= 0) {
+                        e.preventDefault();
+                        this.selectCurrentMCPTool();
+                        return;
+                    }
+                } else if (e.key === 'Escape') {
+                    e.preventDefault();
+                    this.hideMCPAutocomplete();
+                    return;
+                }
+            }
+
+            // Regular keyboard handling
             if (e.key === 'Enter' && !e.shiftKey) {
                 e.preventDefault();
                 this.handleSend();
@@ -198,6 +253,8 @@ class ChatInterface {
             } else if (e.key === 'ArrowDown') {
                 e.preventDefault();
                 this.navigateHistory('down');
+            } else if (e.key === 'Escape') {
+                this.handleEscapeKey();
             }
         });
 
@@ -205,6 +262,11 @@ class ChatInterface {
         this.messageInput?.addEventListener('input', (e) => {
             this.updateSendButtonState();
             this.handleMCPToolAutocomplete(e);
+            this.handlePromptAutocomplete(e);
+            // Handle agent mentions (@)
+            if (this.agentMentionAutocomplete) {
+                this.agentMentionAutocomplete.handleInput();
+            }
         });
     }
 
@@ -217,9 +279,73 @@ class ChatInterface {
         });
     }
 
+    handleEscapeKey() {
+        if (!this.isLoading) return; // Only handle ESC during loading
+
+        if (this.escPressedOnce) {
+            // Second ESC press - cancel the request
+            debugLog('ESC pressed twice - cancelling request');
+            this.cancelCurrentRequest();
+            this.escPressedOnce = false;
+
+            // Remove confirmation message
+            const confirmMsg = document.getElementById('cancel-confirmation-message');
+            if (confirmMsg) confirmMsg.remove();
+        } else {
+            // First ESC press - show confirmation
+            debugLog('ESC pressed once - showing confirmation');
+            this.escPressedOnce = true;
+            this.showCancelConfirmation();
+
+            // Reset after 3 seconds
+            setTimeout(() => {
+                this.escPressedOnce = false;
+                const confirmMsg = document.getElementById('cancel-confirmation-message');
+                if (confirmMsg) confirmMsg.remove();
+            }, 3000);
+        }
+    }
+
+    showCancelConfirmation() {
+        // Remove existing confirmation if any
+        const existing = document.getElementById('cancel-confirmation-message');
+        if (existing) existing.remove();
+
+        // Create confirmation message
+        const confirmation = document.createElement('div');
+        confirmation.id = 'cancel-confirmation-message';
+        confirmation.className = 'fixed bottom-20 left-1/2 transform -translate-x-1/2 bg-yellow-100 dark:bg-yellow-900 text-yellow-800 dark:text-yellow-200 px-6 py-3 rounded-lg shadow-lg z-50 flex items-center gap-2';
+        confirmation.innerHTML = `
+            <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 9v2m0 4h.01m-6.938 4h13.856c1.54 0 2.502-1.667 1.732-3L13.732 4c-.77-1.333-2.694-1.333-3.464 0L3.34 16c-.77 1.333.192 3 1.732 3z"></path>
+            </svg>
+            <span class="font-medium">Press ESC again to cancel the current request</span>
+        `;
+
+        document.body.appendChild(confirmation);
+    }
+
+    cancelCurrentRequest() {
+        debugLog('Cancelling current request');
+
+        // Set loading to false
+        this.isLoading = false;
+        this.updateSendButtonState();
+
+        // Remove typing indicator
+        const typingIndicators = document.querySelectorAll('.typing-indicator');
+        typingIndicators.forEach(indicator => indicator.remove());
+
+        // Display cancellation message
+        this.displayMessage('system', 'Request cancelled by user');
+    }
+
     async handleSend() {
         const message = this.messageInput?.value.trim();
         if (!message || this.isLoading) return;
+
+        // Reset ESC press state
+        this.escPressedOnce = false;
 
         debugLog('Sending message:', message);
 
@@ -249,6 +375,75 @@ class ChatInterface {
         const typingId = this.showTypingIndicator();
 
         try {
+            // Check for @ mention to invoke a specific agent
+            if (message.startsWith('@')) {
+                const atMentionMatch = message.match(/^@(\S+)\s+(.+)$/);
+                if (atMentionMatch) {
+                    const [, agentName, agentMessage] = atMentionMatch;
+                    debugLog('Agent mention detected:', { agentName, agentMessage });
+
+                    // Fetch agents to find the mentioned agent
+                    const agentsResponse = await fetch('/api/ollama/agents');
+                    if (agentsResponse.ok) {
+                        const agentsData = await agentsResponse.json();
+                        const agent = agentsData.agents?.find(a => a.name === agentName);
+
+                        if (agent) {
+                            debugLog('Found agent:', agent);
+
+                            // Invoke the specific agent
+                            const invokeResponse = await fetch(`/api/ollama/agents/${agent.agent_id}/invoke`, {
+                                method: 'POST',
+                                headers: { 'Content-Type': 'application/json' },
+                                body: JSON.stringify({ message: agentMessage })
+                            });
+
+                            const invokeData = await invokeResponse.json();
+                            this.removeTypingIndicator(typingId);
+
+                            if (invokeResponse.ok && invokeData.status === 'success') {
+                                // Calculate elapsed time
+                                const endTime = Date.now();
+                                const elapsedMs = endTime - startTime;
+                                const elapsedSeconds = Math.floor(elapsedMs / 1000);
+                                const elapsedMinutes = Math.floor(elapsedSeconds / 60);
+                                const remainingSeconds = elapsedSeconds % 60;
+                                const elapsedFormatted = elapsedMinutes > 0 ?
+                                    `${elapsedMinutes}m ${remainingSeconds}s` :
+                                    `${remainingSeconds}s`;
+
+                                // Display agent response with metadata
+                                const metadata = {
+                                    model: invokeData.model,
+                                    knowledgeBase: `Agent: ${agentName}`,
+                                    ragEnabled: false,
+                                    sourcesUsed: 0,
+                                    startTime: startTimeFormatted,
+                                    endTime: new Date(endTime).toLocaleTimeString(),
+                                    elapsed: elapsedFormatted,
+                                    cost: '$0.00'
+                                };
+
+                                this.displayMessage('assistant', invokeData.response, metadata);
+                            } else {
+                                this.displayMessage('error', invokeData.error || 'Agent invocation failed');
+                            }
+
+                            this.isLoading = false;
+                            this.updateSendButtonState();
+                            return;
+                        } else {
+                            // Agent not found
+                            this.removeTypingIndicator(typingId);
+                            this.displayMessage('error', `Agent '@${agentName}' not found. Available agents: ${agentsData.agents?.map(a => a.name).join(', ') || 'none'}`);
+                            this.isLoading = false;
+                            this.updateSendButtonState();
+                            return;
+                        }
+                    }
+                }
+            }
+
             // Check knowledge mode
             const knowledgeMode = document.getElementById('knowledge-mode-selector')?.value || 'none';
 
@@ -468,8 +663,16 @@ class ChatInterface {
                     </div>
                 </div>
             `;
+        } else if (type === 'system') {
+            messageHtml = `
+                <div class="flex justify-center mb-4">
+                    <div class="bg-gray-100 dark:bg-gray-700 border border-gray-300 dark:border-gray-600 px-4 py-2 rounded-lg">
+                        <p class="text-sm text-gray-700 dark:text-gray-300">ℹ️ ${this.escapeHtml(content)}</p>
+                    </div>
+                </div>
+            `;
         }
-        
+
         messageDiv.innerHTML = messageHtml;
         this.messagesContainer.appendChild(messageDiv);
         
@@ -661,6 +864,53 @@ class ChatInterface {
         await this.showMCPAutocomplete(searchTerm, hashIndex);
     }
 
+    isMCPAutocompleteVisible() {
+        const dropdown = document.getElementById('mcp-autocomplete');
+        return dropdown && dropdown.style.display !== 'none';
+    }
+
+    navigateMCPAutocomplete(direction) {
+        if (!this.filteredMCPTools || this.filteredMCPTools.length === 0) return;
+
+        if (this.mcpSelectedIndex === -1 && direction === 1) {
+            this.mcpSelectedIndex = 0;
+        } else {
+            this.mcpSelectedIndex += direction;
+        }
+
+        if (this.mcpSelectedIndex < 0) {
+            this.mcpSelectedIndex = this.filteredMCPTools.length - 1;
+        } else if (this.mcpSelectedIndex >= this.filteredMCPTools.length) {
+            this.mcpSelectedIndex = 0;
+        }
+
+        // Update visual selection
+        this.updateMCPAutocompleteSelection();
+    }
+
+    updateMCPAutocompleteSelection() {
+        const dropdown = document.getElementById('mcp-autocomplete');
+        if (!dropdown) return;
+
+        const items = dropdown.querySelectorAll('.mcp-autocomplete-item');
+        items.forEach((item, index) => {
+            if (index === this.mcpSelectedIndex) {
+                item.classList.add('bg-blue-50', 'dark:bg-blue-900/50');
+                item.classList.remove('hover:bg-gray-100', 'dark:hover:bg-gray-700');
+            } else {
+                item.classList.remove('bg-blue-50', 'dark:bg-blue-900/50');
+                item.classList.add('hover:bg-gray-100', 'dark:hover:bg-gray-700');
+            }
+        });
+    }
+
+    selectCurrentMCPTool() {
+        if (this.mcpSelectedIndex >= 0 && this.filteredMCPTools && this.filteredMCPTools[this.mcpSelectedIndex]) {
+            const tool = this.filteredMCPTools[this.mcpSelectedIndex];
+            this.selectMCPTool(tool, this.mcpHashIndex);
+        }
+    }
+
     async showMCPAutocomplete(searchTerm, hashIndex) {
         try {
             // Load MCP tools if not already loaded
@@ -685,6 +935,11 @@ class ChatInterface {
                 return;
             }
 
+            // Store for keyboard navigation
+            this.filteredMCPTools = filteredTools;
+            this.mcpHashIndex = hashIndex;
+            this.mcpSelectedIndex = -1;
+
             // Create or update autocomplete dropdown
             let dropdown = document.getElementById('mcp-autocomplete');
             if (!dropdown) {
@@ -702,9 +957,10 @@ class ChatInterface {
                     </div>
                 </div>
                 <div class="py-1">
-                    ${filteredTools.map(tool => `
+                    ${filteredTools.map((tool, index) => `
                         <button type="button"
                                 class="mcp-autocomplete-item w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-start"
+                                data-index="${index}"
                                 data-tool-id="${tool.id}"
                                 data-tool-config='${JSON.stringify(tool)}'>
                             <svg class="w-5 h-5 text-blue-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -758,6 +1014,201 @@ class ChatInterface {
 
         // Start sequential input collection
         await this.collectMCPToolInputs(toolConfig);
+    }
+
+    // Prompt Autocomplete and Quick Reference
+    async handlePromptAutocomplete(event) {
+        const input = this.messageInput.value;
+        const cursorPos = this.messageInput.selectionStart;
+
+        // Find the last / character before cursor
+        const textBeforeCursor = input.substring(0, cursorPos);
+        const slashIndex = textBeforeCursor.lastIndexOf('/');
+
+        if (slashIndex === -1) {
+            this.hidePromptAutocomplete();
+            return;
+        }
+
+        // Get the text after / up to cursor
+        const searchTerm = textBeforeCursor.substring(slashIndex + 1);
+
+        // Only show autocomplete if / is at start of word (after space or at start)
+        const beforeSlash = slashIndex > 0 ? textBeforeCursor[slashIndex - 1] : ' ';
+        if (beforeSlash !== ' ' && beforeSlash !== '\n' && slashIndex !== 0) {
+            this.hidePromptAutocomplete();
+            return;
+        }
+
+        // Show autocomplete with filtered prompts
+        await this.showPromptAutocomplete(searchTerm, slashIndex);
+    }
+
+    isPromptAutocompleteVisible() {
+        const dropdown = document.getElementById('prompt-autocomplete');
+        return dropdown && dropdown.style.display !== 'none';
+    }
+
+    navigatePromptAutocomplete(direction) {
+        if (!this.filteredPrompts || this.filteredPrompts.length === 0) return;
+
+        if (this.promptSelectedIndex === -1 && direction === 1) {
+            this.promptSelectedIndex = 0;
+        } else {
+            this.promptSelectedIndex += direction;
+        }
+
+        if (this.promptSelectedIndex < 0) {
+            this.promptSelectedIndex = this.filteredPrompts.length - 1;
+        } else if (this.promptSelectedIndex >= this.filteredPrompts.length) {
+            this.promptSelectedIndex = 0;
+        }
+
+        // Update visual selection
+        this.updatePromptAutocompleteSelection();
+    }
+
+    updatePromptAutocompleteSelection() {
+        const dropdown = document.getElementById('prompt-autocomplete');
+        if (!dropdown) return;
+
+        const items = dropdown.querySelectorAll('.prompt-autocomplete-item');
+        items.forEach((item, index) => {
+            if (index === this.promptSelectedIndex) {
+                item.classList.add('bg-blue-50', 'dark:bg-blue-900/50');
+                item.classList.remove('hover:bg-gray-100', 'dark:hover:bg-gray-700');
+            } else {
+                item.classList.remove('bg-blue-50', 'dark:bg-blue-900/50');
+                item.classList.add('hover:bg-gray-100', 'dark:hover:bg-gray-700');
+            }
+        });
+    }
+
+    selectCurrentPrompt() {
+        if (this.promptSelectedIndex >= 0 && this.filteredPrompts && this.filteredPrompts[this.promptSelectedIndex]) {
+            const prompt = this.filteredPrompts[this.promptSelectedIndex];
+            this.selectPrompt(prompt, this.promptSlashIndex);
+        }
+    }
+
+    async showPromptAutocomplete(searchTerm, slashIndex) {
+        try {
+            // Load prompts if not already loaded
+            if (!this.prompts) {
+                const response = await fetch('/api/prompts');
+                if (response.ok) {
+                    const data = await response.json();
+                    this.prompts = data.prompts || [];
+                } else {
+                    this.prompts = [];
+                }
+            }
+
+            // Filter prompts based on search term
+            const filteredPrompts = this.prompts.filter(prompt =>
+                prompt.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
+                (prompt.description && prompt.description.toLowerCase().includes(searchTerm.toLowerCase()))
+            );
+
+            if (filteredPrompts.length === 0) {
+                this.hidePromptAutocomplete();
+                return;
+            }
+
+            // Store for keyboard navigation
+            this.filteredPrompts = filteredPrompts;
+            this.promptSlashIndex = slashIndex;
+            this.promptSelectedIndex = -1;
+
+            // Create or update autocomplete dropdown
+            let dropdown = document.getElementById('prompt-autocomplete');
+            if (!dropdown) {
+                dropdown = document.createElement('div');
+                dropdown.id = 'prompt-autocomplete';
+                dropdown.className = 'absolute bottom-full left-0 right-0 mb-2 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg max-h-64 overflow-y-auto z-20';
+                this.messageInput.parentElement.insertBefore(dropdown, this.messageInput);
+            }
+
+            // Populate dropdown
+            dropdown.innerHTML = `
+                <div class="p-2 border-b border-gray-200 dark:border-gray-700">
+                    <div class="text-xs font-medium text-gray-500 dark:text-gray-400 px-2">
+                        Prompts (${filteredPrompts.length})
+                    </div>
+                </div>
+                <div class="py-1">
+                    ${filteredPrompts.map((prompt, index) => `
+                        <button type="button"
+                                class="prompt-autocomplete-item w-full text-left px-3 py-2 hover:bg-gray-100 dark:hover:bg-gray-700 flex items-start"
+                                data-index="${index}"
+                                data-prompt-id="${prompt.id}"
+                                data-prompt-name="${prompt.name}">
+                            <svg class="w-5 h-5 text-purple-500 mr-2 flex-shrink-0 mt-0.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
+                            </svg>
+                            <div class="flex-1">
+                                <div class="text-sm font-medium text-gray-900 dark:text-white">/${prompt.name}</div>
+                                <div class="text-xs text-gray-500 dark:text-gray-400">${prompt.description || 'No description'}</div>
+                                ${prompt.usage_count ? `<div class="text-xs text-gray-400 dark:text-gray-500 mt-0.5">Used ${prompt.usage_count} times</div>` : ''}
+                            </div>
+                        </button>
+                    `).join('')}
+                </div>
+            `;
+
+            // Add click handlers
+            dropdown.querySelectorAll('.prompt-autocomplete-item').forEach(item => {
+                item.addEventListener('click', (e) => {
+                    const index = parseInt(item.dataset.index);
+                    const prompt = filteredPrompts[index];
+                    this.selectPrompt(prompt, slashIndex);
+                });
+            });
+
+            dropdown.style.display = 'block';
+
+        } catch (error) {
+            console.error('Failed to show prompt autocomplete:', error);
+            this.hidePromptAutocomplete();
+        }
+    }
+
+    hidePromptAutocomplete() {
+        const dropdown = document.getElementById('prompt-autocomplete');
+        if (dropdown) {
+            dropdown.style.display = 'none';
+        }
+    }
+
+    async selectPrompt(prompt, slashIndex) {
+        // Hide autocomplete
+        this.hidePromptAutocomplete();
+
+        // Replace /search with /prompt-name in the input
+        const input = this.messageInput.value;
+        const beforeSlash = input.substring(0, slashIndex);
+        const afterCursor = input.substring(this.messageInput.selectionStart);
+
+        // Insert the prompt content
+        this.messageInput.value = `${beforeSlash}${prompt.content}${afterCursor}`;
+
+        // Position cursor after the prompt content
+        const newCursorPos = beforeSlash.length + prompt.content.length;
+        this.messageInput.setSelectionRange(newCursorPos, newCursorPos);
+
+        // Auto-resize textarea
+        this.messageInput.dispatchEvent(new Event('input'));
+
+        // Update usage count
+        try {
+            await fetch(`/api/prompts/use`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ prompt_id: prompt.id })
+            });
+        } catch (error) {
+            console.error('Failed to update prompt usage:', error);
+        }
     }
 
     async collectMCPToolInputs(toolConfig) {
@@ -1145,15 +1596,18 @@ class Navigation {
         document.getElementById('opportunities-area')?.classList.add('hidden');
         document.getElementById('todos-area')?.classList.add('hidden');
 
-        // Hide all expandable submenu panels
-        document.getElementById('opportunities-list')?.classList.add('hidden');
-        document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
-        document.getElementById('lists-submenu')?.classList.add('hidden');
+        // Hide expandable submenu panels ONLY when navigating away from Lists-related pages
+        // Don't hide them when navigating TO opportunities or todos pages
+        if (page !== 'opportunities' && page !== 'todos') {
+            document.getElementById('opportunities-list')?.classList.add('hidden');
+            document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
+            document.getElementById('lists-submenu')?.classList.add('hidden');
 
-        // Reset expand icons for all expandable nav items
-        document.querySelectorAll('.expandable-nav-item .expand-icon').forEach(icon => {
-            icon.style.transform = 'rotate(0deg)';
-        });
+            // Reset expand icons for all expandable nav items
+            document.querySelectorAll('.expandable-nav-item .expand-icon').forEach(icon => {
+                icon.style.transform = 'rotate(0deg)';
+            });
+        }
 
         // Show the selected area
         const pageTitle = document.getElementById('page-title');

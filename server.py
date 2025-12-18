@@ -73,13 +73,21 @@ from server.routes.agents import (
     handle_agents_metrics_api as handle_agents_metrics_route,
     handle_agents_detail_api as handle_agents_detail_route
 )
-from server.routes.ollama_agents import (
-    handle_ollama_agents_api as handle_ollama_agents_route,
-    handle_ollama_agent_detail_api as handle_ollama_agent_detail_route,
-    handle_ollama_agent_invoke_api as handle_ollama_agent_invoke_route,
-    handle_ollama_skills_api as handle_ollama_skills_route,
-    handle_ollama_status_api as handle_ollama_status_route
-)
+
+# Ollama agents support
+try:
+    from server.routes.ollama_agents import (
+        handle_ollama_agents_api as handle_ollama_agents_route,
+        handle_ollama_agent_detail_api as handle_ollama_agent_detail_route,
+        handle_ollama_agent_invoke_api as handle_ollama_agent_invoke_route,
+        handle_ollama_skills_api as handle_ollama_skills_route,
+        handle_ollama_status_api as handle_ollama_status_route
+    )
+    OLLAMA_AGENTS_AVAILABLE = True
+except ImportError as e:
+    debug_log(f"⚠️ Ollama agents not available: {e}", "⚠️")
+    OLLAMA_AGENTS_AVAILABLE = False
+
 from server.routes.mcp import (
     handle_mcp_servers_api as handle_mcp_servers_route,
     handle_mcp_server_action_api as handle_mcp_server_action_route,
@@ -451,6 +459,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_ollama_agent_invoke_api()
             elif self.path.startswith('/api/ollama/agents/'):
                 self.handle_ollama_agent_detail_api()
+            # Search API endpoints
             elif self.path == '/api/mcp/servers' and AGENT_SYSTEM_AVAILABLE:
                 self.handle_mcp_servers_api()
             elif self.path.startswith('/api/mcp/servers/') and AGENT_SYSTEM_AVAILABLE:
@@ -529,6 +538,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract prompt ID from path
                 prompt_id = self.path.split('/')[-1]
                 self.handle_prompts_delete_api(prompt_id)
+            # Ollama agents API endpoints
+            elif self.path.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE:
+                self.handle_ollama_agent_detail_api()
             # TODO API endpoints - specific routes first, then generic
             elif self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
                 user_id = self.path.split('/')[-1]
@@ -564,8 +576,11 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_PUT(self):
         """Handle PUT requests for API endpoints."""
         try:
+            # Ollama agents API endpoints
+            if self.path.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE:
+                self.handle_ollama_agent_detail_api()
             # TODO API endpoints - specific routes first, then generic
-            if self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
+            elif self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
                 user_id = self.path.split('/')[-1]
                 self.handle_users_update_api(user_id)
             elif self.path.startswith('/api/todos/lists/') and not '/share' in self.path and TODOS_AVAILABLE:

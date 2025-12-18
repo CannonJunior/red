@@ -290,7 +290,7 @@
 
                                 <textarea
                                     id="messageInput"
-                                    placeholder="Type your message here... (or type / for prompts)"
+                                    placeholder="Type your message here... (@ for agents, # for tools, / for prompts)"
                                     class="w-full px-4 py-3 pr-12 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-500 dark:placeholder-gray-400 focus:ring-2 focus:ring-blue-500 focus:border-transparent resize-none"
                                     rows="1"></textarea>
                                 <button
@@ -1592,6 +1592,7 @@
     </div>
 
     <script src="app.js"></script>
+    <script src="agent_mention_autocomplete.js"></script>
     <script src="cag_manager.js"></script>
     <script src="mcp_agents.js"></script>
     <script src="prompts_manager.js"></script>

@@ -243,6 +243,59 @@ class OllamaAgentRuntime:
             'created_at': time.time()
         }
 
+    def update_agent(self, agent_id: str, agent_data: Dict[str, Any]) -> Optional[Dict[str, Any]]:
+        """
+        Update an existing agent's configuration.
+
+        Args:
+            agent_id: ID of the agent to update
+            agent_data: Updated agent data (name, description, model, skills, capabilities, temperature, max_tokens)
+
+        Returns:
+            Updated agent info dictionary or None if not found
+        """
+        if agent_id not in self.active_agents:
+            return None
+
+        config = self.active_agents[agent_id]
+
+        # Update fields if provided
+        if 'name' in agent_data:
+            config.name = agent_data['name']
+        if 'description' in agent_data:
+            config.description = agent_data['description']
+        if 'model' in agent_data:
+            config.model = agent_data['model']
+        if 'capabilities' in agent_data:
+            config.capabilities = agent_data['capabilities']
+        if 'temperature' in agent_data:
+            config.temperature = agent_data['temperature']
+        if 'max_tokens' in agent_data:
+            config.max_tokens = agent_data['max_tokens']
+        if 'skills' in agent_data:
+            # Validate skills exist
+            for skill_name in agent_data['skills']:
+                if skill_name not in self.skills_cache:
+                    raise ValueError(f"Skill '{skill_name}' not found. Available: {list(self.skills_cache.keys())}")
+            config.skills = agent_data['skills']
+
+        # Rebuild system prompt with new configuration
+        config.system_prompt = self._build_system_prompt(config)
+
+        logger.info(f"✅ Updated agent: {config.name} ({agent_id})")
+        logger.info(f"  Model: {config.model}")
+        logger.info(f"  Skills: {config.skills or []}")
+
+        return {
+            'agent_id': agent_id,
+            'name': config.name,
+            'description': config.description,
+            'model': config.model,
+            'skills': config.skills or [],
+            'status': 'active',
+            'capabilities': config.capabilities or []
+        }
+
     def _build_system_prompt(self, config: OllamaAgentConfig) -> str:
         """
         Build system prompt including skills instructions.

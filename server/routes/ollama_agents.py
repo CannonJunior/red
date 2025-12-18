@@ -140,6 +140,35 @@ def handle_ollama_agent_detail_api(handler):
                     'message': f'Agent {agent_id} not found'
                 }, 404)
 
+        elif handler.command == 'PUT':
+            # Update agent
+            agent_data = handler.get_request_body()
+            if agent_data is None:
+                handler.send_json_response({'error': 'Invalid JSON'}, 400)
+                return
+
+            try:
+                updated_agent = runtime.update_agent(agent_id, agent_data)
+
+                if updated_agent:
+                    handler.send_json_response({
+                        'status': 'success',
+                        'message': f'Agent {agent_id} updated successfully',
+                        'data': updated_agent
+                    })
+                else:
+                    handler.send_json_response({
+                        'status': 'error',
+                        'message': f'Agent {agent_id} not found'
+                    }, 404)
+
+            except ValueError as e:
+                # Invalid configuration (e.g., unknown skill)
+                handler.send_json_response({
+                    'status': 'error',
+                    'message': str(e)
+                }, 400)
+
         elif handler.command == 'DELETE':
             # Delete agent
             deleted = runtime.delete_agent(agent_id)
