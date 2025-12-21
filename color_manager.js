@@ -130,9 +130,18 @@ class ColorManager {
                     if (hexValue && hexValue !== '#000000' && hexValue !== '#ffffff') {
                         const key = `${name}-${hexValue}`;
                         if (!colors.has(key)) {
+                            // Get element identifier for the first occurrence
+                            let elementId = element.id;
+                            if (!elementId) {
+                                // Generate a simple identifier if no ID exists
+                                const tagName = element.tagName.toLowerCase();
+                                elementId = `${tagName}`;
+                            }
+
                             colors.set(key, {
                                 category: name,
                                 value: hexValue,
+                                elementId: elementId,
                                 count: 1
                             });
                         } else {
@@ -195,9 +204,15 @@ class ColorManager {
         this.detectedColors.forEach((colorData, index) => {
             const colorItem = document.createElement('div');
             colorItem.className = 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4';
+
+            // Build display name with element ID
+            const displayName = colorData.elementId
+                ? `${colorData.category} - ${colorData.elementId}`
+                : colorData.category;
+
             colorItem.innerHTML = `
                 <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-medium text-gray-600 dark:text-gray-400">${colorData.category}</span>
+                    <span class="text-xs font-medium text-gray-600 dark:text-gray-400">${displayName}</span>
                     <span class="text-xs text-gray-500 dark:text-gray-500">Used ${colorData.count}x</span>
                 </div>
                 <div class="flex items-center space-x-3">
