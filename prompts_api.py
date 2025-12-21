@@ -6,7 +6,7 @@ for the RAG system with Model Context Protocol (MCP) integration.
 """
 
 import json
-import os
+import sqlite3
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
@@ -17,50 +17,62 @@ class PromptsManager:
     """
     Manages prompts storage and retrieval with MCP integration.
 
-    Zero-cost local JSON storage for 5-user scale.
+    Zero-cost local SQLite database storage for 5-user scale.
     """
 
-    def __init__(self, storage_path: str = "prompts_storage.json"):
+    def __init__(self, db_path: str = "search_system.db"):
         """
         Initialize the prompts manager.
 
         Args:
-            storage_path (str): Path to JSON storage file.
+            db_path (str): Path to SQLite database file.
         """
-        self.storage_path = Path(storage_path)
-        self.prompts = self._load_prompts()
+        self.db_path = db_path
+        self._init_database()
 
-    def _load_prompts(self) -> Dict[str, dict]:
-        """
-        Load prompts from JSON storage.
+    def _init_database(self):
+        """Initialize prompts table in database."""
+        conn = sqlite3.connect(self.db_path)
+        cursor = conn.cursor()
 
-        Returns:
-            dict: Dictionary of prompts keyed by prompt_id.
-        """
-        if not self.storage_path.exists():
-            # Initialize with empty storage
-            self._save_prompts({})
-            return {}
+        # Create prompts table
+        cursor.execute("""
+            CREATE TABLE IF NOT EXISTS prompts (
+                id TEXT PRIMARY KEY,
+                name TEXT NOT NULL UNIQUE,
+                content TEXT NOT NULL,
+                description TEXT,
+                tags TEXT,
+                mcp_enabled INTEGER DEFAULT 1,
+                usage_count INTEGER DEFAULT 0,
+                last_used TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            )
+        """)
 
-        try:
-            with open(self.storage_path, 'r', encoding='utf-8') as f:
-                return json.load(f)
-        except (json.JSONDecodeError, IOError) as e:
-            print(f"⚠️  Error loading prompts: {e}, initializing empty storage")
-            return {}
+        # Create indexes for faster queries
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_prompts_name
+            ON prompts(name)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_prompts_usage
+            ON prompts(usage_count DESC)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_prompts_created
+            ON prompts(created_at DESC)
+        """)
 
-    def _save_prompts(self, prompts: Dict[str, dict]) -> None:
-        """
-        Save prompts to JSON storage.
+        conn.commit()
+        conn.close()
 
-        Args:
-            prompts (dict): Dictionary of prompts to save.
-        """
-        try:
-            with open(self.storage_path, 'w', encoding='utf-8') as f:
-                json.dump(prompts, f, indent=2, ensure_ascii=False)
-        except IOError as e:
-            print(f"❌ Error saving prompts: {e}")
+    def _get_connection(self) -> sqlite3.Connection:
+        """Get database connection with row factory."""
+        conn = sqlite3.connect(self.db_path)
+        conn.row_factory = sqlite3.Row
+        return conn
 
     def create_prompt(self, name: str, content: str, description: str = "",
                      tags: List[str] = None, mcp_enabled: bool = True) -> Dict:
@@ -84,42 +96,55 @@ class PromptsManager:
                 'message': 'Prompt name must be alphanumeric (underscores allowed, no spaces)'
             }
 
-        # Check if prompt name already exists
-        for prompt_id, prompt in self.prompts.items():
-            if prompt.get('name', '').lower() == name.lower():
-                return {
-                    'status': 'error',
-                    'message': f'Prompt with name "{name}" already exists'
+        try:
+            # Generate unique ID
+            prompt_id = str(uuid.uuid4())
+            now = datetime.now().isoformat()
+
+            tags_json = json.dumps(tags or [])
+
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            cursor.execute("""
+                INSERT INTO prompts
+                (id, name, content, description, tags, mcp_enabled, usage_count, last_used, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+            """, (prompt_id, name, content, description or f'Custom prompt: {name}',
+                  tags_json, 1 if mcp_enabled else 0, 0, None, now, now))
+
+            conn.commit()
+            conn.close()
+
+            print(f"✅ Created prompt: {name} ({prompt_id})")
+
+            return {
+                'status': 'success',
+                'message': f'Prompt "{name}" created successfully',
+                'data': {
+                    'id': prompt_id,
+                    'name': name,
+                    'content': content,
+                    'description': description or f'Custom prompt: {name}',
+                    'tags': tags or [],
+                    'mcp_enabled': mcp_enabled,
+                    'usage_count': 0,
+                    'last_used': None,
+                    'created_at': now,
+                    'updated_at': now
                 }
+            }
 
-        # Generate unique ID
-        prompt_id = str(uuid.uuid4())
-
-        # Create prompt object
-        prompt_data = {
-            'id': prompt_id,
-            'name': name,
-            'content': content,
-            'description': description or f'Custom prompt: {name}',
-            'tags': tags or [],
-            'mcp_enabled': mcp_enabled,
-            'created_at': datetime.now().isoformat(),
-            'updated_at': datetime.now().isoformat(),
-            'usage_count': 0,
-            'last_used': None
-        }
-
-        # Save to storage
-        self.prompts[prompt_id] = prompt_data
-        self._save_prompts(self.prompts)
-
-        print(f"✅ Created prompt: {name} ({prompt_id})")
-
-        return {
-            'status': 'success',
-            'message': f'Prompt "{name}" created successfully',
-            'data': prompt_data
-        }
+        except sqlite3.IntegrityError:
+            return {
+                'status': 'error',
+                'message': f'Prompt with name "{name}" already exists'
+            }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Failed to create prompt: {str(e)}'
+            }
 
     def get_prompt(self, prompt_id: Optional[str] = None, name: Optional[str] = None) -> Dict:
         """
@@ -132,33 +157,51 @@ class PromptsManager:
         Returns:
             dict: Prompt data or error.
         """
-        if prompt_id:
-            if prompt_id in self.prompts:
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            if prompt_id:
+                cursor.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,))
+            elif name:
+                cursor.execute("SELECT * FROM prompts WHERE LOWER(name) = LOWER(?)", (name,))
+            else:
                 return {
-                    'status': 'success',
-                    'data': self.prompts[prompt_id]
+                    'status': 'error',
+                    'message': 'Either prompt_id or name is required'
                 }
+
+            row = cursor.fetchone()
+            conn.close()
+
+            if not row:
+                identifier = prompt_id or name
+                return {
+                    'status': 'error',
+                    'message': f'Prompt with {"ID" if prompt_id else "name"} "{identifier}" not found'
+                }
+
             return {
-                'status': 'error',
-                'message': f'Prompt with ID "{prompt_id}" not found'
+                'status': 'success',
+                'data': {
+                    'id': row['id'],
+                    'name': row['name'],
+                    'content': row['content'],
+                    'description': row['description'],
+                    'tags': json.loads(row['tags']) if row['tags'] else [],
+                    'mcp_enabled': bool(row['mcp_enabled']),
+                    'usage_count': row['usage_count'],
+                    'last_used': row['last_used'],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at']
+                }
             }
 
-        if name:
-            for prompt_id, prompt in self.prompts.items():
-                if prompt.get('name', '').lower() == name.lower():
-                    return {
-                        'status': 'success',
-                        'data': prompt
-                    }
+        except Exception as e:
             return {
                 'status': 'error',
-                'message': f'Prompt with name "{name}" not found'
+                'message': f'Failed to get prompt: {str(e)}'
             }
-
-        return {
-            'status': 'error',
-            'message': 'Either prompt_id or name is required'
-        }
 
     def list_prompts(self, tags: List[str] = None, mcp_only: bool = False) -> Dict:
         """
@@ -171,28 +214,58 @@ class PromptsManager:
         Returns:
             dict: List of prompts.
         """
-        prompts_list = []
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
 
-        for prompt_id, prompt in self.prompts.items():
-            # Apply filters
-            if mcp_only and not prompt.get('mcp_enabled', False):
-                continue
+            query = "SELECT * FROM prompts"
+            params = []
 
-            if tags:
-                prompt_tags = set(prompt.get('tags', []))
-                if not set(tags).intersection(prompt_tags):
-                    continue
+            if mcp_only:
+                query += " WHERE mcp_enabled = 1"
 
-            prompts_list.append(prompt)
+            query += " ORDER BY usage_count DESC, name ASC"
 
-        # Sort by usage count (most used first), then by name
-        prompts_list.sort(key=lambda p: (-p.get('usage_count', 0), p.get('name', '')))
+            cursor.execute(query, params)
+            rows = cursor.fetchall()
+            conn.close()
 
-        return {
-            'status': 'success',
-            'count': len(prompts_list),
-            'prompts': prompts_list
-        }
+            prompts_list = []
+            for row in rows:
+                prompt_data = {
+                    'id': row['id'],
+                    'name': row['name'],
+                    'content': row['content'],
+                    'description': row['description'],
+                    'tags': json.loads(row['tags']) if row['tags'] else [],
+                    'mcp_enabled': bool(row['mcp_enabled']),
+                    'usage_count': row['usage_count'],
+                    'last_used': row['last_used'],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at']
+                }
+
+                # Apply tag filter
+                if tags:
+                    prompt_tags = set(prompt_data['tags'])
+                    if not set(tags).intersection(prompt_tags):
+                        continue
+
+                prompts_list.append(prompt_data)
+
+            return {
+                'status': 'success',
+                'count': len(prompts_list),
+                'prompts': prompts_list
+            }
+
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Failed to list prompts: {str(e)}',
+                'count': 0,
+                'prompts': []
+            }
 
     def update_prompt(self, prompt_id: str, name: Optional[str] = None,
                      content: Optional[str] = None, description: Optional[str] = None,
@@ -211,56 +284,96 @@ class PromptsManager:
         Returns:
             dict: Updated prompt data or error.
         """
-        if prompt_id not in self.prompts:
-            return {
-                'status': 'error',
-                'message': f'Prompt with ID "{prompt_id}" not found'
-            }
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
 
-        prompt = self.prompts[prompt_id]
+            # Check if prompt exists
+            cursor.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,))
+            row = cursor.fetchone()
 
-        # Update fields
-        if name is not None:
-            # Validate name
-            if not name or not name.replace('_', '').isalnum():
+            if not row:
+                conn.close()
                 return {
                     'status': 'error',
-                    'message': 'Prompt name must be alphanumeric (underscores allowed, no spaces)'
+                    'message': f'Prompt with ID "{prompt_id}" not found'
                 }
 
-            # Check for name conflicts (excluding current prompt)
-            for pid, p in self.prompts.items():
-                if pid != prompt_id and p.get('name', '').lower() == name.lower():
+            # Validate name if provided
+            if name is not None:
+                if not name or not name.replace('_', '').isalnum():
+                    conn.close()
+                    return {
+                        'status': 'error',
+                        'message': 'Prompt name must be alphanumeric (underscores allowed, no spaces)'
+                    }
+
+                # Check for name conflicts (excluding current prompt)
+                cursor.execute("SELECT id FROM prompts WHERE LOWER(name) = LOWER(?) AND id != ?", (name, prompt_id))
+                conflict = cursor.fetchone()
+                if conflict:
+                    conn.close()
                     return {
                         'status': 'error',
                         'message': f'Prompt with name "{name}" already exists'
                     }
 
-            prompt['name'] = name
+            # Build update query
+            update_fields = []
+            update_values = []
 
-        if content is not None:
-            prompt['content'] = content
+            if name is not None:
+                update_fields.append("name = ?")
+                update_values.append(name)
 
-        if description is not None:
-            prompt['description'] = description
+            if content is not None:
+                update_fields.append("content = ?")
+                update_values.append(content)
 
-        if tags is not None:
-            prompt['tags'] = tags
+            if description is not None:
+                update_fields.append("description = ?")
+                update_values.append(description)
 
-        if mcp_enabled is not None:
-            prompt['mcp_enabled'] = mcp_enabled
+            if tags is not None:
+                update_fields.append("tags = ?")
+                update_values.append(json.dumps(tags))
 
-        prompt['updated_at'] = datetime.now().isoformat()
+            if mcp_enabled is not None:
+                update_fields.append("mcp_enabled = ?")
+                update_values.append(1 if mcp_enabled else 0)
 
-        self._save_prompts(self.prompts)
+            if not update_fields:
+                conn.close()
+                return {'status': 'error', 'message': 'No fields to update'}
 
-        print(f"✅ Updated prompt: {prompt['name']} ({prompt_id})")
+            update_fields.append("updated_at = ?")
+            update_values.append(datetime.now().isoformat())
 
-        return {
-            'status': 'success',
-            'message': f'Prompt "{prompt["name"]}" updated successfully',
-            'data': prompt
-        }
+            update_values.append(prompt_id)
+
+            cursor.execute(f"""
+                UPDATE prompts
+                SET {', '.join(update_fields)}
+                WHERE id = ?
+            """, update_values)
+
+            conn.commit()
+            conn.close()
+
+            print(f"✅ Updated prompt: {name or row['name']} ({prompt_id})")
+
+            return self.get_prompt(prompt_id=prompt_id)
+
+        except sqlite3.IntegrityError:
+            return {
+                'status': 'error',
+                'message': f'Prompt with name "{name}" already exists'
+            }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Failed to update prompt: {str(e)}'
+            }
 
     def delete_prompt(self, prompt_id: str) -> Dict:
         """
@@ -272,22 +385,40 @@ class PromptsManager:
         Returns:
             dict: Status message.
         """
-        if prompt_id not in self.prompts:
+        try:
+            conn = self._get_connection()
+            cursor = conn.cursor()
+
+            # Get prompt name before deleting
+            cursor.execute("SELECT name FROM prompts WHERE id = ?", (prompt_id,))
+            row = cursor.fetchone()
+
+            if not row:
+                conn.close()
+                return {
+                    'status': 'error',
+                    'message': f'Prompt with ID "{prompt_id}" not found'
+                }
+
+            prompt_name = row['name']
+
+            cursor.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
+
+            conn.commit()
+            conn.close()
+
+            print(f"🗑️  Deleted prompt: {prompt_name} ({prompt_id})")
+
             return {
-                'status': 'error',
-                'message': f'Prompt with ID "{prompt_id}" not found'
+                'status': 'success',
+                'message': f'Prompt "{prompt_name}" deleted successfully'
             }
 
-        prompt_name = self.prompts[prompt_id].get('name', 'Unknown')
-        del self.prompts[prompt_id]
-        self._save_prompts(self.prompts)
-
-        print(f"🗑️  Deleted prompt: {prompt_name} ({prompt_id})")
-
-        return {
-            'status': 'success',
-            'message': f'Prompt "{prompt_name}" deleted successfully'
-        }
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Failed to delete prompt: {str(e)}'
+            }
 
     def use_prompt(self, prompt_id: Optional[str] = None, name: Optional[str] = None) -> Dict:
         """
@@ -304,22 +435,38 @@ class PromptsManager:
 
         if result['status'] == 'success':
             prompt = result['data']
-            prompt_id = prompt['id']
+            prompt_id_to_update = prompt['id']
 
-            # Update usage statistics
-            self.prompts[prompt_id]['usage_count'] = prompt.get('usage_count', 0) + 1
-            self.prompts[prompt_id]['last_used'] = datetime.now().isoformat()
-            self._save_prompts(self.prompts)
+            try:
+                # Update usage statistics
+                conn = self._get_connection()
+                cursor = conn.cursor()
 
-            return {
-                'status': 'success',
-                'data': {
-                    'id': prompt['id'],
-                    'name': prompt['name'],
-                    'content': prompt['content'],
-                    'description': prompt['description']
+                cursor.execute("""
+                    UPDATE prompts
+                    SET usage_count = usage_count + 1,
+                        last_used = ?
+                    WHERE id = ?
+                """, (datetime.now().isoformat(), prompt_id_to_update))
+
+                conn.commit()
+                conn.close()
+
+                return {
+                    'status': 'success',
+                    'data': {
+                        'id': prompt['id'],
+                        'name': prompt['name'],
+                        'content': prompt['content'],
+                        'description': prompt['description']
+                    }
                 }
-            }
+
+            except Exception as e:
+                return {
+                    'status': 'error',
+                    'message': f'Failed to update usage statistics: {str(e)}'
+                }
 
         return result
 
@@ -333,34 +480,60 @@ class PromptsManager:
         Returns:
             dict: List of matching prompts.
         """
-        query_lower = query.lower()
-        matching_prompts = []
+        try:
+            query_lower = query.lower()
+            conn = self._get_connection()
+            cursor = conn.cursor()
 
-        for prompt_id, prompt in self.prompts.items():
-            # Search in name, description, and tags
-            if (query_lower in prompt.get('name', '').lower() or
-                query_lower in prompt.get('description', '').lower() or
-                any(query_lower in tag.lower() for tag in prompt.get('tags', []))):
-                matching_prompts.append(prompt)
+            # Search in name and description using LIKE
+            cursor.execute("""
+                SELECT * FROM prompts
+                WHERE LOWER(name) LIKE ?
+                   OR LOWER(description) LIKE ?
+                   OR LOWER(tags) LIKE ?
+                ORDER BY
+                    CASE
+                        WHEN LOWER(name) LIKE ? THEN 1
+                        WHEN LOWER(description) LIKE ? THEN 2
+                        WHEN LOWER(tags) LIKE ? THEN 3
+                        ELSE 4
+                    END,
+                    usage_count DESC,
+                    name ASC
+            """, (f'%{query_lower}%', f'%{query_lower}%', f'%{query_lower}%',
+                  f'%{query_lower}%', f'%{query_lower}%', f'%{query_lower}%'))
 
-        # Sort by relevance (name match > description match > tag match)
-        def relevance_score(p):
-            score = 0
-            if query_lower in p.get('name', '').lower():
-                score += 10
-            if query_lower in p.get('description', '').lower():
-                score += 5
-            if any(query_lower in tag.lower() for tag in p.get('tags', [])):
-                score += 2
-            return -score  # Negative for descending sort
+            rows = cursor.fetchall()
+            conn.close()
 
-        matching_prompts.sort(key=relevance_score)
+            matching_prompts = []
+            for row in rows:
+                matching_prompts.append({
+                    'id': row['id'],
+                    'name': row['name'],
+                    'content': row['content'],
+                    'description': row['description'],
+                    'tags': json.loads(row['tags']) if row['tags'] else [],
+                    'mcp_enabled': bool(row['mcp_enabled']),
+                    'usage_count': row['usage_count'],
+                    'last_used': row['last_used'],
+                    'created_at': row['created_at'],
+                    'updated_at': row['updated_at']
+                })
 
-        return {
-            'status': 'success',
-            'count': len(matching_prompts),
-            'prompts': matching_prompts
-        }
+            return {
+                'status': 'success',
+                'count': len(matching_prompts),
+                'prompts': matching_prompts
+            }
+
+        except Exception as e:
+            return {
+                'status': 'error',
+                'message': f'Failed to search prompts: {str(e)}',
+                'count': 0,
+                'prompts': []
+            }
 
 
 # Global prompts manager instance (singleton for 5-user optimization)

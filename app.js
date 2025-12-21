@@ -3019,7 +3019,62 @@ class OpportunitiesManager {
             const item = document.createElement('button');
             item.className = 'flex-1 text-left px-3 py-2 rounded text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors';
             item.textContent = opp.name;
-            item.addEventListener('click', () => this.showOpportunityDetail(opp));
+            item.addEventListener('click', () => {
+                // Show the opportunity detail first
+                this.showOpportunityDetail(opp);
+
+                // Navigate to opportunities page to make it visible
+                if (window.app && window.app.currentPage !== 'opportunities') {
+                    // Hide all areas
+                    document.getElementById('chat-area')?.classList.add('hidden');
+                    document.getElementById('models-area')?.classList.add('hidden');
+                    document.getElementById('settings-area')?.classList.add('hidden');
+                    document.getElementById('knowledge-area')?.classList.add('hidden');
+                    document.getElementById('cag-knowledge-area')?.classList.add('hidden');
+                    document.getElementById('visualizations-area')?.classList.add('hidden');
+                    document.getElementById('mcp-area')?.classList.add('hidden');
+                    document.getElementById('agents-area')?.classList.add('hidden');
+                    document.getElementById('prompts-area')?.classList.add('hidden');
+                    document.getElementById('todos-area')?.classList.add('hidden');
+
+                    // Show opportunities area
+                    document.getElementById('opportunities-area')?.classList.remove('hidden');
+                    window.app.currentPage = 'opportunities';
+
+                    // Update page title
+                    const pageTitle = document.getElementById('page-title');
+                    if (pageTitle) pageTitle.textContent = 'Opportunities';
+
+                    // Set the Lists nav item as active
+                    const navItems = document.querySelectorAll('.nav-item.expandable-nav-item');
+                    navItems.forEach(nav => {
+                        if (nav.textContent.trim().toLowerCase().includes('lists')) {
+                            window.app.setActiveNavItem(nav);
+
+                            // Ensure the Lists submenu is expanded
+                            const expandIcon = nav.querySelector('.expand-icon');
+                            if (expandIcon) {
+                                expandIcon.style.transform = 'rotate(180deg)';
+                            }
+                        }
+                    });
+
+                    // Ensure the opportunities list and lists submenu stay visible
+                    const listsSubmenu = document.getElementById('lists-submenu');
+                    const opportunitiesList = document.getElementById('opportunities-list');
+                    if (listsSubmenu) listsSubmenu.classList.remove('hidden');
+                    if (opportunitiesList) opportunitiesList.classList.remove('hidden');
+
+                    // Rotate the Opportunities expand icon
+                    const oppSubNavItem = document.querySelector('.sub-nav-item[data-list="opportunities"]');
+                    if (oppSubNavItem) {
+                        const oppExpandIcon = oppSubNavItem.querySelector('.expand-icon');
+                        if (oppExpandIcon) {
+                            oppExpandIcon.style.transform = 'rotate(180deg)';
+                        }
+                    }
+                }
+            });
 
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'p-2 text-gray-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity';
@@ -3111,33 +3166,49 @@ class OpportunitiesManager {
         const detailView = document.getElementById('opportunity-detail-view');
         const emptyState = document.getElementById('opportunities-empty-state');
 
+        if (!detailView) {
+            console.error('opportunity-detail-view element not found');
+            return;
+        }
+
         if (detailView) detailView.classList.remove('hidden');
         if (emptyState) emptyState.classList.add('hidden');
 
         // Populate detail fields
-        document.getElementById('opportunity-detail-name').textContent = opportunity.name;
-        document.getElementById('opportunity-detail-status').textContent = this.formatStatus(opportunity.status);
-        document.getElementById('opportunity-detail-priority').textContent = this.formatPriority(opportunity.priority);
-        document.getElementById('opportunity-detail-value').textContent = `$${opportunity.value.toLocaleString()}`;
-        document.getElementById('opportunity-detail-created').textContent = new Date(opportunity.created_at).toLocaleDateString();
-        document.getElementById('opportunity-detail-description').textContent = opportunity.description || 'No description';
+        const nameEl = document.getElementById('opportunity-detail-name');
+        const statusEl = document.getElementById('opportunity-detail-status');
+        const priorityEl = document.getElementById('opportunity-detail-priority');
+        const valueEl = document.getElementById('opportunity-detail-value');
+        const createdEl = document.getElementById('opportunity-detail-created');
+        const descriptionEl = document.getElementById('opportunity-detail-description');
+
+        if (nameEl) nameEl.textContent = opportunity.name;
+        if (statusEl) statusEl.textContent = this.formatStatus(opportunity.status);
+        if (priorityEl) priorityEl.textContent = this.formatPriority(opportunity.priority);
+        if (valueEl) valueEl.textContent = `$${opportunity.value.toLocaleString()}`;
+        if (createdEl) createdEl.textContent = new Date(opportunity.created_at).toLocaleDateString();
+        if (descriptionEl) descriptionEl.textContent = opportunity.description || 'No description';
 
         // Render tags
         const tagsContainer = document.getElementById('opportunity-detail-tags');
-        tagsContainer.innerHTML = '';
-        if (opportunity.tags && opportunity.tags.length > 0) {
-            opportunity.tags.forEach(tag => {
-                const tagEl = document.createElement('span');
-                tagEl.className = 'px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded';
-                tagEl.textContent = tag;
-                tagsContainer.appendChild(tagEl);
-            });
-        } else {
-            tagsContainer.innerHTML = '<span class="text-gray-500 dark:text-gray-400">No tags</span>';
+        if (tagsContainer) {
+            tagsContainer.innerHTML = '';
+            if (opportunity.tags && opportunity.tags.length > 0) {
+                opportunity.tags.forEach(tag => {
+                    const tagEl = document.createElement('span');
+                    tagEl.className = 'px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded';
+                    tagEl.textContent = tag;
+                    tagsContainer.appendChild(tagEl);
+                });
+            } else {
+                tagsContainer.innerHTML = '<span class="text-gray-500 dark:text-gray-400">No tags</span>';
+            }
         }
 
         // Load tasks for this opportunity
         this.loadTasks(opportunity.id);
+
+        debugLog(`Showing opportunity detail: ${opportunity.name}`);
     }
 
     closeOpportunityDetail() {

@@ -576,8 +576,11 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_PUT(self):
         """Handle PUT requests for API endpoints."""
         try:
+            # Prompts API endpoints
+            if self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
+                self.handle_prompts_update_api()
             # Ollama agents API endpoints
-            if self.path.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE:
+            elif self.path.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE:
                 self.handle_ollama_agent_detail_api()
             # TODO API endpoints - specific routes first, then generic
             elif self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
@@ -589,6 +592,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             elif self.path.startswith('/api/todos/tags/') and TODOS_AVAILABLE:
                 tag_id = self.path.split('/')[-1]
                 self.handle_tags_update_api(tag_id)
+            elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
+                # Handle PUT /api/todos/{id} - Update individual todo
+                self.handle_todos_update_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
         except Exception as e:

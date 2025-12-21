@@ -88,6 +88,7 @@ class TodoUI {
         const todoModalCancel = document.getElementById('cancel-todo-btn');
         const todoModalSave = document.getElementById('save-todo-btn');
         const todoModalDelete = document.getElementById('delete-todo-btn');
+        const todoForm = document.getElementById('todo-form');
 
         if (todoModalClose) todoModalClose.addEventListener('click', () => this.closeTodoModal());
         if (todoModalCancel) todoModalCancel.addEventListener('click', () => this.closeTodoModal());
@@ -96,6 +97,12 @@ class TodoUI {
             this.saveTodoModal();
         });
         if (todoModalDelete) todoModalDelete.addEventListener('click', () => this.deleteTodoFromModal());
+
+        // Handle form submission
+        if (todoForm) todoForm.addEventListener('submit', (e) => {
+            e.preventDefault();
+            this.saveTodoModal();
+        });
 
         // Create list modal
         const listModal = document.getElementById('create-list-modal');

@@ -196,6 +196,17 @@
                     </div>
                 </nav>
 
+                <!-- Settings Button -->
+                <div class="px-4 pb-3">
+                    <button id="settings-btn" class="w-full flex items-center justify-center px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.065 2.572c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.572 1.065c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.065-2.572c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z"></path>
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 12a3 3 0 11-6 0 3 3 0 016 0z"></path>
+                        </svg>
+                        Settings
+                    </button>
+                </div>
+
                 <!-- User Profile -->
                 <div class="p-4 border-t border-gray-200 dark:border-gray-700">
                     <div class="flex items-center space-x-3">
@@ -1587,6 +1598,114 @@
                         </div>
                     </div>
                 </div>
+
+                <!-- Settings Modal -->
+                <div id="settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full m-4 max-h-[90vh] overflow-y-auto">
+                        <div class="p-6">
+                            <div class="flex items-center justify-between mb-6">
+                                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white">Settings</h3>
+                                <button id="close-settings-modal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
+                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
+                                    </svg>
+                                </button>
+                            </div>
+
+                            <!-- Settings Tabs -->
+                            <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
+                                <nav class="flex space-x-4">
+                                    <button class="settings-tab active px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" data-tab="colors">
+                                        Color Manager
+                                    </button>
+                                    <button class="settings-tab px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent" data-tab="general">
+                                        General
+                                    </button>
+                                </nav>
+                            </div>
+
+                            <!-- Color Manager Tab -->
+                            <div id="colors-tab" class="settings-tab-content">
+                                <div class="mb-6">
+                                    <div class="flex items-center justify-between mb-4">
+                                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Theme Colors</h4>
+                                        <div class="flex items-center space-x-2">
+                                            <button id="detect-colors-btn" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                                Detect Colors
+                                            </button>
+                                            <select id="theme-selector" class="px-3 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white">
+                                                <option value="light">Light Mode</option>
+                                                <option value="dark">Dark Mode</option>
+                                                <option value="custom">Custom Theme</option>
+                                            </select>
+                                        </div>
+                                    </div>
+
+                                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
+                                        <p>Customize the color scheme of your application. Colors are organized by category.</p>
+                                    </div>
+
+                                    <!-- Color Grid -->
+                                    <div id="color-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
+                                        <!-- Colors will be dynamically populated here -->
+                                        <div class="text-center text-gray-500 dark:text-gray-400 col-span-full py-8">
+                                            Click "Detect Colors" to scan the application for current color values
+                                        </div>
+                                    </div>
+
+                                    <!-- Theme Actions -->
+                                    <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
+                                        <div class="flex items-center space-x-2">
+                                            <input type="text" id="theme-name-input" placeholder="My Custom Theme" class="px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white w-48">
+                                            <button id="save-theme-btn" class="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                                                Save Theme
+                                            </button>
+                                        </div>
+                                        <div class="flex items-center space-x-2">
+                                            <button id="restore-defaults-btn" class="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
+                                                Restore Defaults
+                                            </button>
+                                            <button id="apply-theme-btn" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                                Apply Changes
+                                            </button>
+                                        </div>
+                                    </div>
+
+                                    <!-- Saved Themes -->
+                                    <div class="mt-6">
+                                        <h5 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Saved Themes</h5>
+                                        <div id="saved-themes-list" class="space-y-2">
+                                            <!-- Saved themes will be listed here -->
+                                            <div class="text-sm text-gray-500 dark:text-gray-400">
+                                                No custom themes saved yet
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <!-- General Tab -->
+                            <div id="general-tab" class="settings-tab-content hidden">
+                                <div class="space-y-6">
+                                    <div>
+                                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">General Settings</h4>
+                                        <div class="space-y-4">
+                                            <div class="flex items-center justify-between">
+                                                <div>
+                                                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Dark Mode</label>
+                                                    <p class="text-xs text-gray-500 dark:text-gray-400">Toggle between light and dark themes</p>
+                                                </div>
+                                                <button class="theme-toggle-setting relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 dark:bg-gray-600 transition-colors">
+                                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1 dark:translate-x-6"></span>
+                                                </button>
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </div>
             </div>
         </div>
     </div>
@@ -1599,5 +1718,6 @@
     <script src="svg_calendar_manager.js"></script>
     <script src="gantt_chart_manager.js"></script>
     <script src="todos.js"></script>
+    <script src="color_manager.js"></script>
 </body>
 </html>
