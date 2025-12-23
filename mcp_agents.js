@@ -834,8 +834,11 @@ class MCPAgentManager {
                                         <input type="checkbox" class="edit-agent-skill mt-1" value="${skill.name}"
                                             ${agent.skills && agent.skills.includes(skill.name) ? 'checked' : ''}
                                             class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <div class="ml-2">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                                        <div class="ml-2 flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                                                <span class="text-xs px-2 py-0.5 rounded ${skill.source === 'plugin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">${skill.source === 'plugin' ? 'Plugin' : 'Local'}</span>
+                                            </div>
                                             <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
                                         </div>
                                     </label>
@@ -961,8 +964,11 @@ class MCPAgentManager {
                                     <label class="flex items-start">
                                         <input type="checkbox" class="agent-skill mt-1" value="${skill.name}"
                                             class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <div class="ml-2">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                                        <div class="ml-2 flex-1">
+                                            <div class="flex items-center gap-2">
+                                                <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                                                <span class="text-xs px-2 py-0.5 rounded ${skill.source === 'plugin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">${skill.source === 'plugin' ? 'Plugin' : 'Local'}</span>
+                                            </div>
                                             <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
                                         </div>
                                     </label>

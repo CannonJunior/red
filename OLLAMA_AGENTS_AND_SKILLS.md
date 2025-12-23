@@ -43,11 +43,14 @@ This document describes the zero-cost, locally-running agent system with skills 
 
 ## Skills Included
 
-### 1. PDF Extraction (`pdf-extraction`)
-- Extract text and tables from PDF files
-- Handle multiple pages
-- Export to text format
-- Uses pdfplumber library
+### 1. PDF Processing (`pdf`) - Anthropic Plugin Skill
+- Comprehensive PDF manipulation toolkit
+- Extract text and tables from PDFs
+- Create new PDFs with reportlab
+- Merge/split/rotate PDF documents
+- Fill PDF forms (fillable and non-fillable)
+- Includes 8+ helper scripts for common operations
+- Complete production-grade skill from Anthropic
 
 ### 2. Data Analysis (`data-analysis`)
 - Analyze CSV/JSON files
@@ -86,7 +89,7 @@ curl -X POST http://localhost:9090/api/ollama/agents \
     "name": "PDF Analyst",
     "description": "Analyzes PDF documents",
     "model": "qwen2.5:3b",
-    "skills": ["pdf-extraction", "data-analysis"],
+    "skills": ["pdf", "data-analysis"],
     "capabilities": ["document_processing"]
   }'
 ```
@@ -177,10 +180,10 @@ The implementation has been tested with:
 Example test:
 
 ```bash
-# Create agent with PDF extraction skill
+# Create agent with PDF skill from Anthropic plugin
 curl -X POST http://localhost:9090/api/ollama/agents \
   -H "Content-Type: application/json" \
-  -d '{"name":"Test Agent","description":"A test agent","model":"qwen2.5:3b","skills":["pdf-extraction"]}'
+  -d '{"name":"Test Agent","description":"A test agent","model":"qwen2.5:3b","skills":["pdf"]}'
 
 # Invoke agent
 curl -X POST http://localhost:9090/api/ollama/agents/agent_xxx/invoke \

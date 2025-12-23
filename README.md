@@ -48,13 +48,20 @@ A basic web application with Open WebUI's look and feel, designed to add agentic
    - **Name**: A descriptive name for your agent
    - **Description**: What the agent does
    - **Model**: Select from available Ollama models (default: qwen2.5:3b)
-   - **Skills**: Choose from available skills (pdf-extraction, data-analysis, code-validation)
+   - **Skills**: Choose from available skills (pdf, xlsx, docx, pptx from Anthropic plugins, or local skills: data-analysis, code-validation)
    - **Capabilities**: Add capability tags for organization
 4. Click **Create Agent**
 
 ### Available Skills
 
-- **pdf-extraction**: Extract text and tables from PDF files using pdfplumber
+**Anthropic Plugin Skills** (from document-skills plugin):
+- **pdf**: Comprehensive PDF manipulation toolkit - extract text/tables, create PDFs, merge/split documents, fill forms
+- **xlsx**: Spreadsheet creation, editing, and analysis with formulas and formatting
+- **docx**: Word document creation and editing
+- **pptx**: PowerPoint presentation creation
+- **And 12 more**: mcp-builder, skill-creator, webapp-testing, brand-guidelines, etc.
+
+**Local Custom Skills**:
 - **data-analysis**: Analyze CSV/JSON data and generate formatted reports with pandas
 - **code-validation**: Review Python code for quality, security, and best practices
 
@@ -137,7 +144,7 @@ Custom prompts can be created via the Prompts interface in the sidebar. Each pro
 ### Example Workflows
 
 **PDF Document Processing**:
-1. Create an agent with `pdf-extraction` skill named "PDFHelper"
+1. Create an agent with `pdf` skill (from Anthropic plugin) named "PDFHelper"
 2. In chat: `@PDFHelper Extract all text from this 50-page research paper`
 3. The agent responds with code and instructions using pdfplumber
 
@@ -152,7 +159,7 @@ Custom prompts can be created via the Prompts interface in the sidebar. Each pro
 3. The agent reviews code against best practices and security standards
 
 **Multi-Skill Agent**:
-1. Create an agent with multiple skills: `["pdf-extraction", "data-analysis"]`
+1. Create an agent with multiple skills: `["pdf", "data-analysis"]`
 2. The agent can handle both PDF extraction and data analysis tasks
 3. Example: Extract data from PDFs then analyze it
 
@@ -179,7 +186,7 @@ curl -X POST http://localhost:9090/api/ollama/agents \
     "name": "PDFHelper",
     "description": "Helps with PDF extraction",
     "model": "qwen2.5:3b",
-    "skills": ["pdf-extraction"],
+    "skills": ["pdf"],
     "capabilities": ["PDF Analysis"]
   }'
 
@@ -192,7 +199,7 @@ curl -X POST http://localhost:9090/api/ollama/agents/agent_123/invoke \
 curl -X PUT http://localhost:9090/api/ollama/agents/agent_123 \
   -H "Content-Type: application/json" \
   -d '{
-    "skills": ["pdf-extraction", "data-analysis"]
+    "skills": ["pdf", "data-analysis"]
   }'
 ```
 

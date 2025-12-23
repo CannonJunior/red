@@ -32,6 +32,7 @@ class AgentSkill:
     description: str
     skill_path: Path
     metadata: Dict[str, Any]
+    source: str = "local"  # "local" or "plugin"
 
 
 @dataclass
@@ -70,15 +71,21 @@ class OllamaAgentRuntime:
         self.active_agents: Dict[str, OllamaAgentConfig] = {}
         self.skills_cache: Dict[str, AgentSkill] = {}
         self.skills_dir = get_project_root() / ".claude" / "skills"
+        self.plugin_skills_dir = Path.home() / ".claude" / "plugins" / "cache" / "anthropic-agent-skills" / "document-skills"
 
         # Ensure skills directory exists
         self.skills_dir.mkdir(parents=True, exist_ok=True)
 
-        # Load available skills
+        # Load available skills from both sources
         self._load_skills()
+        self._load_plugin_skills()
+
+        local_count = sum(1 for s in self.skills_cache.values() if s.source == "local")
+        plugin_count = sum(1 for s in self.skills_cache.values() if s.source == "plugin")
 
         logger.info(f"✅ Ollama Agent Runtime initialized (URL: {ollama_url})")
-        logger.info(f"✅ Loaded {len(self.skills_cache)} skills from {self.skills_dir}")
+        logger.info(f"✅ Loaded {local_count} local skills from {self.skills_dir}")
+        logger.info(f"✅ Loaded {plugin_count} plugin skills from Anthropic plugins")
 
     def _load_skills(self):
         """Load all available skills from .claude/skills directory."""
@@ -96,19 +103,53 @@ class OllamaAgentRuntime:
                 continue
 
             try:
-                skill = self._parse_skill(skill_dir, skill_md)
+                skill = self._parse_skill(skill_dir, skill_md, source="local")
                 self.skills_cache[skill.name] = skill
-                logger.info(f"  ✅ Loaded skill: {skill.name}")
+                logger.info(f"  ✅ Loaded local skill: {skill.name}")
             except Exception as e:
                 logger.error(f"  ❌ Failed to load skill {skill_dir.name}: {e}")
 
-    def _parse_skill(self, skill_dir: Path, skill_md: Path) -> AgentSkill:
+    def _load_plugin_skills(self):
+        """Load all available skills from plugin directories."""
+        if not self.plugin_skills_dir.exists():
+            logger.info(f"Plugin skills directory not found: {self.plugin_skills_dir}")
+            return
+
+        # Find the skills subdirectory (there may be version directories)
+        for version_dir in self.plugin_skills_dir.iterdir():
+            if not version_dir.is_dir():
+                continue
+
+            skills_dir = version_dir / "skills"
+            if not skills_dir.exists():
+                continue
+
+            logger.info(f"Loading plugin skills from: {skills_dir}")
+
+            for skill_dir in skills_dir.iterdir():
+                if not skill_dir.is_dir():
+                    continue
+
+                skill_md = skill_dir / "SKILL.md"
+                if not skill_md.exists():
+                    logger.warning(f"Plugin skill directory {skill_dir.name} missing SKILL.md")
+                    continue
+
+                try:
+                    skill = self._parse_skill(skill_dir, skill_md, source="plugin")
+                    self.skills_cache[skill.name] = skill
+                    logger.info(f"  ✅ Loaded plugin skill: {skill.name}")
+                except Exception as e:
+                    logger.error(f"  ❌ Failed to load plugin skill {skill_dir.name}: {e}")
+
+    def _parse_skill(self, skill_dir: Path, skill_md: Path, source: str = "local") -> AgentSkill:
         """
         Parse a skill from its SKILL.md file.
 
         Args:
             skill_dir: Directory containing the skill
             skill_md: Path to SKILL.md file
+            source: Source of the skill ("local" or "plugin")
 
         Returns:
             AgentSkill object
@@ -139,7 +180,8 @@ class OllamaAgentRuntime:
             name=metadata['name'],
             description=metadata['description'],
             skill_path=skill_dir,
-            metadata=metadata
+            metadata=metadata,
+            source=source
         )
 
     def list_skills(self) -> List[Dict[str, Any]]:
@@ -153,7 +195,8 @@ class OllamaAgentRuntime:
             {
                 'name': skill.name,
                 'description': skill.description,
-                'path': str(skill.skill_path)
+                'path': str(skill.skill_path),
+                'source': skill.source
             }
             for skill in self.skills_cache.values()
         ]
@@ -494,10 +537,10 @@ if __name__ == "__main__":
     config = OllamaAgentConfig(
         agent_id="test_agent_001",
         name="Test Agent",
-        description="A test agent with PDF extraction skill",
+        description="A test agent with PDF skill from Anthropic plugin",
         model="qwen2.5:3b",
-        capabilities=["pdf_extraction", "data_analysis"],
-        skills=["pdf-extraction"]
+        capabilities=["pdf_processing", "data_analysis"],
+        skills=["pdf"]
     )
 
     try:
