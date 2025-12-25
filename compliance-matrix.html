@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>RFP Compliance Matrix - Robobrain</title>
+
+    <!-- Tailwind CSS -->
+    <script src="https://cdn.tailwindcss.com"></script>
+
+    <!-- Custom CSS -->
+    <link rel="stylesheet" href="styles.css">
+
+    <!-- Theme detection script -->
+    <script>
+        (function() {
+            const theme = localStorage.getItem('theme') || 'system';
+            if (theme === 'dark' || (theme === 'system' && window.matchMedia('(prefers-color-scheme: dark)').matches)) {
+                document.documentElement.classList.add('dark');
+            }
+        })();
+    </script>
+</head>
+<body class="bg-gray-50 dark:bg-gray-900 text-gray-900 dark:text-white">
+    <!-- Header -->
+    <header class="bg-white dark:bg-gray-800 border-b border-gray-200 dark:border-gray-700">
+        <div class="container mx-auto px-4 py-4">
+            <div class="flex justify-between items-center">
+                <div class="flex items-center space-x-4">
+                    <a href="index.html" class="text-blue-500 hover:text-blue-700">
+                        ← Back to Dashboard
+                    </a>
+                    <h1 class="text-2xl font-bold">RFP Compliance Matrix</h1>
+                </div>
+                <div class="flex items-center space-x-3">
+                    <button id="upload-rfp-btn"
+                        class="px-4 py-2 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                        Upload RFP
+                    </button>
+                    <button id="export-matrix-btn"
+                        class="px-4 py-2 border border-gray-300 dark:border-gray-600 rounded-md hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                        Export CSV
+                    </button>
+                </div>
+            </div>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="container mx-auto px-4 py-6">
+        <!-- Status Overview -->
+        <div id="compliance-status">
+            <!-- Status will be inserted here by JavaScript -->
+        </div>
+
+        <!-- Filters -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg p-4 mb-6">
+            <div class="grid grid-cols-5 gap-4">
+                <div>
+                    <label class="block text-sm font-medium mb-2">Section</label>
+                    <select id="section-filter"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+                        <option value="">All Sections</option>
+                        <option value="C">Section C</option>
+                        <option value="L">Section L</option>
+                        <option value="M">Section M</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Compliance Type</label>
+                    <select id="compliance-filter"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+                        <option value="">All Types</option>
+                        <option value="mandatory">Mandatory</option>
+                        <option value="recommended">Recommended</option>
+                        <option value="optional">Optional</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Category</label>
+                    <select id="category-filter"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+                        <option value="">All Categories</option>
+                        <option value="technical">Technical</option>
+                        <option value="management">Management</option>
+                        <option value="cost">Cost</option>
+                        <option value="deliverable">Deliverable</option>
+                        <option value="compliance">Compliance</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Priority</label>
+                    <select id="priority-filter"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+                        <option value="">All Priorities</option>
+                        <option value="high">High</option>
+                        <option value="medium">Medium</option>
+                        <option value="low">Low</option>
+                    </select>
+                </div>
+                <div>
+                    <label class="block text-sm font-medium mb-2">Status</label>
+                    <select id="status-filter"
+                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700">
+                        <option value="">All Statuses</option>
+                        <option value="not_started">Not Started</option>
+                        <option value="fully_compliant">Fully Compliant</option>
+                        <option value="partially_compliant">Partially Compliant</option>
+                        <option value="non_compliant">Non-Compliant</option>
+                    </select>
+                </div>
+            </div>
+        </div>
+
+        <!-- Requirements Table -->
+        <div class="bg-white dark:bg-gray-800 rounded-lg shadow">
+            <div id="requirements-table">
+                <!-- Table will be inserted here by JavaScript -->
+                <div class="text-center py-12 text-gray-500">
+                    <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                            d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                    </svg>
+                    <p class="text-lg font-medium mb-2">No RFP Loaded</p>
+                    <p class="mb-4">Upload an RFP to start shredding and compliance tracking</p>
+                    <button onclick="shreddingManager.showUploadDialog()"
+                        class="px-6 py-3 bg-blue-500 text-white rounded-md hover:bg-blue-600 transition-colors">
+                        Upload RFP
+                    </button>
+                </div>
+            </div>
+        </div>
+    </main>
+
+    <!-- Footer -->
+    <footer class="container mx-auto px-4 py-6 text-center text-sm text-gray-500">
+        <p>RFP Shredding powered by Ollama AI • Export to CSV for external tools</p>
+    </footer>
+
+    <!-- Shredding Manager JavaScript -->
+    <script src="shredding_manager.js"></script>
+</body>
+</html>

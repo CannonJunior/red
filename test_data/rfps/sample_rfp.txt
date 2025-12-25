@@ -1,0 +1,303 @@
+SOLICITATION NUMBER: FA8732-25-R-0001
+REQUEST FOR PROPOSAL (RFP)
+JOINT ALL-DOMAIN COMMAND AND CONTROL (JADC2)
+INFORMATION TECHNOLOGY SUPPORT SERVICES
+
+DEPARTMENT OF DEFENSE
+UNITED STATES AIR FORCE
+ISSUED: January 15, 2025
+RESPONSE DUE: March 15, 2025, 2:00 PM EST
+
+================================================================================
+SECTION A - SOLICITATION/CONTRACT FORM
+================================================================================
+
+This is a Request for Proposal (RFP) for Information Technology Support Services
+in support of the Joint All-Domain Command and Control (JADC2) initiative.
+
+Contract Type: Firm-Fixed-Price (FFP)
+NAICS Code: 541512 - Computer Systems Design Services
+Set-Aside: Small Business
+Period of Performance: Base Year plus 4 Option Years
+
+================================================================================
+SECTION B - SUPPLIES OR SERVICES AND PRICES/COSTS
+================================================================================
+
+CLIN 0001: Base Year IT Support Services
+CLIN 0002: Option Year 1
+CLIN 0003: Option Year 2
+CLIN 0004: Option Year 3
+CLIN 0005: Option Year 4
+
+================================================================================
+SECTION C - DESCRIPTION/SPECIFICATIONS/WORK STATEMENT
+================================================================================
+
+1.0 BACKGROUND
+
+The Department of Defense requires comprehensive Information Technology support
+services to maintain and enhance the Joint All-Domain Command and Control system.
+
+2.0 SCOPE OF WORK
+
+This contract encompasses all labor, materials, equipment, and services necessary
+to provide complete IT support for the JADC2 infrastructure.
+
+3.0 TECHNICAL REQUIREMENTS
+
+3.1 SYSTEM ARCHITECTURE AND INFRASTRUCTURE
+
+3.1.1 The contractor shall design and implement a cloud-based architecture that
+supports seamless integration across all military domains including air, land,
+sea, space, and cyber operations.
+
+3.1.2 The system must achieve 99.9% uptime during operational hours with mean
+time to recovery (MTTR) not exceeding 4 hours for critical system failures.
+
+3.1.3 All infrastructure components shall be hosted in FedRAMP High authorized
+cloud environments approved by the Department of Defense.
+
+3.2 SECURITY AND COMPLIANCE REQUIREMENTS
+
+3.2.1 The contractor shall implement and maintain security controls in accordance
+with NIST SP 800-53 Revision 5 at the High baseline level.
+
+3.2.2 All data at rest must be encrypted using FIPS 140-2 validated cryptographic
+modules with AES-256 encryption algorithms.
+
+3.2.3 Data in transit shall be protected using TLS 1.3 or higher protocols with
+Perfect Forward Secrecy (PFS) enabled.
+
+3.2.4 The system will implement multi-factor authentication (MFA) for all user
+access using CAC/PIV cards and biometric verification methods.
+
+3.2.5 Security vulnerability scans must be conducted monthly with critical
+vulnerabilities remediated within 30 days and high vulnerabilities within 90 days.
+
+3.3 INTEROPERABILITY AND INTEGRATION
+
+3.3.1 The contractor shall ensure the system integrates with existing DoD
+enterprise systems including: Defense Information Systems Network (DISN), Global
+Command and Control System (GCCS), and Distributed Common Ground System (DCGS).
+
+3.3.2 All application programming interfaces (APIs) must conform to DoD Enterprise
+DevSecOps Reference Design specifications.
+
+3.3.3 The system should support real-time data sharing across coalition partner
+networks when authorized by appropriate security authorities.
+
+3.4 PERFORMANCE AND SCALABILITY
+
+3.4.1 The system shall support concurrent access by at least 10,000 authenticated
+users without performance degradation.
+
+3.4.2 Database query response times must not exceed 100 milliseconds for 95% of
+transactions under normal load conditions.
+
+3.4.3 The architecture shall be designed to scale horizontally to accommodate
+50% growth in user base and data volume within 24 hours.
+
+3.5 DATA MANAGEMENT
+
+3.5.1 The contractor shall implement automated backup procedures with recovery
+point objective (RPO) of 15 minutes and recovery time objective (RTO) of 1 hour
+for mission-critical data.
+
+3.5.2 Data retention policies must comply with DoD 5015.2 STD records management
+requirements.
+
+3.5.3 The system should provide audit logging capabilities that capture all user
+actions with tamper-evident storage for minimum 7 years.
+
+4.0 SUPPORT AND MAINTENANCE
+
+4.1 TECHNICAL SUPPORT
+
+4.1.1 The contractor shall provide 24x7x365 technical support with tier 1 response
+within 15 minutes for critical incidents.
+
+4.1.2 A dedicated program manager must be available during normal business hours
+(0800-1700 EST) Monday through Friday excluding federal holidays.
+
+4.1.3 The contractor should maintain a knowledge base of common issues and
+resolutions accessible to both support staff and end users.
+
+4.2 MAINTENANCE AND UPDATES
+
+4.2.1 Security patches shall be evaluated within 48 hours of vendor release and
+deployed to production within 14 days following successful testing.
+
+4.2.2 System maintenance windows may be scheduled monthly during off-peak hours
+(0200-0600 EST) with 72-hour advance notice to government representatives.
+
+4.3 TRAINING AND DOCUMENTATION
+
+4.3.1 The contractor shall develop and maintain comprehensive system documentation
+including architecture diagrams, standard operating procedures, and troubleshooting
+guides.
+
+4.3.2 Training courses must be provided for three user levels: end users, system
+administrators, and security personnel.
+
+4.3.3 Annual refresher training should be conducted for all system administrators
+to address new features and updated procedures.
+
+5.0 DELIVERABLES
+
+5.1 The contractor shall provide the following deliverables:
+
+5.1.1 System Design Document within 30 days after contract award.
+5.1.2 Security Assessment Report quarterly.
+5.1.3 Monthly status reports summarizing system performance, incidents, and
+planned activities.
+5.1.4 Annual disaster recovery test results demonstrating successful failover
+and restoration procedures.
+
+================================================================================
+SECTION L - INSTRUCTIONS, CONDITIONS, AND NOTICES TO OFFERORS
+================================================================================
+
+1.0 PROPOSAL SUBMISSION REQUIREMENTS
+
+1.1 GENERAL INSTRUCTIONS
+
+1.1.1 Proposals shall be submitted electronically through the System for Award
+Management (SAM.gov) portal by the deadline specified in Section A.
+
+1.1.2 Late proposals will not be considered unless waived by the Contracting
+Officer due to circumstances beyond the offeror's control.
+
+1.1.3 Proposals must be submitted in PDF format with individual file sizes not
+exceeding 50 megabytes.
+
+1.2 PROPOSAL ORGANIZATION
+
+1.2.1 The technical proposal shall be organized in the following order: executive
+summary, technical approach, management approach, past performance, and staffing
+plan.
+
+1.2.2 The cost proposal must be submitted separately from the technical proposal
+and include detailed cost breakdowns by CLIN, labor category, and other direct
+costs.
+
+1.2.3 Page limits for the technical proposal are 50 pages including graphics but
+excluding cover page, table of contents, and resumes.
+
+2.0 TECHNICAL PROPOSAL REQUIREMENTS
+
+2.1 TECHNICAL APPROACH
+
+2.1.1 Offerors shall describe their proposed solution architecture addressing all
+requirements specified in Section C including cloud infrastructure, security
+implementation, and integration approach.
+
+2.1.2 The technical approach must demonstrate understanding of JADC2 operational
+concepts and multi-domain integration challenges.
+
+2.1.3 Risk mitigation strategies should be provided for identified technical
+challenges and potential obstacles.
+
+2.2 MANAGEMENT APPROACH
+
+2.2.1 Offerors shall provide an organizational chart showing proposed project
+structure and reporting relationships.
+
+2.2.2 Quality assurance procedures must be described including testing
+methodologies, defect tracking, and continuous improvement processes.
+
+2.3 STAFFING PLAN
+
+2.3.1 Key personnel resumes shall include current security clearance levels and
+relevant certifications such as CISSP, CISM, or DoD 8570.01-M requirements.
+
+2.3.2 Labor mix should demonstrate appropriate balance of senior, mid-level, and
+junior staff to accomplish required tasks cost-effectively.
+
+3.0 PAST PERFORMANCE
+
+3.1.1 Offerors shall provide at least three references for projects of similar
+scope, complexity, and technical requirements completed within the past 3 years.
+
+3.1.2 Each reference must include contract number, customer point of contact,
+contract value, period of performance, and brief description of work performed.
+
+4.0 QUESTIONS AND AMENDMENTS
+
+4.1.1 Questions regarding this solicitation must be submitted in writing through
+SAM.gov no later than February 1, 2025.
+
+4.1.2 Offerors are responsible for monitoring SAM.gov for amendments to this
+solicitation.
+
+================================================================================
+SECTION M - EVALUATION FACTORS FOR AWARD
+================================================================================
+
+1.0 EVALUATION METHODOLOGY
+
+1.1 The Government will evaluate proposals using a best-value tradeoff process
+considering both technical and cost factors.
+
+1.2 Technical factors are significantly more important than cost when determining
+best value for the Government.
+
+2.0 EVALUATION FACTORS
+
+2.1 FACTOR 1: TECHNICAL APPROACH (Weight: 40%)
+
+2.1.1 The Government shall evaluate the proposed solution architecture for
+feasibility, innovation, and compliance with stated requirements.
+
+2.1.2 Integration approach with existing DoD systems will be assessed for
+technical soundness and risk mitigation.
+
+2.1.3 Proposed security implementation must demonstrate deep understanding of
+FedRAMP High and NIST 800-53 requirements.
+
+2.2 FACTOR 2: MANAGEMENT APPROACH (Weight: 25%)
+
+2.2.1 The Government shall evaluate the project management plan for adequacy of
+oversight, communication procedures, and quality assurance processes.
+
+2.2.2 Proposed organizational structure should demonstrate clear lines of
+authority and efficient decision-making processes.
+
+2.3 FACTOR 3: PAST PERFORMANCE (Weight: 20%)
+
+2.3.1 Past performance shall be evaluated based on quality of work, schedule
+adherence, cost control, and customer satisfaction.
+
+2.3.2 Recent and relevant contracts will be weighted more heavily than older or
+less relevant experience.
+
+2.3.3 Offerors with no past performance history may be evaluated neutrally
+neither favorably nor unfavorably.
+
+2.4 FACTOR 4: KEY PERSONNEL QUALIFICATIONS (Weight: 15%)
+
+2.4.1 The Government shall assess the qualifications, experience, and security
+clearances of proposed key personnel.
+
+2.4.2 Relevant certifications and specialized training in JADC2 or similar
+multi-domain systems will be considered favorably.
+
+3.0 COST EVALUATION
+
+3.1.1 The Government will evaluate proposed costs for realism, reasonableness,
+and completeness.
+
+3.1.2 Unrealistically low prices may result in proposal rejection if determined
+to reflect insufficient understanding of requirements.
+
+4.0 AWARD DECISION
+
+4.1.1 Award shall be made to the offeror whose proposal represents the best value
+to the Government considering technical merit and cost.
+
+4.1.2 The Government may conduct discussions with offerors in the competitive
+range or make award without discussions.
+
+================================================================================
+END OF SOLICITATION
+================================================================================

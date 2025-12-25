@@ -73,6 +73,13 @@ from server.routes.agents import (
     handle_agents_metrics_api as handle_agents_metrics_route,
     handle_agents_detail_api as handle_agents_detail_route
 )
+from server.routes.shredding import (
+    handle_shredding_shred_api as handle_shredding_shred_route,
+    handle_shredding_status_api as handle_shredding_status_route,
+    handle_shredding_requirements_api as handle_shredding_requirements_route,
+    handle_shredding_requirement_update_api as handle_shredding_requirement_update_route,
+    handle_shredding_matrix_api as handle_shredding_matrix_route
+)
 
 # Ollama agents support
 try:
@@ -299,6 +306,16 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
                     self.handle_prompts_detail_api()
                     return
+                # Shredding API endpoints
+                elif self.path.startswith('/api/shredding/status/'):
+                    self.handle_shredding_status_api()
+                    return
+                elif self.path.startswith('/api/shredding/requirements/'):
+                    self.handle_shredding_requirements_api()
+                    return
+                elif self.path.startswith('/api/shredding/matrix/'):
+                    self.handle_shredding_matrix_api()
+                    return
                 # TODO API endpoints - specific routes first, then generic
                 elif self.path == '/api/todos/users' and TODOS_AVAILABLE:
                     self.handle_users_list_api()
@@ -473,6 +490,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_search_create_folder_api()
             elif self.path == '/api/search/objects' and SEARCH_AVAILABLE:
                 self.handle_search_add_object_api()
+            # Shredding API endpoints
+            elif self.path == '/api/shredding/shred':
+                self.handle_shredding_shred_api()
             # Prompts API endpoints
             elif self.path == '/api/prompts' and PROMPTS_AVAILABLE:
                 self.handle_prompts_create_api()
@@ -576,8 +596,11 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     def do_PUT(self):
         """Handle PUT requests for API endpoints."""
         try:
+            # Shredding API endpoints
+            if self.path.startswith('/api/shredding/requirements/'):
+                self.handle_shredding_requirement_update_api()
             # Prompts API endpoints
-            if self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
+            elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
                 self.handle_prompts_update_api()
             # Ollama agents API endpoints
             elif self.path.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE:
@@ -1357,6 +1380,53 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_prompts_search_api(self):
         """Handle POST /api/prompts/search - Search prompts."""
         handle_prompts_search_route(self)
+
+    # ========== Shredding API Handlers ==========
+
+    def handle_shredding_shred_api(self):
+        """Handle POST /api/shredding/shred - Start RFP shredding."""
+        query_params = {}
+        if '?' in self.path:
+            query_string = self.path.split('?', 1)[1]
+            from urllib.parse import parse_qs
+            query_params = parse_qs(query_string)
+        handle_shredding_shred_route(self, self.path, query_params)
+
+    def handle_shredding_status_api(self):
+        """Handle GET /api/shredding/status/{opportunity_id} - Get shredding status."""
+        query_params = {}
+        if '?' in self.path:
+            query_string = self.path.split('?', 1)[1]
+            from urllib.parse import parse_qs
+            query_params = parse_qs(query_string)
+        handle_shredding_status_route(self, self.path, query_params)
+
+    def handle_shredding_requirements_api(self):
+        """Handle GET /api/shredding/requirements/{opportunity_id} - List requirements."""
+        query_params = {}
+        if '?' in self.path:
+            query_string = self.path.split('?', 1)[1]
+            from urllib.parse import parse_qs
+            query_params = parse_qs(query_string)
+        handle_shredding_requirements_route(self, self.path, query_params)
+
+    def handle_shredding_requirement_update_api(self):
+        """Handle PUT /api/shredding/requirements/{requirement_id} - Update requirement."""
+        query_params = {}
+        if '?' in self.path:
+            query_string = self.path.split('?', 1)[1]
+            from urllib.parse import parse_qs
+            query_params = parse_qs(query_string)
+        handle_shredding_requirement_update_route(self, self.path, query_params)
+
+    def handle_shredding_matrix_api(self):
+        """Handle GET /api/shredding/matrix/{opportunity_id} - Export compliance matrix."""
+        query_params = {}
+        if '?' in self.path:
+            query_string = self.path.split('?', 1)[1]
+            from urllib.parse import parse_qs
+            query_params = parse_qs(query_string)
+        handle_shredding_matrix_route(self, self.path, query_params)
 
     # ========== Opportunities API Handlers ==========
 
