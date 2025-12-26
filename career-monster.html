@@ -1,0 +1,616 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Career Monster - Hiring Analysis</title>
+    <link rel="stylesheet" href="styles.css">
+    <style>
+        .career-container {
+            max-width: 1200px;
+            margin: 0 auto;
+            padding: 20px;
+        }
+        .career-header {
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+            color: white;
+            padding: 30px;
+            border-radius: 10px;
+            margin-bottom: 30px;
+        }
+        .career-header h1 {
+            margin: 0 0 10px 0;
+        }
+        .career-header p {
+            margin: 0;
+            opacity: 0.9;
+        }
+        .career-tabs {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 20px;
+            border-bottom: 2px solid #e0e0e0;
+        }
+        .career-tab {
+            padding: 12px 24px;
+            background: none;
+            border: none;
+            cursor: pointer;
+            font-size: 16px;
+            color: #666;
+            border-bottom: 3px solid transparent;
+            transition: all 0.3s;
+        }
+        .career-tab.active {
+            color: #667eea;
+            border-bottom-color: #667eea;
+            font-weight: 600;
+        }
+        .career-tab:hover {
+            color: #667eea;
+        }
+        .career-panel {
+            display: none;
+            background: white;
+            padding: 30px;
+            border-radius: 10px;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+        }
+        .career-panel.active {
+            display: block;
+        }
+        .form-group {
+            margin-bottom: 20px;
+        }
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: 600;
+            color: #333;
+        }
+        .form-group input,
+        .form-group textarea,
+        .form-group select {
+            width: 100%;
+            padding: 10px;
+            border: 1px solid #ddd;
+            border-radius: 5px;
+            font-size: 14px;
+        }
+        .form-group textarea {
+            min-height: 100px;
+            resize: vertical;
+        }
+        .form-group small {
+            display: block;
+            margin-top: 5px;
+            color: #666;
+            font-size: 12px;
+        }
+        .btn {
+            padding: 12px 24px;
+            border: none;
+            border-radius: 5px;
+            font-size: 16px;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .btn-primary {
+            background: #667eea;
+            color: white;
+        }
+        .btn-primary:hover {
+            background: #5568d3;
+        }
+        .btn-secondary {
+            background: #e0e0e0;
+            color: #333;
+        }
+        .btn-secondary:hover {
+            background: #d0d0d0;
+        }
+        .assessment-result {
+            margin-top: 30px;
+            padding: 20px;
+            background: #f8f9fa;
+            border-radius: 10px;
+        }
+        .assessment-scores {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+            gap: 15px;
+            margin-bottom: 20px;
+        }
+        .score-card {
+            background: white;
+            padding: 15px;
+            border-radius: 8px;
+            text-align: center;
+        }
+        .score-value {
+            font-size: 32px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .score-label {
+            font-size: 12px;
+            color: #666;
+            margin-top: 5px;
+        }
+        .narrative-section {
+            margin-top: 20px;
+            padding: 20px;
+            background: white;
+            border-radius: 8px;
+        }
+        .narrative-section h3 {
+            margin-top: 0;
+            color: #667eea;
+        }
+        .stats-grid {
+            display: grid;
+            grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
+            gap: 20px;
+            margin-top: 20px;
+        }
+        .stat-card {
+            background: white;
+            padding: 20px;
+            border-radius: 10px;
+            box-shadow: 0 2px 5px rgba(0,0,0,0.1);
+        }
+        .stat-value {
+            font-size: 36px;
+            font-weight: bold;
+            color: #667eea;
+        }
+        .stat-label {
+            color: #666;
+            margin-top: 5px;
+        }
+        .alert {
+            padding: 15px;
+            border-radius: 5px;
+            margin-bottom: 20px;
+        }
+        .alert-success {
+            background: #d4edda;
+            color: #155724;
+            border: 1px solid #c3e6cb;
+        }
+        .alert-error {
+            background: #f8d7da;
+            color: #721c24;
+            border: 1px solid #f5c6cb;
+        }
+        .loading {
+            text-align: center;
+            padding: 40px;
+            color: #667eea;
+        }
+    </style>
+</head>
+<body>
+    <div class="career-container">
+        <div class="career-header">
+            <h1>🎓 Career Monster</h1>
+            <p>Analyze highly selective career positions through data-driven pattern recognition</p>
+        </div>
+
+        <div class="career-tabs">
+            <button class="career-tab active" data-tab="positions">1. Add Position</button>
+            <button class="career-tab" data-tab="candidates">2. Add Candidate</button>
+            <button class="career-tab" data-tab="analyze">3. Generate Assessment</button>
+            <button class="career-tab" data-tab="stats">Dashboard</button>
+        </div>
+
+        <!-- Add Position Panel -->
+        <div id="positions-panel" class="career-panel active">
+            <h2>Add Hiring Position</h2>
+            <form id="position-form">
+                <div class="form-group">
+                    <label for="institution">Institution *</label>
+                    <input type="text" id="institution" name="institution" required placeholder="Harvard University">
+                </div>
+                <div class="form-group">
+                    <label for="department">Department *</label>
+                    <input type="text" id="department" name="department" required placeholder="Government">
+                </div>
+                <div class="form-group">
+                    <label for="position_title">Position Title *</label>
+                    <input type="text" id="position_title" name="position_title" required placeholder="Assistant Professor">
+                </div>
+                <div class="form-group">
+                    <label for="field_specialty">Field Specialty *</label>
+                    <input type="text" id="field_specialty" name="field_specialty" required placeholder="Political Science">
+                </div>
+                <div class="form-group">
+                    <label for="hire_date">Hire Date *</label>
+                    <input type="date" id="hire_date" name="hire_date" required>
+                </div>
+                <div class="form-group">
+                    <label for="job_posting_url">Job Posting URL</label>
+                    <input type="url" id="job_posting_url" name="job_posting_url" placeholder="https://...">
+                </div>
+                <div class="form-group">
+                    <label for="department_research_areas">Department Research Areas</label>
+                    <textarea id="department_research_areas" name="department_research_areas" placeholder="Enter research areas separated by commas: Democracy, Political Economy, Comparative Politics"></textarea>
+                    <small>Comma-separated list of department research areas</small>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Position</button>
+            </form>
+            <div id="position-result"></div>
+        </div>
+
+        <!-- Add Candidate Panel -->
+        <div id="candidates-panel" class="career-panel">
+            <h2>Add Hired Candidate</h2>
+            <form id="candidate-form">
+                <div class="form-group">
+                    <label for="cand_position_id">Position ID *</label>
+                    <input type="text" id="cand_position_id" name="position_id" required placeholder="Copy from previous step">
+                    <small>Use the position ID from the previous step</small>
+                </div>
+                <div class="form-group">
+                    <label for="cand_name">Candidate Name *</label>
+                    <input type="text" id="cand_name" name="name" required placeholder="Jane Doe">
+                </div>
+                <div class="form-group">
+                    <label for="cand_phd_institution">PhD Institution *</label>
+                    <input type="text" id="cand_phd_institution" name="phd_institution" required placeholder="Stanford University">
+                </div>
+                <div class="form-group">
+                    <label for="cand_phd_year">PhD Year *</label>
+                    <input type="number" id="cand_phd_year" name="phd_year" required placeholder="2023" min="1950" max="2030">
+                </div>
+                <div class="form-group">
+                    <label for="cand_phd_advisor">PhD Advisor</label>
+                    <input type="text" id="cand_phd_advisor" name="phd_advisor" placeholder="John Smith">
+                </div>
+                <div class="form-group">
+                    <label for="cand_dissertation_title">Dissertation Title *</label>
+                    <input type="text" id="cand_dissertation_title" name="dissertation_title" required placeholder="Democratic Accountability in Hybrid Regimes">
+                </div>
+                <div class="form-group">
+                    <label for="cand_dissertation_keywords">Dissertation Keywords</label>
+                    <textarea id="cand_dissertation_keywords" name="dissertation_keywords" placeholder="democracy, accountability, hybrid regimes, political institutions"></textarea>
+                    <small>Comma-separated keywords</small>
+                </div>
+                <div class="form-group">
+                    <label for="cand_dissertation_abstract">Dissertation Abstract</label>
+                    <textarea id="cand_dissertation_abstract" name="dissertation_abstract" placeholder="This dissertation examines..."></textarea>
+                </div>
+                <div class="form-group">
+                    <label for="cand_publications_count">Publications Count</label>
+                    <input type="number" id="cand_publications_count" name="publications_count" placeholder="5" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="cand_citations_count">Citations Count</label>
+                    <input type="number" id="cand_citations_count" name="citations_count" placeholder="100" min="0">
+                </div>
+                <div class="form-group">
+                    <label for="cand_co_authors">Co-authors</label>
+                    <textarea id="cand_co_authors" name="co_authors" placeholder="Alice Johnson, Bob Smith, Carol Williams"></textarea>
+                    <small>Comma-separated list of co-author names</small>
+                </div>
+                <button type="submit" class="btn btn-primary">Create Candidate</button>
+            </form>
+            <div id="candidate-result"></div>
+        </div>
+
+        <!-- Generate Assessment Panel -->
+        <div id="analyze-panel" class="career-panel">
+            <h2>Generate Assessment</h2>
+            <form id="analyze-form">
+                <div class="form-group">
+                    <label for="analyze_candidate_id">Candidate ID *</label>
+                    <input type="text" id="analyze_candidate_id" name="candidate_id" required placeholder="Copy from previous step">
+                </div>
+                <div class="form-group">
+                    <label for="analyze_position_id">Position ID *</label>
+                    <input type="text" id="analyze_position_id" name="position_id" required placeholder="Copy from step 1">
+                </div>
+                <div class="form-group">
+                    <label for="analyze_verbosity">Verbosity Level</label>
+                    <select id="analyze_verbosity" name="verbosity">
+                        <option value="brief">Brief (1-2 paragraphs)</option>
+                        <option value="standard" selected>Standard (3-5 paragraphs)</option>
+                        <option value="detailed">Detailed (4-6 paragraphs)</option>
+                        <option value="comprehensive">Comprehensive (8-10 paragraphs)</option>
+                    </select>
+                </div>
+                <button type="submit" class="btn btn-primary">Generate Assessment</button>
+            </form>
+            <div id="analyze-result"></div>
+        </div>
+
+        <!-- Stats Dashboard Panel -->
+        <div id="stats-panel" class="career-panel">
+            <h2>Dashboard</h2>
+            <div id="stats-container">
+                <p class="loading">Loading statistics...</p>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        // Tab switching
+        document.querySelectorAll('.career-tab').forEach(tab => {
+            tab.addEventListener('click', () => {
+                // Update active tab
+                document.querySelectorAll('.career-tab').forEach(t => t.classList.remove('active'));
+                tab.classList.add('active');
+
+                // Update active panel
+                const tabName = tab.dataset.tab;
+                document.querySelectorAll('.career-panel').forEach(p => p.classList.remove('active'));
+                document.getElementById(`${tabName}-panel`).classList.add('active');
+
+                // Load stats if stats tab
+                if (tabName === 'stats') {
+                    loadStats();
+                }
+            });
+        });
+
+        // Position form submission
+        document.getElementById('position-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            // Parse research areas
+            if (data.department_research_areas) {
+                data.department_research_areas = data.department_research_areas
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s);
+            }
+
+            try {
+                const response = await fetch('/api/career/positions', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('position-result');
+
+                if (result.status === 'success') {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ Success!</strong> ${result.message}<br>
+                            <strong>Position ID:</strong> <code>${result.position_id}</code>
+                            <p>Copy this Position ID for the next step.</p>
+                        </div>
+                    `;
+                    e.target.reset();
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>❌ Error:</strong> ${result.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('position-result').innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        });
+
+        // Candidate form submission
+        document.getElementById('candidate-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            // Parse arrays
+            if (data.dissertation_keywords) {
+                data.dissertation_keywords = data.dissertation_keywords
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s);
+            }
+            if (data.co_authors) {
+                data.co_authors = data.co_authors
+                    .split(',')
+                    .map(s => s.trim())
+                    .filter(s => s);
+            }
+
+            // Convert numbers
+            data.phd_year = parseInt(data.phd_year);
+            data.publications_count = parseInt(data.publications_count) || 0;
+            data.citations_count = parseInt(data.citations_count) || 0;
+
+            try {
+                const response = await fetch('/api/career/candidates', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+                const resultDiv = document.getElementById('candidate-result');
+
+                if (result.status === 'success') {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-success">
+                            <strong>✅ Success!</strong> ${result.message}<br>
+                            <strong>Candidate ID:</strong> <code>${result.candidate_id}</code>
+                            <p>Copy this Candidate ID for the next step.</p>
+                        </div>
+                    `;
+                    e.target.reset();
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>❌ Error:</strong> ${result.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                document.getElementById('candidate-result').innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        });
+
+        // Analyze form submission
+        document.getElementById('analyze-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const formData = new FormData(e.target);
+            const data = Object.fromEntries(formData);
+
+            const resultDiv = document.getElementById('analyze-result');
+            resultDiv.innerHTML = '<p class="loading">🤖 Generating assessment... This may take 1-2 minutes.</p>';
+
+            try {
+                const response = await fetch('/api/career/analyze', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify(data)
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const align = result.alignment_score;
+                    resultDiv.innerHTML = `
+                        <div class="assessment-result">
+                            <h3>Assessment Complete</h3>
+                            <div class="assessment-scores">
+                                <div class="score-card">
+                                    <div class="score-value">${align.overall_score.toFixed(1)}</div>
+                                    <div class="score-label">Overall Score</div>
+                                </div>
+                                <div class="score-card">
+                                    <div class="score-value">${align.topic_alignment.toFixed(1)}</div>
+                                    <div class="score-label">Topic Alignment</div>
+                                </div>
+                                <div class="score-card">
+                                    <div class="score-value">${align.publication_strength.toFixed(1)}</div>
+                                    <div class="score-label">Publications</div>
+                                </div>
+                                <div class="score-card">
+                                    <div class="score-value">${align.network_overlap.toFixed(1)}</div>
+                                    <div class="score-label">Network</div>
+                                </div>
+                            </div>
+
+                            <div class="narrative-section">
+                                <h3>🌟 Optimistic Perspective</h3>
+                                <p>${result.narratives.optimistic}</p>
+                            </div>
+
+                            <div class="narrative-section">
+                                <h3>⚠️ Critical Perspective</h3>
+                                <p>${result.narratives.pessimistic}</p>
+                            </div>
+
+                            <div class="narrative-section">
+                                <h3>⚖️ Pragmatic Perspective</h3>
+                                <p>${result.narratives.pragmatic}</p>
+                            </div>
+
+                            <div class="narrative-section">
+                                <h3>🔮 Speculative Perspective</h3>
+                                <p>${result.narratives.speculative}</p>
+                            </div>
+
+                            <div class="narrative-section">
+                                <h3>✅ Success Factors</h3>
+                                <ul>
+                                    ${result.success_factors.map(f => `<li>${f}</li>`).join('')}
+                                </ul>
+                            </div>
+
+                            ${result.red_flags.length > 0 ? `
+                                <div class="narrative-section">
+                                    <h3>🚩 Potential Concerns</h3>
+                                    <ul>
+                                        ${result.red_flags.map(f => `<li>${f}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>❌ Error:</strong> ${result.message}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        });
+
+        // Load stats
+        async function loadStats() {
+            const container = document.getElementById('stats-container');
+            container.innerHTML = '<p class="loading">Loading statistics...</p>';
+
+            try {
+                const response = await fetch('/api/career/stats');
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const stats = result.stats;
+                    container.innerHTML = `
+                        <div class="stats-grid">
+                            <div class="stat-card">
+                                <div class="stat-value">${stats.total_positions}</div>
+                                <div class="stat-label">Positions Tracked</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${stats.total_candidates}</div>
+                                <div class="stat-label">Candidates Analyzed</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${stats.total_assessments}</div>
+                                <div class="stat-label">Assessments Generated</div>
+                            </div>
+                            <div class="stat-card">
+                                <div class="stat-value">${stats.avg_overall_score}</div>
+                                <div class="stat-label">Avg Overall Score</div>
+                            </div>
+                        </div>
+
+                        ${stats.top_phd_institutions.length > 0 ? `
+                            <div style="margin-top: 30px; background: white; padding: 20px; border-radius: 10px;">
+                                <h3>Top PhD Institutions</h3>
+                                <ul>
+                                    ${stats.top_phd_institutions.map(inst =>
+                                        `<li><strong>${inst.institution}</strong> - ${inst.count} hires</li>`
+                                    ).join('')}
+                                </ul>
+                            </div>
+                        ` : ''}
+                    `;
+                } else {
+                    container.innerHTML = `<p style="color: red;">Error loading stats: ${result.message}</p>`;
+                }
+            } catch (error) {
+                container.innerHTML = `<p style="color: red;">Error: ${error.message}</p>`;
+            }
+        }
+
+        // Load stats on page load if on stats tab
+        if (document.getElementById('stats-panel').classList.contains('active')) {
+            loadStats();
+        }
+    </script>
+</body>
+</html>

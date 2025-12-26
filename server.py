@@ -80,6 +80,14 @@ from server.routes.shredding import (
     handle_shredding_requirement_update_api as handle_shredding_requirement_update_route,
     handle_shredding_matrix_api as handle_shredding_matrix_route
 )
+from server.routes.career import (
+    handle_career_positions_list_api as handle_career_positions_list_route,
+    handle_career_positions_create_api as handle_career_positions_create_route,
+    handle_career_candidates_create_api as handle_career_candidates_create_route,
+    handle_career_analyze_api as handle_career_analyze_route,
+    handle_career_assessment_get_api as handle_career_assessment_get_route,
+    handle_career_stats_api as handle_career_stats_route
+)
 
 # Ollama agents support
 try:
@@ -359,6 +367,16 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
                     self.handle_todos_detail_api()
                     return
+                # Career Monster API endpoints
+                elif self.path == '/api/career/positions' or self.path.startswith('/api/career/positions?'):
+                    self.handle_career_positions_list_api()
+                    return
+                elif self.path == '/api/career/stats':
+                    self.handle_career_stats_api()
+                    return
+                elif self.path.startswith('/api/career/assessments/'):
+                    self.handle_career_assessment_get_api()
+                    return
                 # Opportunities API endpoints
                 elif self.path == '/api/opportunities':
                     self.handle_opportunities_list_api()
@@ -490,6 +508,13 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 self.handle_search_create_folder_api()
             elif self.path == '/api/search/objects' and SEARCH_AVAILABLE:
                 self.handle_search_add_object_api()
+            # Career Monster API endpoints
+            elif self.path == '/api/career/positions':
+                self.handle_career_positions_create_api()
+            elif self.path == '/api/career/candidates':
+                self.handle_career_candidates_create_api()
+            elif self.path == '/api/career/analyze':
+                self.handle_career_analyze_api()
             # Shredding API endpoints
             elif self.path == '/api/shredding/shred':
                 self.handle_shredding_shred_api()
@@ -1624,6 +1649,33 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_tags_delete_api(self, tag_id):
         """Handle DELETE /api/todos/tags/{id} - Delete tag."""
         handle_tags_delete_route(self, tag_id)
+
+    # ========== Career Monster API Handlers ==========
+
+    def handle_career_positions_list_api(self):
+        """Handle GET /api/career/positions - List positions."""
+        handle_career_positions_list_route(self)
+
+    def handle_career_positions_create_api(self):
+        """Handle POST /api/career/positions - Create position."""
+        handle_career_positions_create_route(self)
+
+    def handle_career_candidates_create_api(self):
+        """Handle POST /api/career/candidates - Create candidate."""
+        handle_career_candidates_create_route(self)
+
+    def handle_career_analyze_api(self):
+        """Handle POST /api/career/analyze - Generate assessment."""
+        handle_career_analyze_route(self)
+
+    def handle_career_assessment_get_api(self):
+        """Handle GET /api/career/assessments/{id} - Get assessment."""
+        assessment_id = self.path.split('/')[-1]
+        handle_career_assessment_get_route(self, assessment_id)
+
+    def handle_career_stats_api(self):
+        """Handle GET /api/career/stats - Get statistics."""
+        handle_career_stats_route(self)
 
 
 def main():

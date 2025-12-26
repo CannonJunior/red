@@ -1,4 +1,21 @@
-RAG system not available: No module named 'chromadb'
+INFO:rag_api:RAG system imported successfully
+INFO:rag_core:Loading local embedding model...
+INFO:sentence_transformers.SentenceTransformer:Use pytorch device_name: cpu
+INFO:sentence_transformers.SentenceTransformer:Load pretrained SentenceTransformer: all-MiniLM-L6-v2
+INFO:ollama_config:Ollama connection successful (0.016s) - 4 models available
+INFO:rag_core:Available Ollama models: ['mistral:latest', 'llama2:latest', 'incept5/llama3.1-claude:latest', 'qwen2.5:3b']
+INFO:rag_core:Selected model: qwen2.5:3b
+INFO:rag_core:Connected to Redis for event streaming
+INFO:document_processor:DocumentProcessor initialized with zero-cost processing
+INFO:rag_api:RAG service initialized successfully
+INFO:cag_api:CAG Capacity Calculation:
+  Total RAM: 28.17 GB
+  Available RAM: 17.82 GB
+  Usable for CAG: 10.78 GB
+  Estimated tokens: 1,928,354,645
+  Optimal capacity: 200,000 tokens
+INFO:document_processor:DocumentProcessor initialized with zero-cost processing
+INFO:cag_api:CAG Manager initialized with 200,000 token capacity
 INFO:search_system:Database initialized successfully
 INFO:search_api:Search system initialized
 INFO:search_system:Added object: chat_sample_1 (chat)
@@ -11,3 +28,23 @@ ERROR:search_system:Error creating folder: UNIQUE constraint failed: folders.id
 INFO:search_api:Created sample folder: Personal
 INFO:search_api:Data synchronization completed
 INFO:search_api:Search API initialized successfully
+INFO:rag_system.document_processor:DocumentProcessor initialized with zero-cost processing
+INFO:shredding.requirement_classifier:Connected to Ollama. Available models: 4
+INFO:agent_system.mcp.server_manager:Connected to Redis for event streaming
+INFO:agent_system.mcp.server_manager:Loaded configuration for server: local_rag_server
+INFO:agent_system.mcp.server_manager:Loaded configuration for server: multi_index_server
+INFO:agent_system.mcp.server_manager:Zero-Cost MCP Server Manager initialized
+INFO:agent_system.mcp.server_manager:Registered MCP server: local_rag_server
+INFO:agent_system.mcp.server_manager:Registered default server: local_rag_server
+INFO:agent_system.mcp.server_manager:Registered MCP server: multi_index_server
+INFO:agent_system.mcp.server_manager:Registered default server: multi_index_server
+INFO:agent_system.agents.agent_config:Connected to Redis for agent coordination
+INFO:agent_system.agents.agent_config:Initialized 3 default agent templates
+INFO:agent_system.agents.agent_config:Mojo-Optimized Agent Manager initialized
+INFO:agent_system.security.local_security:Loaded security policy: code_review_agent_policy
+INFO:agent_system.security.local_security:Loaded security policy: rag_research_agent_policy
+INFO:agent_system.security.local_security:Loaded security policy: vector_analysis_agent_policy
+INFO:agent_system.security.local_security:Initialized 3 default security policies
+INFO:agent_system.security.local_security:Zero-Cost Local Security Manager initialized
+INFO:career_monster.database:Career-monster schema initialized
+INFO:career_monster.database:Career-monster schema initialized

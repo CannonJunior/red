@@ -828,21 +828,42 @@ class MCPAgentManager {
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
-                            <div class="border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
-                                ${availableSkills.length > 0 ? availableSkills.map(skill => `
+                            <!-- Tab buttons -->
+                            <div class="flex border-b border-gray-300 dark:border-gray-600 mb-2">
+                                <button type="button" class="skill-tab px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400" data-tab="plugin">
+                                    Plugin Skills
+                                </button>
+                                <button type="button" class="skill-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" data-tab="custom">
+                                    Custom Skills
+                                </button>
+                            </div>
+                            <!-- Plugin Skills Tab Content -->
+                            <div class="skill-tab-content border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto" data-tab-content="plugin">
+                                ${availableSkills.filter(s => s.source === 'plugin').length > 0 ? availableSkills.filter(s => s.source === 'plugin').map(skill => `
                                     <label class="flex items-start">
                                         <input type="checkbox" class="edit-agent-skill mt-1" value="${skill.name}"
                                             ${agent.skills && agent.skills.includes(skill.name) ? 'checked' : ''}
                                             class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                         <div class="ml-2 flex-1">
-                                            <div class="flex items-center gap-2">
-                                                <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
-                                                <span class="text-xs px-2 py-0.5 rounded ${skill.source === 'plugin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">${skill.source === 'plugin' ? 'Plugin' : 'Local'}</span>
-                                            </div>
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
                                             <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
                                         </div>
                                     </label>
-                                `).join('') : '<div class="text-sm text-gray-500">No skills available</div>'}
+                                `).join('') : '<div class="text-sm text-gray-500">No plugin skills available</div>'}
+                            </div>
+                            <!-- Custom Skills Tab Content -->
+                            <div class="skill-tab-content border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto hidden" data-tab-content="custom">
+                                ${availableSkills.filter(s => s.source === 'local').length > 0 ? availableSkills.filter(s => s.source === 'local').map(skill => `
+                                    <label class="flex items-start">
+                                        <input type="checkbox" class="edit-agent-skill mt-1" value="${skill.name}"
+                                            ${agent.skills && agent.skills.includes(skill.name) ? 'checked' : ''}
+                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <div class="ml-2 flex-1">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                                            <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
+                                        </div>
+                                    </label>
+                                `).join('') : '<div class="text-sm text-gray-500">No custom skills available</div>'}
                             </div>
                         </div>
                         <div>
@@ -878,6 +899,37 @@ class MCPAgentManager {
                 e.stopPropagation();
             });
         }
+
+        // Handle skill tab switching
+        const skillTabs = modal.querySelectorAll('.skill-tab');
+        const skillTabContents = modal.querySelectorAll('.skill-tab-content');
+
+        skillTabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetTab = tab.dataset.tab;
+
+                // Update tab button styles
+                skillTabs.forEach(t => {
+                    if (t.dataset.tab === targetTab) {
+                        t.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                        t.classList.add('border-blue-600', 'text-blue-600', 'dark:border-blue-400', 'dark:text-blue-400');
+                    } else {
+                        t.classList.remove('border-blue-600', 'text-blue-600', 'dark:border-blue-400', 'dark:text-blue-400');
+                        t.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                    }
+                });
+
+                // Show/hide tab contents
+                skillTabContents.forEach(content => {
+                    if (content.dataset.tabContent === targetTab) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                });
+            });
+        });
 
         // Handle form submission
         const form = modal.querySelector('#edit-agent-form');
@@ -959,20 +1011,40 @@ class MCPAgentManager {
                         </div>
                         <div>
                             <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
-                            <div class="border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto">
-                                ${availableSkills.length > 0 ? availableSkills.map(skill => `
+                            <!-- Tab buttons -->
+                            <div class="flex border-b border-gray-300 dark:border-gray-600 mb-2">
+                                <button type="button" class="skill-tab px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400" data-tab="plugin">
+                                    Plugin Skills
+                                </button>
+                                <button type="button" class="skill-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" data-tab="custom">
+                                    Custom Skills
+                                </button>
+                            </div>
+                            <!-- Plugin Skills Tab Content -->
+                            <div class="skill-tab-content border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto" data-tab-content="plugin">
+                                ${availableSkills.filter(s => s.source === 'plugin').length > 0 ? availableSkills.filter(s => s.source === 'plugin').map(skill => `
                                     <label class="flex items-start">
                                         <input type="checkbox" class="agent-skill mt-1" value="${skill.name}"
                                             class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
                                         <div class="ml-2 flex-1">
-                                            <div class="flex items-center gap-2">
-                                                <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
-                                                <span class="text-xs px-2 py-0.5 rounded ${skill.source === 'plugin' ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200' : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-300'}">${skill.source === 'plugin' ? 'Plugin' : 'Local'}</span>
-                                            </div>
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
                                             <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
                                         </div>
                                     </label>
-                                `).join('') : '<div class="text-sm text-gray-500">No skills available</div>'}
+                                `).join('') : '<div class="text-sm text-gray-500">No plugin skills available</div>'}
+                            </div>
+                            <!-- Custom Skills Tab Content -->
+                            <div class="skill-tab-content border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto hidden" data-tab-content="custom">
+                                ${availableSkills.filter(s => s.source === 'local').length > 0 ? availableSkills.filter(s => s.source === 'local').map(skill => `
+                                    <label class="flex items-start">
+                                        <input type="checkbox" class="agent-skill mt-1" value="${skill.name}"
+                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
+                                        <div class="ml-2 flex-1">
+                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                                            <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
+                                        </div>
+                                    </label>
+                                `).join('') : '<div class="text-sm text-gray-500">No custom skills available</div>'}
                             </div>
                         </div>
                         <div>
@@ -1008,6 +1080,37 @@ class MCPAgentManager {
                 e.stopPropagation();
             });
         }
+
+        // Handle skill tab switching
+        const skillTabs = modal.querySelectorAll('.skill-tab');
+        const skillTabContents = modal.querySelectorAll('.skill-tab-content');
+
+        skillTabs.forEach(tab => {
+            tab.addEventListener('click', (e) => {
+                e.preventDefault();
+                const targetTab = tab.dataset.tab;
+
+                // Update tab button styles
+                skillTabs.forEach(t => {
+                    if (t.dataset.tab === targetTab) {
+                        t.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                        t.classList.add('border-blue-600', 'text-blue-600', 'dark:border-blue-400', 'dark:text-blue-400');
+                    } else {
+                        t.classList.remove('border-blue-600', 'text-blue-600', 'dark:border-blue-400', 'dark:text-blue-400');
+                        t.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                    }
+                });
+
+                // Show/hide tab contents
+                skillTabContents.forEach(content => {
+                    if (content.dataset.tabContent === targetTab) {
+                        content.classList.remove('hidden');
+                    } else {
+                        content.classList.add('hidden');
+                    }
+                });
+            });
+        });
 
         // Handle form submission
         const form = modal.querySelector('#create-agent-form');

@@ -674,8 +674,37 @@ class ChatInterface {
         }
 
         messageDiv.innerHTML = messageHtml;
+
+        // Add career-monster button if mentioned in assistant message
+        if (type === 'assistant' && (content.toLowerCase().includes('career-monster') || content.toLowerCase().includes('career monster'))) {
+            const buttonDiv = document.createElement('div');
+            buttonDiv.className = 'mt-3';
+            buttonDiv.innerHTML = `
+                <button class="career-monster-btn px-4 py-2 bg-purple-600 dark:bg-purple-700 text-white rounded-lg hover:bg-purple-700 dark:hover:bg-purple-800 transition-colors flex items-center gap-2">
+                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                    </svg>
+                    Open Career-Monster
+                </button>
+            `;
+            const messageContent = messageDiv.querySelector('.message-assistant');
+            if (messageContent) {
+                messageContent.appendChild(buttonDiv);
+            }
+
+            // Add click handler for career-monster button
+            const careerBtn = messageDiv.querySelector('.career-monster-btn');
+            if (careerBtn) {
+                careerBtn.addEventListener('click', () => {
+                    if (window.app) {
+                        window.app.showCareerMonster();
+                    }
+                });
+            }
+        }
+
         this.messagesContainer.appendChild(messageDiv);
-        
+
         // Scroll to bottom
         this.scrollToBottom();
     }
@@ -1527,12 +1556,21 @@ class Navigation {
             });
         });
 
-        // Setup sub-nav items (Opportunities)
+        // Setup sub-nav items (Opportunities, Skills)
         const subNavItems = document.querySelectorAll('.sub-nav-item');
         subNavItems.forEach(item => {
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
                 const listType = item.getAttribute('data-list');
+                const skillType = item.getAttribute('data-skill');
+
+                // Handle skill interface items
+                if (skillType) {
+                    if (skillType === 'career-monster') {
+                        this.showCareerMonster();
+                    }
+                    return;
+                }
 
                 if (item.classList.contains('expandable-nav-item')) {
                     this.toggleExpandableNavItem(item, listType);
@@ -1554,6 +1592,23 @@ class Navigation {
         });
     }
 
+    showCareerMonster() {
+        // Hide all other areas
+        this.navigateTo('career-monster');
+
+        // Show career-monster area
+        const careerArea = document.getElementById('career-monster-area');
+        if (careerArea) {
+            careerArea.classList.remove('hidden');
+        }
+
+        // Update page title
+        const pageTitle = document.getElementById('page-title');
+        if (pageTitle) {
+            pageTitle.textContent = 'Career-Monster';
+        }
+    }
+
     toggleExpandableNavItem(item, itemName) {
         const expandIcon = item.querySelector('.expand-icon');
         let submenu = null;
@@ -1564,6 +1619,8 @@ class Navigation {
             submenu = document.getElementById('opportunities-list');
         } else if (itemName === 'todos') {
             submenu = document.getElementById('todo-lists-dropdown');
+        } else if (itemName === 'skills interface') {
+            submenu = document.getElementById('skills-submenu');
         }
 
         if (submenu) {
@@ -1595,6 +1652,7 @@ class Navigation {
         document.getElementById('prompts-area')?.classList.add('hidden');
         document.getElementById('opportunities-area')?.classList.add('hidden');
         document.getElementById('todos-area')?.classList.add('hidden');
+        document.getElementById('career-monster-area')?.classList.add('hidden');
 
         // Hide expandable submenu panels ONLY when navigating away from Lists-related pages
         // Don't hide them when navigating TO opportunities or todos pages
