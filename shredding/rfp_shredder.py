@@ -484,7 +484,7 @@ class RFPShredder:
         Args:
             opportunity_id: Opportunity ID
             rfp_number: RFP number for filename
-            output_dir: Output directory (default: current dir)
+            output_dir: Output directory (default: outputs/shredding/compliance-matrices/)
 
         Returns:
             Path to generated CSV file
@@ -508,15 +508,20 @@ class RFPShredder:
         requirements = cursor.fetchall()
         conn.close()
 
-        # Generate filename
+        # Generate filename with timestamp
+        timestamp = datetime.now().strftime("%Y-%m-%d")
+
+        # Determine output directory
         if output_dir:
             output_path = Path(output_dir)
         else:
-            output_path = Path.cwd()
+            # Default to outputs/shredding/compliance-matrices/
+            project_root = Path(__file__).parent.parent
+            output_path = project_root / "outputs" / "shredding" / "compliance-matrices"
 
         output_path.mkdir(parents=True, exist_ok=True)
 
-        csv_file = output_path / f"{rfp_number}_compliance_matrix.csv"
+        csv_file = output_path / f"{rfp_number}_compliance_matrix_{timestamp}.csv"
 
         # Write CSV
         with open(csv_file, 'w', newline='', encoding='utf-8') as f:

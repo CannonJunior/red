@@ -73,6 +73,8 @@ class SectionParser:
         """
         Extract all sections from RFP document.
 
+        Supports both FAR format (SECTION A-M) and CSO format (numbered sections).
+
         Args:
             file_path: Path to RFP PDF file
             section_ranges: Optional manual section page ranges
@@ -103,11 +105,17 @@ class SectionParser:
         # Get full text
         full_text = self._combine_chunks(doc_result['chunks'])
 
-        # Detect sections
+        # Detect document format (FAR vs CSO)
+        doc_format = self._detect_document_format(full_text)
+        logger.info(f"Detected document format: {doc_format}")
+
+        # Detect sections based on format
         if section_ranges:
             sections = self._extract_by_ranges(
                 file_path, section_ranges, doc_result
             )
+        elif doc_format == 'CSO':
+            sections = self._extract_cso_sections(full_text, doc_result)
         else:
             sections = self._detect_sections(full_text, doc_result)
 
@@ -371,3 +379,190 @@ class SectionParser:
             )
 
         return validation
+
+    def _detect_document_format(self, text: str) -> str:
+        """
+        Detect document format (FAR or CSO).
+
+        Args:
+            text: Full document text
+
+        Returns:
+            'FAR' or 'CSO'
+        """
+        # Check for CSO markers FIRST (more specific)
+        cso_markers = [
+            r'Commercial\s+Solutions\s+Opening',
+            r'CSO\s+Number',
+            r'CSO\s+Type',
+            r'CSO\s+Title',
+            r'Technology\s+Focus\s+Areas',
+            r'Other\s+Transaction',
+            r'^\d+\.\d+\s+[A-Z]',  # Numbered sections like "5.1 Prototyping"
+        ]
+
+        cso_count = 0
+        for pattern in cso_markers:
+            matches = re.findall(pattern, text, re.IGNORECASE | re.MULTILINE)
+            if matches:
+                cso_count += len(matches)
+                logger.debug(f"Found CSO marker '{pattern}': {len(matches)} times")
+
+        logger.debug(f"Total CSO markers found: {cso_count}")
+
+        # If 3 or more CSO marker instances found, it's CSO format
+        if cso_count >= 3:
+            return 'CSO'
+
+        # Check for FAR section markers
+        far_markers = [
+            r'SECTION\s+[A-M]',
+            r'SEC\.\s+[A-M]',
+            r'PART\s+[A-M]'
+        ]
+
+        for pattern in far_markers:
+            if re.search(pattern, text, re.IGNORECASE):
+                return 'FAR'
+
+        # Default to CSO if we have any CSO markers but no FAR markers
+        if cso_count > 0:
+            return 'CSO'
+
+        return 'UNKNOWN'
+
+    def _extract_cso_sections(
+        self,
+        full_text: str,
+        doc_result: Dict
+    ) -> Dict[str, Dict]:
+        """
+        Extract sections from CSO (Commercial Solutions Opening) format documents.
+
+        CSO documents use numbered sections (1.0, 2.0, 3.0, etc.) instead of
+        FAR lettered sections (A, B, C, etc.).
+
+        Maps CSO sections to virtual FAR sections:
+        - All numbered sections -> Section C (Technical/Requirements)
+        - Submission/Proposal sections -> Section L (Instructions)
+        - Evaluation sections -> Section M (Evaluation)
+
+        Args:
+            full_text: Full document text
+            doc_result: Document processor result
+
+        Returns:
+            Dictionary of sections mapped to FAR-like structure
+        """
+        sections = {}
+
+        # Split text by numbered sections (1.0, 2.0, 3.0, etc.)
+        # Try multiple patterns to handle different formatting
+        # PDFs from Docling use markdown headings: ## 1.0 Title
+        # Text files use plain format: 1.0 Title
+        patterns = [
+            re.compile(r'^##\s+(\d+\.\d+)\s+(.+?)$', re.MULTILINE),  # "## 1.0 TITLE" (PDF markdown)
+            re.compile(r'^##\s+(\d+\.0)\s+(.+?)$', re.MULTILINE),    # "## 1.0 TITLE" (PDF markdown, stricter)
+            re.compile(r'^(\d+\.\d+)\s+(.+?)$', re.MULTILINE),       # "1.0 TITLE" (plain text)
+            re.compile(r'^(\d+\.0)\s+(.+?)$', re.MULTILINE),         # "1.0 TITLE" (plain text, stricter)
+            re.compile(r'(\d+\.\d+)\s+([A-Z][A-Z\s]+)', re.MULTILINE),  # "1.0 TITLE" (uppercase)
+        ]
+
+        matches = []
+        for pattern in patterns:
+            matches = list(pattern.finditer(full_text))
+            if matches:
+                logger.info(f"Matched {len(matches)} CSO sections with pattern: {pattern.pattern}")
+                break
+
+        if not matches:
+            logger.warning("No CSO numbered sections found")
+            return sections
+
+        # Extract all CSO sections
+        cso_sections = []
+        for i, match in enumerate(matches):
+            section_num = match.group(1)
+            section_title = match.group(2).strip()
+            start_pos = match.end()
+
+            # Find end position (start of next section or end of document)
+            if i < len(matches) - 1:
+                end_pos = matches[i + 1].start()
+            else:
+                end_pos = len(full_text)
+
+            section_text = full_text[start_pos:end_pos].strip()
+
+            cso_sections.append({
+                'number': section_num,
+                'title': section_title,
+                'text': section_text
+            })
+
+        logger.info(f"Found {len(cso_sections)} CSO numbered sections")
+
+        # Map CSO sections to FAR-like structure
+        # Combine all sections into Section C for now
+        technical_text_parts = []
+        instruction_text_parts = []
+        evaluation_text_parts = []
+
+        for cso_sec in cso_sections:
+            title_lower = cso_sec['title'].lower()
+
+            # Map to Section L (Instructions)
+            if any(keyword in title_lower for keyword in [
+                'proposal', 'submission', 'white paper', 'content',
+                'proprietary', 'instructions'
+            ]):
+                instruction_text_parts.append(
+                    f"{cso_sec['number']} {cso_sec['title']}\n\n{cso_sec['text']}"
+                )
+
+            # Map to Section M (Evaluation)
+            elif any(keyword in title_lower for keyword in [
+                'evaluation', 'criteria', 'award'
+            ]):
+                evaluation_text_parts.append(
+                    f"{cso_sec['number']} {cso_sec['title']}\n\n{cso_sec['text']}"
+                )
+
+            # Map to Section C (Technical)
+            else:
+                technical_text_parts.append(
+                    f"{cso_sec['number']} {cso_sec['title']}\n\n{cso_sec['text']}"
+                )
+
+        # Create virtual FAR sections
+        if technical_text_parts:
+            sections['C'] = {
+                'title': 'Technical Requirements (CSO Format)',
+                'start_page': None,
+                'end_page': None,
+                'text': '\n\n'.join(technical_text_parts),
+                'chunks': doc_result['chunks'],
+                'format': 'CSO'
+            }
+
+        if instruction_text_parts:
+            sections['L'] = {
+                'title': 'Submission Instructions (CSO Format)',
+                'start_page': None,
+                'end_page': None,
+                'text': '\n\n'.join(instruction_text_parts),
+                'chunks': doc_result['chunks'],
+                'format': 'CSO'
+            }
+
+        if evaluation_text_parts:
+            sections['M'] = {
+                'title': 'Evaluation Criteria (CSO Format)',
+                'start_page': None,
+                'end_page': None,
+                'text': '\n\n'.join(evaluation_text_parts),
+                'chunks': doc_result['chunks'],
+                'format': 'CSO'
+            }
+
+        return sections

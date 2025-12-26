@@ -80,6 +80,35 @@
 - Redis Streams for event processing (not Kafka)
 - Document processing: Docling + Unstract (not paid APIs)
 
+### 📁 Skill Output Organization - CRITICAL
+- **Skills MUST place outputs in `outputs/<skill-name>/` directory structure**
+- **NEVER output to the top-level project directory** - this creates clutter
+- **Directory Structure**:
+  ```
+  outputs/              # Generated artifacts (CSV, reports, etc.)
+  ├── shredding/
+  │   ├── compliance-matrices/
+  │   └── requirement-extracts/
+  ├── data-analysis/
+  │   ├── reports/
+  │   └── visualizations/
+  └── shared/
+      └── exports/
+
+  docs/                 # Documentation and implementation notes
+  ├── shredding/
+  ├── data-analysis/
+  └── architecture/
+  ```
+- **Filename Convention**: `<rfp-number>_<artifact-type>_<YYYY-MM-DD>.<ext>`
+  - Example: `FA8612-21-S-C001_compliance_matrix_2025-12-26.csv`
+- **Architecture**:
+  - Core libraries live in `<feature>/` (e.g., `shredding/`)
+  - Skill definitions live in `.claude/skills/<feature>/`
+  - Skills are thin wrappers that import from core libraries
+  - This separation is intentional and follows Anthropic's guidance
+  - Implementation docs go in `docs/<feature>/`, not top-level
+
 ### 📝 Memoization Instructions
 - **Memoize any input given in MEMOIZE.md file.**
 - **This project focuses on agent-native RAG features to help users with document analysis and knowledge synthesis.**

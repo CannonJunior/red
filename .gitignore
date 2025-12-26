@@ -1,1 +1,37 @@
 __pycache__
+
+# Skill outputs
+outputs/
+*.csv
+*.xlsx
+*.pdf
+
+# Python
+*.pyc
+*.pyo
+*.egg-info
+.pytest_cache/
+.coverage
+
+# Environment
+.env
+.venv/
+venv_linux/
+
+# IDE
+.vscode/
+.idea/
+
+# Logs
+*.log
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+*.tmp
+*.bak
+*.swp
+*~

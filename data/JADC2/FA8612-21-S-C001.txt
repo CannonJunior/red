@@ -1,0 +1,275 @@
+Amendment 01 dated 12 July 2021: Updated "CSO" to read "Commercial Solutions Opening" in an effort to prevent confusion with other acronyms.
+
+Federal Agency: Air Force
+Program Office: AFLCMC/XA “Architecture and Integration Directorate”
+CSO Title: JADC2 Commercial Solutions Opening
+CSO Type: Commercial Solutions Opening with Calls
+CSO Number:  FA8612-21-S-C001
+CSO Date: June 28, 2021
+
+NOTE
+
+This is only an announcement; PLEASE DO NOT SUBMIT PROPOSALS IN RESPONSE. Subsequent calls will be issued under this announcement to solicit proposals for specific efforts. Please refer to the attachment section of this announcement for the calls. 
+
+Publication of this announcement does not obligate the DoD to review any white papers submission beyond an initial administrative review, or to award any specific project, or to obligate any available funds.
+
+1.0 OVERVIEW 
+This Commercial Solutions Opening is intended to be as streamlined as possible to allow the Architecture and Integration Directorate (AFLCMC/XA), or any organization AFLCMC/XA supports, to leverage the latest technology advances from a large variety of prospective Contractors. AFLCMC/XA invites innovative technical approach proposals addressing Joint All-Domain Command and Control (JADC2) problems associated with getting the right information to the right platform/decision maker in the most efficient manner thereby reducing kill chain and Observe, Orient, Decide and Act (OODA) timelines and cycles.  This Commercial Solutions Opening will focus on existing and emerging technologies and platforms across the Defense Department, the Intelligence Community, and the commercial world, to perform an integrated analysis of the capability of various options to contribute to the fight and prioritize investments over time.  
+
+This solicitation is not requesting any white papers or proposals at this time. This Commercial Solutions Opening functions as the overarching umbrella solicitation from which Calls will be published. This Commercial Solutions Opening will remain open for Calls until rescinded. This Commercial Solutions Opening can result in the award of FAR Part 12 Contracts, Procurement for experimental purposes under 10 U.S.C. 4023 or Other Transaction Agreements (OTAs) under 10 USC 4021. Over the course of this time period, AFLCMC/XA will publish Calls via amendments to this Commercial Solutions Opening. These Calls will contain specific Areas of Interest (AoIs) related to JADC2’s Technology Focus Areas. Those specific AoIs are what prospective Contractors shall focus their solutions towards.
+
+This is a competitive solicitation that seeks to fund innovative technologies that propose new solutions to expand Air Force capabilities as it relates to JADC2 Technology Focus Areas. AFLCMC/XA is interested in receiving responses from all interested offerors to include, but not limited to, the following: traditional defense contractors, nontraditional defense contractors, large businesses, small businesses and research institutions. The Commercial Solutions Opening is a streamlined acquisition process that seeks to reduce acquisition timelines and acquire new, innovative solutions that companies can bring forth to meet the stated AoIs detailed in each Call.
+
+All details of the process shall be governed by this Commercial Solutions Opening unless otherwise noted or expanded upon in each Call. AFLCMC/XA is not obligated to make any awards as a result of this Commercial Solutions Opening and all awards are subject to the availability of funds and successful negotiations. The Government is not responsible for any monies expended by the proposer prior to the issuance of any contract award. AFLCMC/XA reserves the right to modify the solicitation requirements of this Commercial Solutions Opening and each subsequent Call.
+
+The Commercial Solutions Opening authority reference to Class Deviation 2022-O0007.  
+
+2.0 Commercial Solutions Opening with Calls
+This Commercial Solutions Opening is a hybrid solicitation against which both Closed Calls and/or Open Period Calls can be published via amendments to the Commercial Solutions Opening. All Calls issued under this Commercial Solutions Opening will include specific instructions including dates, AoIs, evaluation criteria and proposal instructions to potential offerors. While each offeror shall adhere to this Commercial Solutions Opening, the Calls can contain other information the Contractor shall adhere to. Each Call will be announced on the Government Point of Entry (beta.SAM.gov), which may result in the award of a FAR Part 12, Procurement for experimental purposes under 10 U.S.C. 4023 contract or an Other Transaction Agreement (OTA) under 10 USC 4021.
+
+2.1 Closed Calls (One-Step or Two-Step) 
+Over the period of this Commercial Solutions Opening, Calls may be issued to request white papers and/or proposals for specific AoIs. It will be determined on a Call-by-Call basis whether or not the announcement is for a one-step (Proposals only) or a two-step process (White Papers first, then Proposals by invite-only). The submission for white papers and proposals shall be submitted at a specific date and time as set forth in each particular Call. White papers and/or proposals will not be reviewed if submitted after the stated date and time. No exceptions will be made for late proposal submission, including technology issues encountered during submission.
+
+One-Step Calls
+
+Step 1: Proposal due date and time will be provided in Calls issued against this Commercial Solutions Opening.
+
+Two-Step Calls
+
+Step 1: White Paper due date and time will be provided in Calls issued against this Commercial Solutions Opening
+
+Step 2: Proposal due date and time will be provided in Requests for Proposals (RFPs) sent to offerors that submit White Papers who are evaluated well in accordance with the criteria stated in each Call.
+
+2.2 Open Period Calls (Two-Step)
+This Commercial Solutions Opening may also have Open Period Calls. Open Period Calls will only be issued under a two-step process. After an Open Call is published, white papers may be submitted at any time during an Open Period for the AoIs detailed in the Call. It is important to note that only white papers submitted in response to the specific AoIs detailed in the Call will be considered.
+
+Step 1: White paper submission period will be provided in Calls issued under this Commercial Solutions Opening.
+
+Step 2: Proposal due date and time will be provided in Requests for Proposals (RFPs) sent to offerors that submit White Papers who are evaluated well in accordance with the criteria stated in each Call.
+
+3.0 TECHNOLOGY FOCUS AREAS (TFAs)
+Each Technology Focus Area identifies an area where prospective Contractors can bring substantial value to meet the JADC2 mission. This Commercial Solutions Opening is not limited to the following TFAs. Additional TFAs may be included via amendments to this Commercial Solutions Opening.
+
+    Digital Architecture, Standards and Concepts
+
+This category consists of various activities to analyze, mature, and document the foundational aspects of the development of the overall enterprise architecture. This includes digital modeling, simulation and analysis, trade studies, government owned standard development and maintenance, and potential concept development and refinement. Development of digital engineering architecture to include appropriate toolsets, licenses, data, etc., at multiple levels of security and including services such as data management, configuration control, and security/access management.  Other activities may include architecting the toolchains to support the linkage of digital engineering artifacts to modeling and simulation tools and operational analysis.
+
+    Sensor Integration
+
+The development, maturation, integration, demonstration, and proliferation of sensor hardware and software.  A key interest of JADC2 is the compatibility and interoperability capabilities through the use of open interfaces to enable improved control of systems and the processing of their data.
+
+    Data
+
+Data incorporates the cloud based data repositories across domains that are discoverable, enabling publish subscribe approaches servicing various consumers across the DoD. These repositories contain data that consists of structured and unstructured data and where possible, this data will be meta tagged for further analytics and as well as fusion purposes.  One of the key element of this approach is this ability to analyze the data to develop machine learning and further enhance the artificial intelligence (AI) algorithms to provide previously unrealized military utility in decision aides.
+
+    Secure Processing
+
+Secure Processing will leverage the Enterprise Information Technology as a Service (EITaaS) work at the unclassified and secret level to expand this capability to all levels of security. A key feature of secure processing will be to develop a multi-level security (MLS) technology set that enables moving up and down in security level where feasible no matter the hardware device, transportation method, or environment.  Lastly secure processing encompasses providing deployment, training, and support services for all of these capabilities worldwide.
+
+    Connectivity
+
+Development and fielding of networks to enable the timely processing and dissemination of data from any sensor to users at the tactical edge and/or strategic levels. Assets in any domain may be platforms-of-opportunity to serve as communications nodes enabled by omnidirectional and directional line-of-sight (LOS), and beyond-line-of-sight (BLOS) capabilities.  Attributes of interest include: increased data rates, reduced latency, improved anti-jam, Low Probability of Intercept/Low Probability of Detection (LPI/LPD) characteristics, scalability of nodes/connections, improved integration of dissimilar users, etc.
+
+    Applications
+
+Applications encompasses the design, development and demonstration of open interface applications and/or open interface software development kits for distributed command and control decision-makers (e.g., machine-to-human, machine-to-machine) across multi-domain operations. Additionally, this category seeks solutions which demonstrate the ability to ingest and process cross domain, multi-sourced data feeds (intelligence, information, etc.) via fusion environments and/or fusion services.
+
+    Effects Integration
+
+Design, development, demonstration and integration of networked weapons engaged across complex (e.g. wide area mesh) environments. This includes, but is not limited to, smart munitions and low-cost autonomous platforms capable of supporting C2 de-confliction and synchronization of multi-domain assets. Incorporation of techniques and/or technologies are also sought to enable near-real time mission feedback loops and reduce processing time between system/mission data updates.
+
+
+The specific AoIs that prospective Contractors shall propose to will logically relate back to the Technology Focus Areas. Additional details and requirement specifics will be contained within the AoIs section of the Calls published under this Commercial Solutions Opening.
+
+The technology being proposed should meet the requirements of a Technology Readiness Level (TRL) assessment of at least three (3) or higher as detailed in the GAO link provided. AFLCMC/XA has the ability to adjust the TRL it requires on a per call basis and is the final decision authority for the TRL determination of any proposed technology solutions. For more information on TRL please see Figure 1 on page 11 at the following link: https://www.gao.gov/assets/710/703694.pdf
+
+4.0 DEFINITIONS
+Commercial Solutions Opening with Calls: This allows for publication of an umbrella Commercial Solutions Opening solicitation that contains overarching information, but does not request white papers or proposals. The Commercial Solutions Opening functions as a framework identifying the technical areas and giving the basic terms and administrative information of the Commercial Solutions Opening. The requests for white papers and/or proposals are done by issuing Calls that are published via amendments to the Commercial Solutions Opening. Calls can be issued at any time during the open period of the Commercial Solutions Opening. Each Call will be tailored to best fit the acquisition approach identified by the Government. The Calls may also include specific terms that apply to that Call such as further technical details and any pertinent clauses. Proposals or white papers are submitted only when Calls under this Commercial Solutions Opening are published.
+
+Open Period Calls: This type of Call allows for white paper and proposal submittals at any time within a specified period as set forth in the subsequent Call.
+
+Closed Calls: This type of Call allows for white paper and/or proposal submittals at a specified date and time as set forth in the subsequent Call. This process and the dates associated with it are more structured than Open Period Calls.
+
+Areas of Interest (AoIs): These are specific requests for innovative solutions that AFLCMC/XA will detail in each subsequent Call and will derive from the Technology Focus Areas. Contractors’ innovative solutions should focus on addressing a specific AoI.
+
+White Paper: A brief (usually 2-5 pages) summary of the proposed technical approach with an accompanying rough-order-of-magnitude (ROM) price.
+
+Pitch Day: Pitch Day is a tool that can be used as a part of the Call process. When used, Pitch Day gives Contractors an opportunity to meet AFLCMC/XA personnel in-person and provide a Pitch of their proposed technology. If a Pitch Day is utilized, specific details explaining the process and evaluation methods will be contained in the specific Call.
+
+Other Transaction: Refers to the type of Other Transaction Agreement (OTA) that may be placed as a result of this Commercial Solutions Opening and associated Calls. This type of OT is authorized by 10 U.S.C. § 4021 for prototype projects directly relevant to enhancing the mission effectiveness of military personnel and the supporting platforms, systems, components, or materials proposed to be acquired or developed by the DoD, or for the improvement of platforms, systems, components, or materials in use by the armed forces. This type of OTA is treated by DoD as an acquisition instrument, commonly referred to as an "other transaction" for a prototype project or a Section 4021 "other transaction".
+
+Prototype Project: Can generally be described as a proof of concept, model, reverse engineering to address obsolescence, pilot, novel application of commercial technologies for defense purposes, agile development activity, creation, design, development, demonstration of technical or operational utility, or combinations of the foregoing. A process, including a business process, may also be the subject of a prototype project. Although assistance terms are generally not appropriate in OT agreements in 10 U.S.C. § 4021, ancillary work efforts that are necessary for completion of the prototype project, such as test site training or limited logistics support, may be included in prototype projects. A prototype may be physical, virtual, or conceptual in nature. The quantity of prototypes/commercial solutions should generally be limited to that needed to prove technical or manufacturing feasibility or evaluate military utility.
+
+Innovative: This refers to any technology, process, or method, including research and development that is new as of the date of proposal submission; or any new application of an existing technology, process or method as of the proposal date.
+
+Nontraditional Defense Contractor: As defined in 10 U.S.C. § 2302(9) as an entity that is not currently performing and has not performed, for at least the one-year period preceding the solicitation of sources by the DoD for the procurement or transaction, any contract or subcontract for the DoD that is subject to full coverage under the cost accounting standards prescribed pursuant to 41 U.S.C. § 1502 and the regulations implementing such section. This includes all small business concerns under the criteria and size standards in 13 C.F.R. Part 121.
+
+Small Business Concern: Defined in the Small Business Act (15 U.S.C. 632) and 13 CFR Part 121.
+
+5.0 CONTRACT/AGREEMENT DETAILS
+As stated in the Overview Section, Calls issued under this Commercial Solutions Opening can result in the award of either a FAR Part 12 Contract, Procurement for experimental purposes under 10 U.S.C. 4023 or an Other Transaction Agreement (OTA) under 10 USC 4021. Regardless of the Contract Instrument AFLCMC/XA chooses to purse the Contract/Agreement type for all shall be Fixed Price, which includes Firm Fixed Price (FFP) and Fixed Price Incentive (FPI). This solicitation is not accepting offers for grants or cooperative agreements as the purpose of this Commercial Solutions Opening is to transfer something of value directly to the Government.
+
+The Government will be the decision authority on whether to pursue a FAR Part 12 Contract, an OTA or no award at all. The Government reserves the right to award some, all or none of the proposals from responses to each Call. The Contracting/Agreements Officer reserves the right to negotiate directly with the offeror on the terms and conditions prior to execution of the resulting contract/agreement on behalf of the Government. Be advised that only a Contracting/Agreements Officer has the authority to enter into, or modify, a binding contract/agreement on behalf of the United Stated Government.
+
+5.1 Prototyping
+This Commercial Solutions Opening may result in the award of prototype projects, which include not only commercially available technologies fueled by commercial or strategic investment, but also concept demonstrations, pilots, and agile development activities that can incrementally improve commercial technologies, existing government-owned capabilities, and/or concepts for broad defense and/or public application(s). The Government reserves the right to award a FAR Part 12 contract, Procurement for experimental purposes under 10 U.S.C. 4023 or an Other Transaction (OT) under 10 USC 4021 agreement (including an OT for a prototype project and a follow-on OT or contract for production), or no award at all. Calls issued under this Commercial Solutions Opening constitute competitive procedures. AFLCMC/XA may competitively award OTs for prototype projects that provide for the award of a follow-on production contract or OT for production to participants in the OT for prototype projects without the use of further competitive procedures, if the participant in the OT for prototype projects successfully completes the prototype project, as permitted by 10 U.S.C. § 4021.
+
+5.1.1 Iterative Prototyping
+A contract or OT for a prototype awarded under this Commercial Solutions Opening shall allow for an iterative prototyping process. An iterative prototyping process will allow the Government to modify, by mutual agreement, the scope of a prototype contract or OT to allow for the adaptation and modification of the technology being prototyped to meet additional unique and discrete purposes/mission sets. The sequential prototype iterations may result in a separate prototype project rather than a modification of the original prototype contract or OT. These additional unique and discrete purposes/mission sets can be generated by AFLCMC/XA or originate within any organization that AFLCMC/XA supports.
+
+5.1.2 Successful Completion of Prototype
+A prototype project is complete upon the written determination of the appropriate approving official (program manager and Contracting/Agreements Officer) for the matter in question that the efforts conducted under a prototype contract or OT: (1) met the key technical goals of a project; (2) met the metrics incorporated into the prototype contract or OT; or (3) accomplished a particularly favorable or unexpected result that justifies the transition to a production contract or OT. Furthermore, prior to successful completion of a prototype project under this Commercial Solutions Opening, the Government can transition any aspect of the prototype project determined to provide utility into production while other aspects of the prototype project have yet to be completed.
+
+5.1.3 Follow-on Production of a Prototype
+After award of a prototype using OT authority, the Government and offeror may negotiate a follow-on contract or OT for production or solution integration with or without further competition. Any concept/technology/solution successfully proven through a Prototype OT can be transitioned to a production contract. The Government reserves the right to award a follow-on contract or OT before the prototype is complete, under competitive procedures as provided in 10 U.S.C. 4021.
+
+Any Call posted by the Government under this Commercial Solutions Opening could result in the potential award of a follow on production or solution integration contract or OT.
+
+The Government reserves the right to extend performance to all, some, or none of the selected solutions and decisions will be made based on the availability of government funds.
+
+5.2 Other Transaction Agreements (OTAs) Specifics
+In accordance with 10 U.S.C 4021, if an Agreement for a prototype is utilized and if that Agreement provides for payments in a total amount in excess of $5,000,000, the Agreement will include a mandatory clause that provides for the Comptroller General the ability to examine the records of any party to the agreement or any entity that participates in the performance of the agreement. The $5,000,000 amount includes the base agreement plus options.
+
+Additionally, to enter into an OT for a Prototype agreement under 10 U.S.C. 4021, one of the following conditions must be met:
+
+    There is at least one nontraditional defense contractor or nonprofit research institution participating to a significant extent in the prototype project.
+    All significant participants other than the Federal Government are small businesses or nontraditional defense contractors.
+    Parties to the transaction other than the Federal Government must pay at least one third of the prototype project total cost.
+    The senior procurement executive determines that exceptional circumstances justify the use of an OT to provide an innovative business arrangement not feasible under a contract or to expand the defense supply base in a manner not practical under a contract.
+
+Further specifics and requirements as it relates to OTs may be applicable and included in subsequent Calls published under this Commercial Solutions Opening.
+
+6.0 CLOSED CALLS
+This Commercial Solutions Opening will have Closed Calls that consist of either a one-step or two-step process and will be specified in each individual Call. For a one-step Call, only proposals will be solicited. For a two-step Call, white papers will be solicited first and then subsequent Requests for Proposals may follow after the government first reviews your white paper.
+
+Any part of this process may be modified or altered by AFLCMC/XA in the Calls or through an amendment to this Commercial Solutions Opening (e.g. A Pitch Day might be utilized). It is important to note that at no stage is AFLCMC/XA obligated to make any awards and all awards are subject to the availability of funds and successful negotiations. The Government is not responsible for any monies expended by the proposer prior to the issuance of any contract/agreement award.
+
+6.1 One-Step Closed Call Process
+
+6.1.1 Call Published
+AFLCMC/XA would publish a Call via an amendment to this Commercial Solutions Opening. The Call would specifically state the Commercial Solutions Opening Call type is a one-step, Closed Call. This Call would provide a required date and time for proposal submission. The Call would also detail the specific AoIs being solicited for, required proposal content, evaluation criteria and detail other requirements unique to that particular Call.
+
+6.1.2 Proposals Received
+Proposals that are received on time will then be evaluated according to the evaluation criteria stated in the Call. After this technical review is complete, AFLCMC/XA will notify each prospective Contractor that has been selected to proceed to the Contract Negotiations and Fact Finding stage.
+
+6.1.3 Contract Negotiations and Fact-Finding
+If a company is notified that it has been selected to proceed to the next stage, then contract negotiations and fact-finding will occur. This includes contract formation, scope, cost/price and any other terms and conditions the Contracting/Agreements Officer wishes to discuss.
+
+6.1.4 Award Decision
+After Contract Negotiations and Fact-Finding is complete, AFLCMC/XA will render a decision whether or not to enter into a Contract/Agreement with the prospective Contractor.
+
+6.2 Two-Step Closed Call Process
+
+6.2.1 Call Published
+AFLCMC/XA would publish a Call via an amendment to this Commercial Solutions Opening. The Call would specifically state that the Commercial Solutions Opening Call type is a two-step, Closed Call. This Call would provide a specific date and time when prospective contractors may submit their white-papers. The Call would also detail the specific AoIs being solicited for, required white paper content, evaluation criteria and detail any other requirements unique to that particular Call.
+
+6.2.2 White Papers Received
+White papers that are received on time will then be evaluated according to the evaluation criteria stated in the Call.
+
+6.2.3 Requests for Proposals (RFPs) Sent
+Companies who submit white papers that are reviewed favorably by AFLCMC/XA will be sent a Request for Proposal (RFP) to notify them that they have been selected to proceed to the next step of the process and submit a proposal. Additional details will also be provided in the RFP.
+
+6.2.4 Incorporate Sections 6.1.2 - 6.1.4
+After the submission of the white papers and the RFPs are sent to the Contractors whose white papers are evaluated favorably, the rest of the process is the same as the one-step, closed Call. Therefore, Sections 6.1.2, 6.1.3 and 6.1.4 are incorporated into this Section by reference.
+
+7.0 OPEN PERIOD CALLS
+This Commercial Solutions Opening will have Open Period Calls that consist only of a two-step process. For this Call type, the process would almost exactly mirror Section 6.2; however, with the important distinction that white papers will be accepted at any time during the stated time period on the Call. This is in contrast to a Closed Call where all proposals are required to be submitted at a specific date and time together and follow a standard timeline for all participants. For Open Period Calls, the timelines are usually less structured and broader in nature. Typical turn-around times that Contractors can expect are usually stated in the Call. AFLCMC/XA reserves the right to modify or alter any of these instructions in each Call.
+
+8.0 EVALUATION CRITERIA
+The evaluation criteria for White Papers and Proposals will be further detailed and/or expanded upon in the Calls. Solutions will be evaluated on the basis of the merit of the proposed concept in addressing the AoI, not against other solution briefs submitted in response to the same AoI.
+
+Disclaimer: No proposals or white papers are being requested at this time. Those will be requested via Calls published under this Commercial Solutions Opening.
+
+9.0 GENERAL PROPOSAL INFORMATION
+
+9.1 Proposal Content
+Below is the typical structure and required volumes for proposal submission. AFLCMC/XA reserves the right to alter or change the structure and content it requires for each proposal submission on a per Call basis.
+
+    Title Page (does not count against page limit) Company Name, CAGE Number (if applicable), Title, Offeror, Date, E-Mail Address, Phone, Fax, Organization/Office symbol, and Address.  Identify if you or a proposed sub-contractor are a small business such as 8(a), small disadvantaged business, woman-owned business, HUBZone small business, Veteran-owned business, service disabled veteran owned business, historically black college or university and minority institution. Identification of potential sponsor(s) organizations.
+    Volume 1 - Technical Volume: This will typically contain a page limit and detail specific sections that the government requires all prospective contractors to address.
+    Volume 2 - Cost Volume: This Section is where your company shall detail the proposed cost by breaking down the overall proposed price into specific cost categories (Ex: Direct Labor, Overhead, Direct Material, and Profit).
+
+9.2 Proprietary Information
+Information constituting a trade secret, commercial or financial information, confidential personal information, or data affecting national security must be clearly marked. It shall be treated in confidence to the extent permitted by law. This restriction does not limit the Government's right to use information contained if it is obtained from another source without restriction. AFLCMC/XA assumes no liability for disclosure or use of unmarked data and may use or disclose such data for any purpose. If a proposer is awarded a contract as a result of or in connection with the submission of proprietary data in the proposal, the Government shall have the right to duplicate, use, or disclose the data to the extent provided in the resulting contract/agreement.
+
+Proposals containing data that is not to be disclosed to the public for any purpose or used by the Government except for evaluation purposes shall include the following sentences in accordance with FAR 52.215-1(e)(1) and (2) on the cover page:
+
+“This proposal includes data that shall not be disclosed outside the Government and shall not be duplicated, used, or disclosed -- in whole or in part -- for any purpose other than to evaluate this proposal. If, however, a contract is awarded to this offeror as a result of -- or in connection with -- the submission of this data, the Government shall have the right to duplicate, use, or disclose the data to the extent provided in the resulting contract. This restriction does not limit the Government's right to use information contained in this data if it is obtained from another source without restriction. The data subject to this restriction are contained in sheets [insert numbers or other identification of sheets]”
+
+Each restricted data sheet should be marked as follows:
+
+“Use or disclosure of data contained on this sheet is subject to the restriction on the title page of this proposal.”
+
+9.3 Classified Proposals
+Classified whitepapers/proposals will not be accepted under this Commercial Solutions Opening unless otherwise stated in the Call. If topics require classified work, the proposing firm must have a facility clearance in order to perform the work.
+
+9.4 Security
+Security Classification will be determined for each Call/Award. If classified data will be accessed or generated, a facility and storage clearance, at the required classification level, will be required and the proposal will discuss appropriate personnel and facility clearances.
+
+If a submitter has any reason to believe their concept may reference ideas or operations that require special protection, the submitter should immediately contact the Contracting/Agreements Officer for further instruction.
+
+Additionally, if a DD254 is applicable for a Call/Award, offerors must verify their Cognizant Security Office information is current with Defense Security Service (DSS).
+
+9.5 Promotional Material
+Promotional and non-project related discussion is discouraged, and additional information provided via Universal Resource Locator (URL) links or on computer disks, CDs, DVDs, video tapes or any other medium will not be accepted or considered in the proposal evaluation unless otherwise directed by the Call or Contracting/Agreements Officer. This also means that unnecessarily elaborate brochures or proposals are not desired.
+
+9.6 Small Business
+FAR-based contracts awarded pursuant to this Commercial Solutions Opening shall include FAR 52.219-8, Utilization of Small Business Concerns (Oct. 2018). FAR-based contracts awarded pursuant to this Commercial Solutions Opening which meet FAR Subpart 19.7 criteria for small business subcontracting plans shall include FAR 52.219-9, Small Business Subcontracting Plan (March 2020).
+
+Offerors shall address plans to comply with these requirements as part of their Proposals if seeking FAR Part 12 contracts, or if seeking OTs which provide for follow-on non-competitive production contracts. Offerors not seeking either instrument in the preceding sentence shall clearly state so as part of their Proposal and shall address these requirements as part of competition for follow-on production contracts. If the event that any follow-on production contracts are required to have small business subcontracting plans and are negotiated using FAR Part 15, DFARS 215.304(c) Small Business Participation Plans shall be required.
+
+9.7 Export-Controlled Items
+Depending on the proposal, it may be subject to Export Control (International Traffic in Arms (ITAR) 22 CFR 120-131, or Export Administration Regulations (EAR) 15 CFR 710-774). If the effort is subject to export controls, then a Certified DD Form 2345, Militarily Critical Technical Data Agreement, will be required to be submitted with proposals. DFARS 252.225-7048, "Export-Controlled Item (JUN 2013)" clause shall be contained in all resulting contracts.
+
+9.8 Data Rights
+All proposal submissions shall include Data Rights Assertions, if applicable. This will be a required component of each proposal submission.
+
+AFLCMC/XA reserves the right to negotiate data rights as part of the Contracting process. Additionally, each Call may have specific data rights considerations associated with it. Should this be the case, the specific rights AFLCMC/XA is requesting will be detailed in each Call. AFLCMC/XA also reserves the right to tailor the data management approach for each individual effort based on the needs for each situation.
+
+9.8.1 FAR Part 12 Considerations
+In accordance with DFARS 227.7102-1, AFLCMC/XA only seeks to acquire the technical data that is customarily required on a commercial basis. As a result, DFARS Clauses 252.227-7015 and 252.227-7037 will be included on each FAR Part 12 Contract awarded as a result of this Commercial Solutions Opening. If additional data rights are considered warranted, AFLCMC/XA reserves the right to negotiate these with prospective Contractors as part of the Contracting process.
+
+If the Government pays for any portion of development costs, DFARS 252.227-7013 will be included to govern the associated technical data for the portion of Commercial items that was developed at Government expense. For the portion of Commercial items that was developed exclusively at private expense, DFARS 252.227-7015 will still govern the technical data associated with those.
+
+Companies whose effort originated under the SBIR program will maintain standard SBIR Data Rights IAW DFARS 252-227-7018 (Class Deviation 2020-O0007).
+
+Additional Clauses may be applicable depending on the technology and requirements associated with it.
+
+10.0 OTHER INFORMATION
+
+10.1 Unique Item Identification (IUID)
+For hardware deliverables, Item Unique Identification IAW DFARS 252.211-7003 may be required. See https://www.acq.osd.mil/dpap/dars/dfars/html/current/252211.htm#252.211-7003.
+
+10.2 Foreign-Owned Businesses
+Foreign-Owned businesses may independently submit a solution or do so as part of a teaming arrangement with one or more United States-Owned businesses. However, the ability to obtain a contract/agreement based upon a submission may depend upon the ability of the Foreign-Owned businesses to obtain necessary clearances and approvals to obtain prescribed information.
+
+10.3 Within Scope Modifications
+Potential offerors are advised that awards resulting from the Calls under this Commercial Solutions Opening may be modified during the performance to make within scope changes. Only a Contracting/Agreements Officer can legally bind a contract/agreement modification on behalf of the United Stated Government.
+
+10.4 Non-Government Advisors and Source Selection Sensitive Information
+Non-government advisors may participate in the evaluation of all submissions and shall have signed a non-disclosure agreement (NDA) with the Government. Non-government advisors may also serve in administrative & assistance support capacities. The Government understands that information provided in response to this Commercial Solutions Opening is presented in confidence and may contain trade secrets or commercial or financial information, and it agrees to protect such information from unauthorized disclosure to the maximum extent permitted or required by Law.
+
+AFLCMC/XA will treat all submissions to Calls published against this Commercial Solutions Opening as source selection information. During the evaluation process, submissions may be handled by Non-Government advisors for administrative purposes and/or technical evaluation(s). All Government support contractors are bound by appropriate NDAs. Submissions will not be returned unless otherwise stated in the Call.
+
+10.5 Multiple White Paper/Proposal Submissions
+Companies may submit multiple submissions in response to any single AoI detailed in each Call if each submission represents a separate and distinct concept. However, for each individual submission, prospective Contractors may only address one concept per submission unless otherwise detailed in the individual Calls.
+
+10.6 Fraud and False Statements
+Knowingly and willfully making any false, fictitious, or fraudulent statements or representations may be a felony under the Federal Criminal False Statement Act (18 U.S.C. Sec 1001), punishable by a fine of up to $10,000, up to five years in prison, or both.
+
+10.7 DUNS and SAM Registration
+Offerors must have a Dun and Bradstreet (DUNS) number and must register in the System for Award Management (SAM) prior to receiving an award or agreement. Offerors must be determined to be responsible by the Contracting/Agreements Officer and must not be suspended or debarred from award by the Federal Government nor be prohibited by Presidential Executive Order and/or law from receiving an award.
+
+10.8 WAWF Registration
+Offerors must be registered in the prescribed government invoicing system (Wide Area Work
+
+Flow: https://wawf.eb.mil/xhtml/unauth/registration/notice.xhtml).
+
+10.9 Supplier Performance Risk System (SPRS)
+In order to receive a DoD contract every contractor will be required to perform a Basic NIST SP 800-171 DoD Assessment.  That process is described here https://www.acq.osd.mil/dpap/pdi/cyber/docs/NIST%20SP%20800-171%20Assessment%20Methodology%20Version%201.2.1%20%206.24.2020.pdf
+
+Once the Basic NIST SP 800-171 DoD Assessment is complete, each contractor will need to follow the instructions here https://www.sprs.csd.disa.mil/ to enter the results into SPRS on the PIEE website.
+
+10.10 Cost Sharing or Matching
+Cost sharing or matching will be considered based on the solutions proposed and details associated with each call. AFLCMC/XA has the final decision authority on whether to enter into a cost sharing or matching agreement.
+
