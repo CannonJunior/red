@@ -12,6 +12,7 @@ import json
 import logging
 import subprocess
 import time
+import re
 from pathlib import Path
 from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
@@ -19,6 +20,14 @@ import requests
 
 # Import path utilities
 from project_paths import get_project_root, resolve_path
+
+# Import web tools for agent function calling
+try:
+    from agent_system.web_tools import web_search, web_fetch, search_faculty_hires
+    WEB_TOOLS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Web tools not available: {e}")
+    WEB_TOOLS_AVAILABLE = False
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -78,6 +87,9 @@ class OllamaAgentRuntime:
         # Ensure directories exist
         self.skills_dir.mkdir(parents=True, exist_ok=True)
         self.agents_config_file.parent.mkdir(parents=True, exist_ok=True)
+
+        # Initialize tool registry for agent function calling
+        self._init_tool_registry()
 
         # Load available skills from both sources
         self._load_skills()
@@ -499,6 +511,138 @@ class OllamaAgentRuntime:
             'max_tokens': config.max_tokens
         }
 
+    def _init_tool_registry(self):
+        """Initialize the registry of callable tools for agents."""
+        self.tools = {}
+
+        if WEB_TOOLS_AVAILABLE:
+            self.tools['web_search'] = {
+                'function': web_search,
+                'description': 'Search the web using DuckDuckGo. Returns list of search results.',
+                'parameters': {
+                    'query': 'Search query string',
+                    'max_results': 'Maximum number of results (default: 10)',
+                    'site': 'Optional site filter (e.g., ".edu" for academic sites)'
+                }
+            }
+
+            self.tools['web_fetch'] = {
+                'function': web_fetch,
+                'description': 'Fetch and parse content from a URL. Returns extracted text.',
+                'parameters': {
+                    'url': 'URL to fetch',
+                    'extract_text': 'Whether to extract clean text (default: true)',
+                    'max_length': 'Maximum text length (default: 10000)'
+                }
+            }
+
+            self.tools['search_faculty_hires'] = {
+                'function': search_faculty_hires,
+                'description': 'Search for recent faculty hires in academic departments. Returns hire records.',
+                'parameters': {
+                    'department': 'Academic department name (e.g., "political science")',
+                    'university': 'Optional university name',
+                    'max_results': 'Maximum results (default: 5)'
+                }
+            }
+
+            logger.info(f"✅ Loaded {len(self.tools)} web tools for agents")
+        else:
+            logger.warning("Web tools not available - agents cannot perform web searches")
+
+    def _get_tool_documentation(self) -> str:
+        """Generate tool documentation for agent system prompts."""
+        if not self.tools:
+            return ""
+
+        doc = "\n\n## Available Tools\n\n"
+        doc += "You can use the following tools to gather information:\n\n"
+
+        for tool_name, tool_info in self.tools.items():
+            doc += f"### {tool_name}\n"
+            doc += f"{tool_info['description']}\n\n"
+            doc += "**Parameters:**\n"
+            for param, desc in tool_info['parameters'].items():
+                doc += f"- `{param}`: {desc}\n"
+            doc += "\n**Usage:**\n"
+            doc += f"```\n[TOOL_CALL:{tool_name}]\n"
+            doc += json.dumps({"param1": "value1", "param2": "value2"}, indent=2)
+            doc += "\n[/TOOL_CALL]\n```\n\n"
+
+        doc += "**Important:** When you need to use a tool, output the [TOOL_CALL:tool_name] block with JSON parameters, then wait for the results before continuing your response.\n\n"
+
+        return doc
+
+    def _parse_tool_calls(self, response: str) -> List[Dict[str, Any]]:
+        """
+        Parse tool calls from agent response.
+
+        Args:
+            response: Agent's response text
+
+        Returns:
+            List of tool call dictionaries with tool_name and parameters
+        """
+        tool_calls = []
+
+        # Pattern: [TOOL_CALL:tool_name]...json...[/TOOL_CALL]
+        pattern = r'\[TOOL_CALL:(\w+)\](.*?)\[/TOOL_CALL\]'
+        matches = re.finditer(pattern, response, re.DOTALL)
+
+        for match in matches:
+            tool_name = match.group(1)
+            json_str = match.group(2).strip()
+
+            try:
+                parameters = json.loads(json_str)
+                tool_calls.append({
+                    'tool_name': tool_name,
+                    'parameters': parameters
+                })
+                logger.info(f"Parsed tool call: {tool_name} with params: {list(parameters.keys())}")
+            except json.JSONDecodeError as e:
+                logger.error(f"Failed to parse tool call JSON for {tool_name}: {e}")
+
+        return tool_calls
+
+    def _execute_tool(self, tool_name: str, parameters: Dict[str, Any]) -> Dict[str, Any]:
+        """
+        Execute a tool with given parameters.
+
+        Args:
+            tool_name: Name of the tool to execute
+            parameters: Parameters for the tool
+
+        Returns:
+            Tool execution result
+        """
+        if tool_name not in self.tools:
+            return {
+                'status': 'error',
+                'error': f"Tool '{tool_name}' not found"
+            }
+
+        tool_info = self.tools[tool_name]
+        tool_function = tool_info['function']
+
+        try:
+            logger.info(f"Executing tool: {tool_name}")
+            result = tool_function(**parameters)
+
+            return {
+                'status': 'success',
+                'tool_name': tool_name,
+                'result': result
+            }
+
+        except Exception as e:
+            logger.error(f"Tool execution failed for {tool_name}: {e}")
+            return {
+                'status': 'error',
+                'tool_name': tool_name,
+                'error': str(e)
+            }
+
     def _build_system_prompt(self, config: OllamaAgentConfig) -> str:
         """
         Build system prompt including skills instructions.
@@ -513,6 +657,11 @@ class OllamaAgentRuntime:
 
 You are a helpful AI assistant running locally via Ollama with zero external API costs.
 """
+
+        # Add tool documentation
+        tool_docs = self._get_tool_documentation()
+        if tool_docs:
+            base_prompt += tool_docs
 
         if config.skills:
             base_prompt += "\n\nYou have access to the following skills:\n\n"
@@ -535,7 +684,7 @@ You are a helpful AI assistant running locally via Ollama with zero external API
 
     def invoke_agent(self, agent_id: str, user_message: str, **kwargs) -> Dict[str, Any]:
         """
-        Invoke an agent to process a user message.
+        Invoke an agent to process a user message with tool calling support.
 
         Args:
             agent_id: ID of the agent to invoke
@@ -549,52 +698,113 @@ You are a helpful AI assistant running locally via Ollama with zero external API
             raise ValueError(f"Agent '{agent_id}' not found")
 
         config = self.active_agents[agent_id]
+        start_time = time.time()
 
-        # Prepare request to Ollama
-        ollama_request = {
-            'model': config.model,
-            'prompt': user_message,
-            'system': config.system_prompt,
-            'options': {
-                'temperature': kwargs.get('temperature', config.temperature),
-                'num_predict': kwargs.get('max_tokens', config.max_tokens)
-            },
-            'stream': False
-        }
+        # Tool calling loop
+        max_iterations = 5
+        current_prompt = user_message
+        tool_results_history = []
+        agent_responses = []
 
-        try:
-            start_time = time.time()
-
-            response = requests.post(
-                f"{self.ollama_url}/api/generate",
-                json=ollama_request,
-                timeout=60
-            )
-
-            response.raise_for_status()
-            result = response.json()
-
-            elapsed_time = time.time() - start_time
-
-            return {
-                'status': 'success',
-                'agent_id': agent_id,
-                'response': result.get('response', ''),
+        for iteration in range(max_iterations):
+            # Prepare request to Ollama
+            ollama_request = {
                 'model': config.model,
-                'elapsed_time_ms': int(elapsed_time * 1000),
-                'cost': 0.00,  # Zero cost - local Ollama
-                'total_duration': result.get('total_duration', 0),
-                'eval_count': result.get('eval_count', 0)
+                'prompt': current_prompt,
+                'system': config.system_prompt,
+                'options': {
+                    'temperature': kwargs.get('temperature', config.temperature),
+                    'num_predict': kwargs.get('max_tokens', config.max_tokens)
+                },
+                'stream': False
             }
 
-        except requests.exceptions.RequestException as e:
-            logger.error(f"Ollama request failed: {e}")
-            return {
-                'status': 'error',
-                'agent_id': agent_id,
-                'error': str(e),
-                'cost': 0.00
-            }
+            try:
+                response = requests.post(
+                    f"{self.ollama_url}/api/generate",
+                    json=ollama_request,
+                    timeout=120  # Increased timeout for tool calls
+                )
+
+                response.raise_for_status()
+                result = response.json()
+                agent_response = result.get('response', '')
+                agent_responses.append(agent_response)
+
+                # Check for tool calls
+                tool_calls = self._parse_tool_calls(agent_response)
+
+                if not tool_calls:
+                    # No more tool calls - this is the final response
+                    elapsed_time = time.time() - start_time
+
+                    return {
+                        'status': 'success',
+                        'agent_id': agent_id,
+                        'response': agent_response,
+                        'model': config.model,
+                        'elapsed_time_ms': int(elapsed_time * 1000),
+                        'cost': 0.00,  # Zero cost - local Ollama
+                        'tool_calls_made': len(tool_results_history),
+                        'iterations': iteration + 1,
+                        'total_duration': result.get('total_duration', 0),
+                        'eval_count': result.get('eval_count', 0)
+                    }
+
+                # Execute tool calls
+                tool_results = []
+                for tool_call in tool_calls:
+                    result = self._execute_tool(
+                        tool_call['tool_name'],
+                        tool_call['parameters']
+                    )
+                    tool_results.append(result)
+                    tool_results_history.append(result)
+
+                # Build prompt for next iteration with tool results
+                results_text = "\n\n[TOOL_RESULTS]\n"
+                for i, tr in enumerate(tool_results, 1):
+                    results_text += f"\nResult {i} ({tr.get('tool_name', 'unknown')}):\n"
+                    if tr['status'] == 'success':
+                        # Format result nicely
+                        result_data = tr['result']
+                        if isinstance(result_data, list):
+                            results_text += f"Found {len(result_data)} items:\n"
+                            results_text += json.dumps(result_data[:10], indent=2)  # Limit to first 10
+                            if len(result_data) > 10:
+                                results_text += f"\n... and {len(result_data) - 10} more"
+                        else:
+                            results_text += json.dumps(result_data, indent=2)
+                    else:
+                        results_text += f"Error: {tr.get('error', 'Unknown error')}\n"
+
+                results_text += "\n[/TOOL_RESULTS]\n\n"
+                results_text += "Based on these tool results, please provide your final response to the user's question."
+
+                current_prompt = results_text
+
+            except requests.exceptions.RequestException as e:
+                logger.error(f"Ollama request failed: {e}")
+                return {
+                    'status': 'error',
+                    'agent_id': agent_id,
+                    'error': str(e),
+                    'cost': 0.00
+                }
+
+        # Max iterations reached
+        elapsed_time = time.time() - start_time
+        return {
+            'status': 'success',
+            'agent_id': agent_id,
+            'response': agent_responses[-1] if agent_responses else "Max iterations reached",
+            'model': config.model,
+            'elapsed_time_ms': int(elapsed_time * 1000),
+            'cost': 0.00,
+            'tool_calls_made': len(tool_results_history),
+            'iterations': max_iterations,
+            'warning': 'Max iterations reached'
+        }
 
     def delete_agent(self, agent_id: str) -> bool:
         """

@@ -31,15 +31,13 @@
   },
   "vector_data_analyst": {
     "agent_id": "vector_data_analyst",
-    "name": "Career Intelligence Agent",
+    "name": "Career-Agent",
     "description": "Specialized career analysis and opportunity matching agent",
     "model": "qwen2.5:3b",
-    "capabilities": [
-      "vector_analysis",
-      "data_clustering",
-      "similarity_search"
+    "capabilities": [],
+    "skills": [
+      "career-researcher"
     ],
-    "skills": [],
     "temperature": 0.3,
     "max_tokens": 2048,
     "status": "active"

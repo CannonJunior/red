@@ -25,6 +25,14 @@ try:
 except ImportError:
     CAG_AVAILABLE = False
 
+# Import Ollama Agent Runtime if available
+try:
+    from agent_system.ollama_agent_runtime import get_runtime
+    AGENTS_AVAILABLE = True
+except ImportError:
+    AGENTS_AVAILABLE = False
+    debug_log("Ollama Agent Runtime not available", "⚠️")
+
 
 def handle_chat_api(handler):
     """
@@ -46,6 +54,7 @@ def handle_chat_api(handler):
         workspace = request_data.get('workspace', 'default')  # Extract workspace
         knowledge_mode = request_data.get('knowledge_mode', 'none')  # Extract knowledge mode
         mcp_tool_call = request_data.get('mcp_tool_call')  # Check for MCP tool call
+        agent_id = request_data.get('agent')  # Check for agent invocation
 
         if not message:
             handler.send_json_response({'error': 'Message is required'}, 400)
@@ -55,6 +64,12 @@ def handle_chat_api(handler):
         if mcp_tool_call:
             debug_log(f"MCP Tool call: {mcp_tool_call.get('tool_name', 'unknown')}", "🔧")
             handle_mcp_tool_call(handler, mcp_tool_call, model)
+            return
+
+        # Handle agent invocation
+        if agent_id and AGENTS_AVAILABLE:
+            debug_log(f"Agent invocation: {agent_id} - {message[:50]}...", "🤖")
+            handle_agent_invocation(handler, agent_id, message, model)
             return
 
         debug_log(f"Chat request: {message[:50]}... (model: {model}, knowledge_mode: {knowledge_mode})", "💬")
@@ -159,6 +174,72 @@ def handle_chat_api(handler):
     except Exception as e:
         print(f"❌ Chat API error: {e}")
         handler.send_json_response({'error': f'Chat API error: {str(e)}'}, 500)
+
+
+def handle_agent_invocation(handler, agent_id, message, model):
+    """
+    Handle agent invocation requests with tool calling support.
+
+    Args:
+        handler: The HTTP request handler instance
+        agent_id: ID of the agent to invoke
+        message: User's message
+        model: Model to use (may be overridden by agent config)
+    """
+    try:
+        runtime = get_runtime()
+
+        debug_log(f"Invoking agent: {agent_id}", "🤖")
+
+        # Invoke the agent (supports tool calling)
+        result = runtime.invoke_agent(agent_id, message)
+
+        if result['status'] == 'success':
+            response_text = result.get('response', 'No response generated')
+
+            # Send successful response
+            handler.send_json_response({
+                'response': response_text,
+                'model': result.get('model', model),
+                'agent_id': agent_id,
+                'agent_enabled': True,
+                'tool_calls_made': result.get('tool_calls_made', 0),
+                'iterations': result.get('iterations', 1),
+                'elapsed_time_ms': result.get('elapsed_time_ms', 0),
+                'tokens_used': result.get('eval_count', 0),
+                'prompt_tokens': 0,
+                'completion_tokens': result.get('eval_count', 0),
+                'timestamp': '',
+                'connection_attempt': 1
+            })
+
+            debug_log(f"Agent response completed - {result.get('tool_calls_made', 0)} tool calls", "✅")
+
+        else:
+            # Agent invocation failed
+            error_msg = result.get('error', 'Unknown agent error')
+            debug_log(f"Agent invocation failed: {error_msg}", "❌")
+
+            handler.send_json_response({
+                'error': f'Agent invocation failed: {error_msg}',
+                'agent_id': agent_id
+            }, 500)
+
+    except ValueError as e:
+        # Agent not found
+        debug_log(f"Agent not found: {agent_id}", "❌")
+        handler.send_json_response({
+            'error': f'Agent not found: {agent_id}',
+            'available_agents_hint': 'Use /api/ollama/agents to list available agents'
+        }, 404)
+
+    except Exception as e:
+        print(f"❌ Agent invocation error: {e}")
+        import traceback
+        traceback.print_exc()
+        handler.send_json_response({
+            'error': f'Agent invocation error: {str(e)}'
+        }, 500)
 
 
 def handle_mcp_tool_call(handler, mcp_tool_call, model):

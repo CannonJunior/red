@@ -391,17 +391,21 @@ class ChatInterface {
                         if (agent) {
                             debugLog('Found agent:', agent);
 
-                            // Invoke the specific agent
-                            const invokeResponse = await fetch(`/api/ollama/agents/${agent.agent_id}/invoke`, {
+                            // Invoke the specific agent via chat API (with tool calling support)
+                            const invokeResponse = await fetch('/api/chat', {
                                 method: 'POST',
                                 headers: { 'Content-Type': 'application/json' },
-                                body: JSON.stringify({ message: agentMessage })
+                                body: JSON.stringify({
+                                    message: agentMessage,
+                                    agent: agent.agent_id,
+                                    model: agent.model || 'qwen2.5:3b'
+                                })
                             });
 
                             const invokeData = await invokeResponse.json();
                             this.removeTypingIndicator(typingId);
 
-                            if (invokeResponse.ok && invokeData.status === 'success') {
+                            if (invokeResponse.ok && !invokeData.error) {
                                 // Calculate elapsed time
                                 const endTime = Date.now();
                                 const elapsedMs = endTime - startTime;
@@ -413,10 +417,16 @@ class ChatInterface {
                                     `${remainingSeconds}s`;
 
                                 // Display agent response with metadata
+                                const toolCallsInfo = invokeData.tool_calls_made > 0 ?
+                                    ` (${invokeData.tool_calls_made} tool calls)` : '';
+
                                 const metadata = {
                                     model: invokeData.model,
-                                    knowledgeBase: `Agent: ${agentName}`,
+                                    knowledgeBase: `Agent: ${agentName}${toolCallsInfo}`,
                                     ragEnabled: false,
+                                    agentEnabled: true,
+                                    toolCallsMade: invokeData.tool_calls_made || 0,
+                                    iterations: invokeData.iterations || 1,
                                     sourcesUsed: 0,
                                     startTime: startTimeFormatted,
                                     endTime: new Date(endTime).toLocaleTimeString(),
