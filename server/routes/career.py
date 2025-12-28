@@ -270,6 +270,9 @@ def handle_career_analyze_api(handler):
 def handle_career_assessment_get_api(handler, assessment_id):
     """
     Handle GET /api/career/assessments/{id} - Get assessment by ID.
+
+    Query params:
+        full: If 'true', includes full candidate and position data (optional)
     """
     try:
         from career_monster import CareerDatabase
@@ -284,10 +287,41 @@ def handle_career_assessment_get_api(handler, assessment_id):
             }, 404)
             return
 
-        handler.send_json_response({
+        # Check if full data requested
+        query_params = handler.get_query_params()
+        include_full = query_params.get('full', '').lower() == 'true'
+
+        response_data = {
             'status': 'success',
             'assessment': assessment.model_dump()
-        })
+        }
+
+        if include_full:
+            # Fetch candidate and position data
+            # First, get IDs from database
+            import sqlite3
+            with sqlite3.connect(db.db_path) as conn:
+                cursor = conn.cursor()
+                cursor.execute("""
+                    SELECT candidate_id, position_id
+                    FROM career_assessments
+                    WHERE id = ?
+                """, (assessment_id,))
+                row = cursor.fetchone()
+
+                if row:
+                    candidate_id, position_id = row
+
+                    # Get candidate and position
+                    candidate = db.get_candidate(candidate_id)
+                    position = db.get_position(position_id)
+
+                    if candidate:
+                        response_data['candidate'] = candidate.model_dump()
+                    if position:
+                        response_data['position'] = position.model_dump()
+
+        handler.send_json_response(response_data)
 
     except Exception as e:
         logger.error(f"Error retrieving assessment: {e}")
@@ -314,6 +348,68 @@ def handle_career_stats_api(handler):
 
     except Exception as e:
         logger.error(f"Error retrieving stats: {e}")
+        handler.send_json_response({
+            'status': 'error',
+            'message': str(e)
+        }, 500)
+
+def handle_career_list_get_api(handler):
+    """
+    Handle GET /api/career/list - Get career analysis list.
+    """
+    try:
+        from server.routes.career_list import get_career_list
+        result = get_career_list()
+        handler.send_json_response(result)
+
+    except Exception as e:
+        logger.error(f"Error getting career list: {e}")
+        handler.send_json_response({
+            'status': 'error',
+            'message': str(e)
+        }, 500)
+
+
+def handle_career_list_add_api(handler):
+    """
+    Handle POST /api/career/list - Add assessment to list.
+    """
+    try:
+        from server.routes.career_list import add_to_career_list
+        content_length = int(handler.headers.get('Content-Length', 0))
+        body = handler.rfile.read(content_length)
+        data = json.loads(body)
+
+        assessment_id = data.get('assessment_id')
+        if not assessment_id:
+            handler.send_json_response({
+                'status': 'error',
+                'message': 'assessment_id required'
+            }, 400)
+            return
+
+        result = add_to_career_list(assessment_id)
+        handler.send_json_response(result)
+
+    except Exception as e:
+        logger.error(f"Error adding to career list: {e}")
+        handler.send_json_response({
+            'status': 'error',
+            'message': str(e)
+        }, 500)
+
+
+def handle_career_list_remove_api(handler, list_id):
+    """
+    Handle DELETE /api/career/list/{list_id} - Remove from list.
+    """
+    try:
+        from server.routes.career_list import remove_from_career_list
+        result = remove_from_career_list(list_id)
+        handler.send_json_response(result)
+
+    except Exception as e:
+        logger.error(f"Error removing from career list: {e}")
         handler.send_json_response({
             'status': 'error',
             'message': str(e)

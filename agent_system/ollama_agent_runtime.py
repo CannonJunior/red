@@ -47,6 +47,7 @@ class OllamaAgentConfig:
     temperature: float = 0.7
     max_tokens: int = 2048
     system_prompt: Optional[str] = None
+    status: str = "active"  # "active" or "inactive"
 
 
 class OllamaAgentRuntime:
@@ -72,9 +73,11 @@ class OllamaAgentRuntime:
         self.skills_cache: Dict[str, AgentSkill] = {}
         self.skills_dir = get_project_root() / ".claude" / "skills"
         self.plugin_skills_dir = Path.home() / ".claude" / "plugins" / "cache" / "anthropic-agent-skills" / "document-skills"
+        self.agents_config_file = get_project_root() / "agent_system" / "agents_config.json"
 
-        # Ensure skills directory exists
+        # Ensure directories exist
         self.skills_dir.mkdir(parents=True, exist_ok=True)
+        self.agents_config_file.parent.mkdir(parents=True, exist_ok=True)
 
         # Load available skills from both sources
         self._load_skills()
@@ -86,6 +89,13 @@ class OllamaAgentRuntime:
         logger.info(f"✅ Ollama Agent Runtime initialized (URL: {ollama_url})")
         logger.info(f"✅ Loaded {local_count} local skills from {self.skills_dir}")
         logger.info(f"✅ Loaded {plugin_count} plugin skills from Anthropic plugins")
+
+        # Load agents from persistent storage
+        self._load_agents_from_file()
+
+        # Create default agents if none exist
+        if len(self.active_agents) == 0:
+            self._create_default_agents()
 
     def _load_skills(self):
         """Load all available skills from .claude/skills directory."""
@@ -213,6 +223,113 @@ class OllamaAgentRuntime:
         """
         return self.skills_cache.get(skill_name)
 
+    def _create_default_agents(self):
+        """Create default agents for the system."""
+        default_agents = [
+            OllamaAgentConfig(
+                agent_id="rag_research_agent",
+                name="RAG Research Agent",
+                description="Specialized in document analysis and research using local RAG",
+                model="qwen2.5:3b",
+                capabilities=["vector_search", "document_analysis", "llm_inference"],
+                skills=[],
+                temperature=0.7,
+                max_tokens=2048
+            ),
+            OllamaAgentConfig(
+                agent_id="code_review_agent",
+                name="Code Review Agent",
+                description="Security and performance code analysis using local LLMs",
+                model="qwen2.5:3b",
+                capabilities=["code_analysis", "security_review", "static_analysis"],
+                skills=[],
+                temperature=0.5,
+                max_tokens=2048
+            ),
+            OllamaAgentConfig(
+                agent_id="vector_data_analyst",
+                name="Vector Data Analyst",
+                description="Mojo SIMD-optimized vector analysis and data clustering",
+                model="qwen2.5:3b",
+                capabilities=["vector_analysis", "data_clustering", "similarity_search"],
+                skills=[],
+                temperature=0.3,
+                max_tokens=2048
+            )
+        ]
+
+        for config in default_agents:
+            # Only create if doesn't already exist
+            if config.agent_id not in self.active_agents:
+                self.active_agents[config.agent_id] = config
+                logger.info(f"  ✅ Created default agent: {config.name} ({config.agent_id})")
+
+        # Save default agents to file
+        if len(self.active_agents) > 0:
+            self._save_agents()
+
+    def _load_agents_from_file(self):
+        """Load agents from persistent JSON file."""
+        if not self.agents_config_file.exists():
+            logger.info("No agents config file found, will create on first save")
+            return
+
+        try:
+            with open(self.agents_config_file, 'r') as f:
+                agents_data = json.load(f)
+
+            for agent_id, agent_dict in agents_data.items():
+                # Reconstruct OllamaAgentConfig from dict
+                config = OllamaAgentConfig(
+                    agent_id=agent_dict['agent_id'],
+                    name=agent_dict['name'],
+                    description=agent_dict['description'],
+                    model=agent_dict.get('model', 'qwen2.5:3b'),
+                    capabilities=agent_dict.get('capabilities', []),
+                    skills=agent_dict.get('skills', []),
+                    temperature=agent_dict.get('temperature', 0.7),
+                    max_tokens=agent_dict.get('max_tokens', 2048),
+                    status=agent_dict.get('status', 'active')
+                )
+
+                # Rebuild system prompt
+                config.system_prompt = self._build_system_prompt(config)
+
+                self.active_agents[agent_id] = config
+
+            logger.info(f"✅ Loaded {len(self.active_agents)} agents from {self.agents_config_file}")
+
+        except Exception as e:
+            logger.error(f"Failed to load agents from file: {e}")
+            logger.info("Will use default agents instead")
+
+    def _save_agents(self):
+        """Save agents to persistent JSON file."""
+        try:
+            # Convert agents to serializable dict
+            agents_data = {}
+            for agent_id, config in self.active_agents.items():
+                agents_data[agent_id] = {
+                    'agent_id': config.agent_id,
+                    'name': config.name,
+                    'description': config.description,
+                    'model': config.model,
+                    'capabilities': config.capabilities or [],
+                    'skills': config.skills or [],
+                    'temperature': config.temperature,
+                    'max_tokens': config.max_tokens,
+                    'status': config.status
+                }
+
+            # Write to file
+            with open(self.agents_config_file, 'w') as f:
+                json.dump(agents_data, f, indent=2)
+
+            logger.info(f"✅ Saved {len(self.active_agents)} agents to {self.agents_config_file}")
+
+        except Exception as e:
+            logger.error(f"Failed to save agents to file: {e}")
+
     def check_ollama_available(self) -> bool:
         """
         Check if Ollama server is available.
@@ -271,6 +388,9 @@ class OllamaAgentRuntime:
         # Register agent
         self.active_agents[config.agent_id] = config
 
+        # Save to persistent storage
+        self._save_agents()
+
         logger.info(f"✅ Created agent: {config.name} ({config.agent_id})")
         logger.info(f"  Model: {config.model}")
         logger.info(f"  Skills: {config.skills or []}")
@@ -281,7 +401,7 @@ class OllamaAgentRuntime:
             'description': config.description,
             'model': config.model,
             'skills': config.skills or [],
-            'status': 'active',
+            'status': config.status,
             'capabilities': config.capabilities or [],
             'created_at': time.time()
         }
@@ -325,6 +445,9 @@ class OllamaAgentRuntime:
         # Rebuild system prompt with new configuration
         config.system_prompt = self._build_system_prompt(config)
 
+        # Save to persistent storage
+        self._save_agents()
+
         logger.info(f"✅ Updated agent: {config.name} ({agent_id})")
         logger.info(f"  Model: {config.model}")
         logger.info(f"  Skills: {config.skills or []}")
@@ -335,8 +458,45 @@ class OllamaAgentRuntime:
             'description': config.description,
             'model': config.model,
             'skills': config.skills or [],
-            'status': 'active',
+            'status': config.status,
             'capabilities': config.capabilities or []
+        }
+
+    def update_agent_status(self, agent_id: str, new_status: str) -> Optional[Dict[str, Any]]:
+        """
+        Update an agent's active/inactive status.
+
+        Args:
+            agent_id: ID of the agent to update
+            new_status: New status - "active" or "inactive"
+
+        Returns:
+            Updated agent info dictionary or None if not found
+        """
+        if agent_id not in self.active_agents:
+            return None
+
+        if new_status not in ['active', 'inactive']:
+            raise ValueError(f"Invalid status: {new_status}. Must be 'active' or 'inactive'")
+
+        config = self.active_agents[agent_id]
+        config.status = new_status
+
+        # Save to persistent storage
+        self._save_agents()
+
+        logger.info(f"✅ Updated agent status: {config.name} ({agent_id}) -> {new_status}")
+
+        return {
+            'agent_id': agent_id,
+            'name': config.name,
+            'description': config.description,
+            'model': config.model,
+            'skills': config.skills or [],
+            'status': config.status,
+            'capabilities': config.capabilities or [],
+            'temperature': config.temperature,
+            'max_tokens': config.max_tokens
         }
 
     def _build_system_prompt(self, config: OllamaAgentConfig) -> str:
@@ -448,13 +608,17 @@ You are a helpful AI assistant running locally via Ollama with zero external API
         """
         if agent_id in self.active_agents:
             del self.active_agents[agent_id]
+
+            # Save to persistent storage
+            self._save_agents()
+
             logger.info(f"✅ Deleted agent: {agent_id}")
             return True
         return False
 
     def list_agents(self) -> List[Dict[str, Any]]:
         """
-        List all active agents.
+        List all agents (both active and inactive).
 
         Returns:
             List of agent info dictionaries
@@ -466,7 +630,7 @@ You are a helpful AI assistant running locally via Ollama with zero external API
                 'description': config.description,
                 'model': config.model,
                 'skills': config.skills or [],
-                'status': 'active',
+                'status': config.status,
                 'capabilities': config.capabilities or []
             }
             for agent_id, config in self.active_agents.items()
@@ -496,7 +660,7 @@ You are a helpful AI assistant running locally via Ollama with zero external API
             'system_prompt': config.system_prompt,
             'temperature': config.temperature,
             'max_tokens': config.max_tokens,
-            'status': 'active'
+            'status': config.status
         }
 
 

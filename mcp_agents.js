@@ -540,14 +540,24 @@ class MCPAgentManager {
         const statusColor = agent.status === 'active' ? 'green' : 'gray';
         const capabilities = agent.capabilities || ['general'];
 
+        const isActive = agent.status === 'active';
+
         div.innerHTML = `
             <div class="flex items-center justify-between">
                 <div class="flex-1">
                     <h4 class="font-medium text-gray-900 dark:text-white">${agent.name || agent.agent_id}</h4>
                     <p class="text-sm text-gray-600 dark:text-gray-400">${agent.description || 'Multi-purpose agent'}</p>
-                    <div class="flex items-center mt-2">
-                        <div class="w-2 h-2 bg-${statusColor}-500 rounded-full mr-2"></div>
-                        <span class="text-sm text-gray-600 dark:text-gray-400 capitalize">${agent.status || 'inactive'}</span>
+                    <div class="flex items-center mt-2 gap-3">
+                        <!-- Status Toggle -->
+                        <label class="flex items-center cursor-pointer">
+                            <span class="text-sm text-gray-600 dark:text-gray-400 mr-2">Status:</span>
+                            <div class="relative">
+                                <input type="checkbox" class="status-toggle sr-only" ${isActive ? 'checked' : ''} data-agent-id="${agent.agent_id}">
+                                <div class="toggle-bg w-10 h-6 bg-gray-300 dark:bg-gray-600 rounded-full shadow-inner"></div>
+                                <div class="toggle-dot absolute w-4 h-4 bg-white rounded-full shadow left-1 top-1 transition-transform ${isActive ? 'translate-x-4 bg-green-500' : ''}"></div>
+                            </div>
+                            <span class="status-label ml-2 text-sm font-medium ${isActive ? 'text-green-600 dark:text-green-400' : 'text-gray-600 dark:text-gray-400'}">${isActive ? 'Active' : 'Inactive'}</span>
+                        </label>
                     </div>
                     <div class="mt-2">
                         <div class="flex flex-wrap gap-1">
@@ -573,6 +583,7 @@ class MCPAgentManager {
         // Add event listeners
         const editBtn = div.querySelector('.edit-agent');
         const deleteBtn = div.querySelector('.delete-agent');
+        const statusToggle = div.querySelector('.status-toggle');
 
         editBtn.addEventListener('click', () => this.showEditAgentDialog(agent));
         deleteBtn.addEventListener('click', () => {
@@ -580,6 +591,14 @@ class MCPAgentManager {
                 this.deleteAgent(agent.agent_id);
             }
         });
+
+        // Status toggle handler
+        if (statusToggle) {
+            statusToggle.addEventListener('change', async (e) => {
+                const newStatus = e.target.checked ? 'active' : 'inactive';
+                await this.toggleAgentStatus(agent.agent_id, newStatus);
+            });
+        }
 
         return div;
     }
@@ -1935,6 +1954,38 @@ class MCPAgentManager {
             }
         } catch (error) {
             console.error(`❌ Failed to delete agent ${agentId}:`, error);
+        }
+    }
+
+    async toggleAgentStatus(agentId, newStatus) {
+        try {
+            // Update agent status via API
+            const response = await this.apiCall(`/api/ollama/agents/${agentId}/status`, 'PUT', {
+                status: newStatus
+            });
+
+            if (response.status === 'success') {
+                console.log(`✅ Agent ${agentId} status changed to: ${newStatus}`);
+
+                // Update local agent data
+                const agent = this.agents.get(agentId);
+                if (agent) {
+                    agent.status = newStatus;
+                    this.agents.set(agentId, agent);
+                }
+
+                // Refresh UI to show updated toggle state
+                this.updateAgentsUI();
+
+                return response.data;
+            } else {
+                throw new Error(response.message || 'Failed to update agent status');
+            }
+        } catch (error) {
+            console.error(`❌ Failed to toggle agent status for ${agentId}:`, error);
+            // Revert the UI by refreshing
+            this.updateAgentsUI();
+            alert(`Failed to update agent status: ${error.message}`);
         }
     }
 }

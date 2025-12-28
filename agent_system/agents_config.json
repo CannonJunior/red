@@ -1,0 +1,47 @@
+{
+  "rag_research_agent": {
+    "agent_id": "rag_research_agent",
+    "name": "RAG Research Agent",
+    "description": "Specialized in document analysis and research using local RAG",
+    "model": "qwen2.5:3b",
+    "capabilities": [
+      "vector_search",
+      "document_analysis",
+      "llm_inference"
+    ],
+    "skills": [],
+    "temperature": 0.7,
+    "max_tokens": 2048,
+    "status": "active"
+  },
+  "code_review_agent": {
+    "agent_id": "code_review_agent",
+    "name": "Code Review Agent",
+    "description": "Security and performance code analysis using local LLMs",
+    "model": "qwen2.5:3b",
+    "capabilities": [
+      "code_analysis",
+      "security_review",
+      "static_analysis"
+    ],
+    "skills": [],
+    "temperature": 0.5,
+    "max_tokens": 2048,
+    "status": "inactive"
+  },
+  "vector_data_analyst": {
+    "agent_id": "vector_data_analyst",
+    "name": "Career Intelligence Agent",
+    "description": "Specialized career analysis and opportunity matching agent",
+    "model": "qwen2.5:3b",
+    "capabilities": [
+      "vector_analysis",
+      "data_clustering",
+      "similarity_search"
+    ],
+    "skills": [],
+    "temperature": 0.3,
+    "max_tokens": 2048,
+    "status": "active"
+  }
+}

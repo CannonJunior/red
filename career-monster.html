@@ -334,6 +334,160 @@
     </div>
 
     <script>
+        // Check for assessment URL parameter on page load
+        (async function checkUrlParams() {
+            const urlParams = new URLSearchParams(window.location.search);
+            const assessmentId = urlParams.get('assessment');
+
+            if (assessmentId) {
+                // Load assessment directly
+                await loadAssessmentById(assessmentId);
+            }
+        })();
+
+        // Load assessment by ID from URL parameter
+        async function loadAssessmentById(assessmentId) {
+            const resultDiv = document.getElementById('analyze-result');
+
+            // Switch to analyze tab
+            document.querySelectorAll('.career-tab').forEach(t => t.classList.remove('active'));
+            document.querySelectorAll('.career-panel').forEach(p => p.classList.remove('active'));
+            document.querySelector('[data-tab="analyze"]').classList.add('active');
+            document.getElementById('analyze-panel').classList.add('active');
+
+            // Show loading state
+            resultDiv.innerHTML = '<p class="loading">🤖 Loading assessment...</p>';
+
+            try {
+                const response = await fetch(`/api/career/assessments/${assessmentId}?full=true`);
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    const assessment = result.assessment;
+                    const candidate = result.candidate;
+                    const position = result.position;
+
+                    // Build header with candidate and position info
+                    let headerHtml = '';
+                    if (candidate && position) {
+                        headerHtml = `
+                            <div style="background: #f8f9fa; padding: 15px; border-radius: 8px; margin-bottom: 20px;">
+                                <h4 style="margin: 0 0 10px 0; color: #667eea;">
+                                    ${candidate.name} → ${position.institution}
+                                </h4>
+                                <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(200px, 1fr)); gap: 10px; font-size: 14px; color: #666;">
+                                    <div><strong>Position:</strong> ${position.position_title}</div>
+                                    <div><strong>Department:</strong> ${position.department}</div>
+                                    <div><strong>PhD:</strong> ${candidate.phd_institution} (${candidate.phd_year})</div>
+                                    <div><strong>Publications:</strong> ${candidate.publications_count || 0}</div>
+                                    <div><strong>Citations:</strong> ${candidate.citations_count || 0}</div>
+                                </div>
+                            </div>
+                        `;
+                    }
+
+                    const align = assessment.alignment_score;
+                    const narratives = assessment.narratives || {};
+                    const successFactors = assessment.success_factors || [];
+                    const redFlags = assessment.red_flags || [];
+
+                    resultDiv.innerHTML = `
+                        ${headerHtml}
+                        <div class="assessment-result">
+                            <h3>Assessment Results</h3>
+                            <div class="assessment-scores">
+                                <div class="score-card">
+                                    <div class="score-value">${align.overall_score.toFixed(1)}</div>
+                                    <div class="score-label">Overall Score</div>
+                                </div>
+                                <div class="score-card">
+                                    <div class="score-value">${align.topic_alignment.toFixed(1)}</div>
+                                    <div class="score-label">Topic Alignment</div>
+                                </div>
+                                <div class="score-card">
+                                    <div class="score-value">${align.publication_strength.toFixed(1)}</div>
+                                    <div class="score-label">Publications</div>
+                                </div>
+                                <div class="score-card">
+                                    <div class="score-value">${align.network_overlap.toFixed(1)}</div>
+                                    <div class="score-label">Network</div>
+                                </div>
+                            </div>
+
+                            ${narratives.optimistic ? `
+                                <div class="narrative-section">
+                                    <h3>🌟 Optimistic Perspective</h3>
+                                    <p>${narratives.optimistic}</p>
+                                </div>
+                            ` : ''}
+
+                            ${narratives.pessimistic ? `
+                                <div class="narrative-section">
+                                    <h3>⚠️ Critical Perspective</h3>
+                                    <p>${narratives.pessimistic}</p>
+                                </div>
+                            ` : ''}
+
+                            ${narratives.pragmatic ? `
+                                <div class="narrative-section">
+                                    <h3>⚖️ Pragmatic Perspective</h3>
+                                    <p>${narratives.pragmatic}</p>
+                                </div>
+                            ` : ''}
+
+                            ${narratives.speculative ? `
+                                <div class="narrative-section">
+                                    <h3>🔮 Speculative Perspective</h3>
+                                    <p>${narratives.speculative}</p>
+                                </div>
+                            ` : ''}
+
+                            ${successFactors.length > 0 ? `
+                                <div class="narrative-section">
+                                    <h3>✅ Success Factors</h3>
+                                    <ul>
+                                        ${successFactors.map(f => `<li>${f}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+
+                            ${redFlags.length > 0 ? `
+                                <div class="narrative-section">
+                                    <h3>🚩 Potential Concerns</h3>
+                                    <ul>
+                                        ${redFlags.map(f => `<li>${f}</li>`).join('')}
+                                    </ul>
+                                </div>
+                            ` : ''}
+
+                            <div class="narrative-section" style="background: #f0f9ff; border: 2px solid #0284c7; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                                <h3 style="margin-top: 0; color: #0284c7;">📋 Add to Career Analysis List?</h3>
+                                <p style="margin-bottom: 15px; color: #334155;">Save this assessment to your Career Analysis list for easy comparison and filtering.</p>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <button onclick="addToCareerList('${assessmentId}')" class="btn btn-primary" style="background: #0284c7;">
+                                        ✓ Add to List
+                                    </button>
+                                    <span id="add-to-list-status" style="color: #059669; font-weight: 600;"></span>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    resultDiv.innerHTML = `
+                        <div class="alert alert-error">
+                            <strong>❌ Error:</strong> ${result.message || 'Assessment not found'}
+                        </div>
+                    `;
+                }
+            } catch (error) {
+                resultDiv.innerHTML = `
+                    <div class="alert alert-error">
+                        <strong>❌ Error:</strong> ${error.message}
+                    </div>
+                `;
+            }
+        }
+
         // Tab switching
         document.querySelectorAll('.career-tab').forEach(tab => {
             tab.addEventListener('click', () => {
@@ -539,6 +693,17 @@
                                     </ul>
                                 </div>
                             ` : ''}
+
+                            <div class="narrative-section" style="background: #f0f9ff; border: 2px solid #0284c7; padding: 20px; border-radius: 8px; margin-top: 20px;">
+                                <h3 style="margin-top: 0; color: #0284c7;">📋 Add to Career Analysis List?</h3>
+                                <p style="margin-bottom: 15px; color: #334155;">Save this assessment to your Career Analysis list for easy comparison and filtering.</p>
+                                <div style="display: flex; gap: 10px; align-items: center;">
+                                    <button onclick="addToCareerList('${result.assessment_id}')" class="btn btn-primary" style="background: #0284c7;">
+                                        ✓ Add to List
+                                    </button>
+                                    <span id="add-to-list-status" style="color: #059669; font-weight: 600;"></span>
+                                </div>
+                            </div>
                         </div>
                     `;
                 } else {
@@ -610,6 +775,68 @@
         // Load stats on page load if on stats tab
         if (document.getElementById('stats-panel').classList.contains('active')) {
             loadStats();
+        }
+
+        // Add assessment to Career Analysis List
+        async function addToCareerList(assessmentId) {
+            const statusSpan = document.getElementById('add-to-list-status');
+            const button = event.target;
+
+            // Disable button and show loading state
+            button.disabled = true;
+            button.textContent = '⏳ Adding...';
+            statusSpan.textContent = '';
+
+            try {
+                const response = await fetch('/api/career/list', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ assessment_id: assessmentId })
+                });
+
+                const result = await response.json();
+
+                if (result.status === 'success') {
+                    // Success - update button and show message
+                    button.textContent = '✓ Added to List!';
+                    button.style.background = '#059669';
+                    statusSpan.textContent = '✓ Assessment saved to Career Analysis list';
+                    statusSpan.style.color = '#059669';
+
+                    // Add link to view list
+                    setTimeout(() => {
+                        statusSpan.innerHTML = `
+                            ✓ Saved!
+                            <a href="/" onclick="event.preventDefault(); if(window.parent.careerList) { window.parent.careerList.showCareerAnalysisList(); }"
+                               style="color: #0284c7; text-decoration: underline; margin-left: 10px;">
+                                View Career Analysis List →
+                            </a>
+                        `;
+                    }, 1000);
+
+                } else if (result.status === 'info') {
+                    // Already in list
+                    button.textContent = '✓ Already in List';
+                    button.style.background = '#6b7280';
+                    statusSpan.textContent = 'ℹ️ This assessment is already in your list';
+                    statusSpan.style.color = '#6b7280';
+
+                } else {
+                    // Error
+                    button.disabled = false;
+                    button.textContent = '✓ Add to List';
+                    button.style.background = '#0284c7';
+                    statusSpan.textContent = `❌ Error: ${result.message}`;
+                    statusSpan.style.color = '#dc2626';
+                }
+
+            } catch (error) {
+                button.disabled = false;
+                button.textContent = '✓ Add to List';
+                button.style.background = '#0284c7';
+                statusSpan.textContent = `❌ Error: ${error.message}`;
+                statusSpan.style.color = '#dc2626';
+            }
         }
     </script>
 </body>

@@ -86,7 +86,10 @@ from server.routes.career import (
     handle_career_candidates_create_api as handle_career_candidates_create_route,
     handle_career_analyze_api as handle_career_analyze_route,
     handle_career_assessment_get_api as handle_career_assessment_get_route,
-    handle_career_stats_api as handle_career_stats_route
+    handle_career_stats_api as handle_career_stats_route,
+    handle_career_list_get_api as handle_career_list_get_route,
+    handle_career_list_add_api as handle_career_list_add_route,
+    handle_career_list_remove_api as handle_career_list_remove_route
 )
 
 # Ollama agents support
@@ -368,6 +371,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     self.handle_todos_detail_api()
                     return
                 # Career Monster API endpoints
+                elif self.path == '/api/career/list':
+                    self.handle_career_list_get_api()
+                    return
                 elif self.path == '/api/career/positions' or self.path.startswith('/api/career/positions?'):
                     self.handle_career_positions_list_api()
                     return
@@ -403,9 +409,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             # Handle root path
             if self.path == '/':
                 self.path = '/index.html'
-            
-            # Remove leading slash and resolve file path
-            file_path = self.path.lstrip('/')
+
+            # Remove query string and leading slash, then resolve file path
+            path_without_query = self.path.split('?')[0]
+            file_path = path_without_query.lstrip('/')
             full_path = os.path.join(os.getcwd(), file_path)
             
             debug_log(f"Request: {self.path} -> {file_path}")
@@ -509,6 +516,8 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             elif self.path == '/api/search/objects' and SEARCH_AVAILABLE:
                 self.handle_search_add_object_api()
             # Career Monster API endpoints
+            elif self.path == '/api/career/list':
+                self.handle_career_list_add_api()
             elif self.path == '/api/career/positions':
                 self.handle_career_positions_create_api()
             elif self.path == '/api/career/candidates':
@@ -583,6 +592,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract prompt ID from path
                 prompt_id = self.path.split('/')[-1]
                 self.handle_prompts_delete_api(prompt_id)
+            elif self.path.startswith('/api/career/list/'):
+                # Extract list ID from path
+                list_id = self.path.split('/')[-1]
+                self.handle_career_list_remove_api(list_id)
             # Ollama agents API endpoints
             elif self.path.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE:
                 self.handle_ollama_agent_detail_api()
@@ -1250,9 +1263,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
             # Handle root path
             if self.path == '/':
                 self.path = '/index.html'
-            
-            # Remove leading slash and resolve file path
-            file_path = self.path.lstrip('/')
+
+            # Remove query string and leading slash, then resolve file path
+            path_without_query = self.path.split('?')[0]
+            file_path = path_without_query.lstrip('/')
             full_path = os.path.join(os.getcwd(), file_path)
             
             # Check if file exists
@@ -1670,12 +1684,26 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     def handle_career_assessment_get_api(self):
         """Handle GET /api/career/assessments/{id} - Get assessment."""
-        assessment_id = self.path.split('/')[-1]
+        # Strip query string and extract ID
+        path_without_query = self.path.split('?')[0]
+        assessment_id = path_without_query.split('/')[-1]
         handle_career_assessment_get_route(self, assessment_id)
 
     def handle_career_stats_api(self):
         """Handle GET /api/career/stats - Get statistics."""
         handle_career_stats_route(self)
+
+    def handle_career_list_get_api(self):
+        """Handle GET /api/career/list - Get career analysis list."""
+        handle_career_list_get_route(self)
+
+    def handle_career_list_add_api(self):
+        """Handle POST /api/career/list - Add to career analysis list."""
+        handle_career_list_add_route(self)
+
+    def handle_career_list_remove_api(self, list_id):
+        """Handle DELETE /api/career/list/{id} - Remove from list."""
+        handle_career_list_remove_route(self, list_id)
 
 
 def main():

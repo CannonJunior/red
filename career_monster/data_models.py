@@ -176,7 +176,7 @@ class HiringAssessment(BaseModel):
     # Scoring
     alignment_score: AlignmentScore
     network_analysis: NetworkAnalysis
-    confidence_score: ConfidenceScore
+    confidence_score: Optional[ConfidenceScore] = None
 
     # Narratives (4 perspectives)
     optimistic_narrative: str = ""

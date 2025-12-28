@@ -122,7 +122,53 @@ def handle_ollama_agent_detail_api(handler):
         runtime = get_runtime()
 
         # Extract agent_id from path
-        path_parts = handler.path.split('/')
+        path_parts = handler.path.split('?')[0].split('/')
+
+        # Check if this is a status update endpoint
+        if len(path_parts) >= 5 and path_parts[-1] == 'status':
+            agent_id = path_parts[-2]
+
+            if handler.command == 'PUT':
+                # Update agent status
+                agent_data = handler.get_request_body()
+                if agent_data is None:
+                    handler.send_json_response({'error': 'Invalid JSON'}, 400)
+                    return
+
+                new_status = agent_data.get('status')
+                if new_status not in ['active', 'inactive']:
+                    handler.send_json_response({
+                        'status': 'error',
+                        'message': 'Status must be "active" or "inactive"'
+                    }, 400)
+                    return
+
+                try:
+                    updated_agent = runtime.update_agent_status(agent_id, new_status)
+
+                    if updated_agent:
+                        handler.send_json_response({
+                            'status': 'success',
+                            'message': f'Agent {agent_id} status updated to {new_status}',
+                            'data': updated_agent
+                        })
+                    else:
+                        handler.send_json_response({
+                            'status': 'error',
+                            'message': f'Agent {agent_id} not found'
+                        }, 404)
+                except Exception as e:
+                    handler.send_json_response({
+                        'status': 'error',
+                        'message': str(e)
+                    }, 500)
+            else:
+                handler.send_json_response({
+                    'status': 'error',
+                    'message': f'Method {handler.command} not allowed for status endpoint'
+                }, 405)
+            return
+
         agent_id = path_parts[-1]
 
         if handler.command == 'GET':

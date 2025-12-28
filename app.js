@@ -1572,6 +1572,14 @@ class Navigation {
                     return;
                 }
 
+                // Handle career-analysis list
+                if (listType === 'career-analysis') {
+                    if (window.careerList) {
+                        window.careerList.showCareerAnalysisList();
+                    }
+                    return;
+                }
+
                 if (item.classList.contains('expandable-nav-item')) {
                     this.toggleExpandableNavItem(item, listType);
                     // Navigate to appropriate area based on list type

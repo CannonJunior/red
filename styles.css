@@ -875,3 +875,44 @@ div:not(.progress-bar):not(.typing-dot) {
     backdrop-filter: blur(20px);
   }
 }
+/* Toggle Switch Styles */
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border-width: 0;
+}
+
+.status-toggle:checked ~ .toggle-bg {
+  background-color: #10b981;
+}
+
+.dark .status-toggle:checked ~ .toggle-bg {
+  background-color: #059669;
+}
+
+.status-toggle:checked ~ .toggle-dot {
+  transform: translateX(1rem);
+  background-color: #ffffff;
+}
+
+.toggle-bg {
+  transition: background-color 0.2s ease-in-out;
+}
+
+.toggle-dot {
+  transition: transform 0.2s ease-in-out, background-color 0.2s ease-in-out;
+}
+
+.status-toggle:focus ~ .toggle-bg {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.5);
+}
+
+.dark .status-toggle:focus ~ .toggle-bg {
+  box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.3);
+}
