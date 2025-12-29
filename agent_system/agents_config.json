@@ -27,18 +27,33 @@
     "skills": [],
     "temperature": 0.5,
     "max_tokens": 2048,
-    "status": "inactive"
+    "status": "active"
   },
   "vector_data_analyst": {
     "agent_id": "vector_data_analyst",
-    "name": "Career-Agent",
-    "description": "Specialized career analysis and opportunity matching agent",
+    "name": "Vector Data Analyst",
+    "description": "Specialized career analysis and opportunity matching agent with web research capabilities",
     "model": "qwen2.5:3b",
     "capabilities": [],
     "skills": [
-      "career-researcher"
+      "career-researcher",
+      "career-monster"
     ],
     "temperature": 0.3,
+    "max_tokens": 2048,
+    "status": "active"
+  },
+  "agent_68b292cc": {
+    "agent_id": "agent_68b292cc",
+    "name": "Career-Agent",
+    "description": "Specialized career analysis and opportunity matching agent with web research capabilities",
+    "model": "qwen2.5:3b",
+    "capabilities": [],
+    "skills": [
+      "career-researcher",
+      "career-monster"
+    ],
+    "temperature": 0.5,
     "max_tokens": 2048,
     "status": "active"
   }

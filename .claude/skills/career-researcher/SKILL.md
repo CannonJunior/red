@@ -19,6 +19,77 @@ Career-Researcher automates the data collection process for competitive career p
 - Gather dissertation information from ProQuest/library catalogs
 - Auto-populate career-monster database with research findings
 
+## Required Output Format
+
+**CRITICAL**: Every hire must be reported with complete information and sources.
+
+### Structured Output Template
+
+For each hire found, provide:
+
+```
+[Number]. [Full Name]
+   Position: [Title] at [Institution] - [Department]
+   PhD Institution: [University, Year]
+   Dissertation: "[Title]" (Link: [URL if available])
+   Source: [Faculty page URL or announcement URL]
+   Additional Info: [Any relevant details about research focus, previous positions, etc.]
+```
+
+### Example Output
+
+```
+1. Dr. Sarah Brown
+   Position: Assistant Professor at Washington College - Political Science Department
+   PhD Institution: Harvard University, 2024
+   Dissertation: "Democratic Accountability in Hybrid Regimes"
+                (Link: https://dash.harvard.edu/handle/...)
+   Source: https://www.washcoll.edu/political-science/faculty/sarah-brown
+   Additional Info: Specializes in comparative politics, previously postdoc at Stanford
+
+2. Dr. Sahil Chinoy
+   Position: Assistant Professor at Stanford University - Political Science Department
+   PhD Institution: MIT, 2023
+   Dissertation: "Computational Methods for Political Text Analysis"
+                (Link: https://dspace.mit.edu/handle/...)
+   Source: https://politicalscience.stanford.edu/people/sahil-chinoy
+   Additional Info: Previously data journalist at The New York Times,
+                    focuses on quantitative methods and machine learning
+```
+
+### Source Citation Rules
+
+**ALWAYS include sources for EVERY claim:**
+- Faculty profile pages
+- Department announcements
+- University press releases
+- Dissertation repository links
+- Personal/CV websites
+
+**Never report information without a verifiable source URL.**
+
+## What NOT to Do ❌
+
+**NEVER give up or make excuses:**
+- ❌ "This would be extremely challenging and time-consuming"
+- ❌ "I can only provide a hypothetical list"
+- ❌ "No valid opportunities found" (after only 1 search with 10 results)
+- ❌ "I cannot access real-time data"
+- ❌ "Let me outline an approach instead of doing the work"
+
+**INSTEAD:**
+- ✅ Make 3-5 different searches with 50 results each
+- ✅ Try different query variations if first search has few results
+- ✅ Extract profiles from all valid URLs, skip failed ones
+- ✅ Return whatever results you find (even if it's 5-10, not 50)
+- ✅ DO THE ACTUAL WORK using your tools
+
+**If you find fewer results than expected:**
+- Still return what you found with complete information
+- Make additional searches with different terms
+- Try broader or more specific queries
+- Search different university tiers (R1, R2, liberal arts)
+
 ## Quick Start
 
 ### Via AI Agent (Recommended)
@@ -28,10 +99,92 @@ Use an agent configured with both `career-researcher` and `career-monster` skill
 ```
 User: "Research recent political science hires at top universities from 2023-2024"
 
-Agent: [Uses career-researcher to find hires]
-       [Uses career-monster to analyze each hire]
-       [Returns comprehensive analysis]
+Agent: [Step 1: Uses web_search to find faculty pages]
+       [Step 2: Uses extract_faculty_profile on each hire's page]
+       [Step 3: Compiles structured output with sources]
+       [Step 4: Returns formatted list with all required fields]
 ```
+
+### Required Workflow
+
+**CRITICAL**: Be persistent and comprehensive. DO NOT give up after one search.
+
+**ALWAYS follow this iterative multi-search process:**
+
+1. **Comprehensive Search Phase**: Use MULTIPLE searches with different queries
+
+   **Search Strategy 1 - General Field Search:**
+   ```
+   [TOOL_CALL:web_search]
+   {
+     "query": "political science new faculty 2025 site:.edu",
+     "max_results": 50
+   }
+   [/TOOL_CALL]
+   ```
+
+   **Search Strategy 2 - Postdoc-Specific:**
+   ```
+   [TOOL_CALL:web_search]
+   {
+     "query": "political science postdoctoral fellow 2025 site:.edu",
+     "max_results": 50
+   }
+   [/TOOL_CALL]
+   ```
+
+   **Search Strategy 3 - Recent Hires:**
+   ```
+   [TOOL_CALL:web_search]
+   {
+     "query": "political science assistant professor hired 2024 2025 site:.edu",
+     "max_results": 50
+   }
+   [/TOOL_CALL]
+   ```
+
+   **Search Strategy 4 - Target Top Universities:**
+   ```
+   [TOOL_CALL:web_search]
+   {
+     "query": "Harvard Yale Stanford Princeton political science new faculty site:.edu",
+     "max_results": 50
+   }
+   [/TOOL_CALL]
+   ```
+
+2. **Extraction Phase**: For EACH valid faculty page URL found, use `extract_faculty_profile`
+
+   **Error Handling:**
+   - If a URL fails (404, timeout), skip it and continue with others
+   - DO NOT stop if one profile extraction fails
+   - Try all URLs from your search results
+
+   ```
+   [TOOL_CALL:extract_faculty_profile]
+   {
+     "url": "https://www.washcoll.edu/political-science/faculty/sarah-brown"
+   }
+   [/TOOL_CALL]
+   ```
+
+3. **Iteration Requirements**:
+   - Minimum 3-5 different search queries
+   - Each search should return 30-50 results
+   - Extract profiles from at least 20-30 URLs
+   - Compile ALL successful extractions into final list
+
+**NEVER say "this would be challenging" - that's why you exist. DO THE WORK.**
+
+This ensures you have:
+- ✓ Comprehensive coverage (multiple searches)
+- ✓ Complete name
+- ✓ Position title
+- ✓ PhD institution and year
+- ✓ Dissertation title and link
+- ✓ Research interests
+- ✓ Verified source URL
+- ✓ Multiple hires (not just 1-3)
 
 ### API Usage (Programmatic)
 

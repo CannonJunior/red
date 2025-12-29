@@ -23,7 +23,7 @@ from project_paths import get_project_root, resolve_path
 
 # Import web tools for agent function calling
 try:
-    from agent_system.web_tools import web_search, web_fetch, search_faculty_hires
+    from agent_system.web_tools import web_search, web_fetch, search_faculty_hires, extract_faculty_profile
     WEB_TOOLS_AVAILABLE = True
 except ImportError as e:
     logger.warning(f"Web tools not available: {e}")
@@ -518,10 +518,10 @@ class OllamaAgentRuntime:
         if WEB_TOOLS_AVAILABLE:
             self.tools['web_search'] = {
                 'function': web_search,
-                'description': 'Search the web using DuckDuckGo. Returns list of search results.',
+                'description': 'Search the web using DuckDuckGo. Returns list of search results. FOR COMPREHENSIVE RESEARCH: Use max_results=50 and make MULTIPLE searches with different queries.',
                 'parameters': {
                     'query': 'Search query string',
-                    'max_results': 'Maximum number of results (default: 10)',
+                    'max_results': 'Maximum number of results (default: 50, use 50+ for comprehensive searches)',
                     'site': 'Optional site filter (e.g., ".edu" for academic sites)'
                 }
             }
@@ -543,6 +543,14 @@ class OllamaAgentRuntime:
                     'department': 'Academic department name (e.g., "political science")',
                     'university': 'Optional university name',
                     'max_results': 'Maximum results (default: 5)'
+                }
+            }
+
+            self.tools['extract_faculty_profile'] = {
+                'function': extract_faculty_profile,
+                'description': 'Extract detailed profile from a faculty member\'s webpage. Returns name, position, PhD info, dissertation title/link, research interests.',
+                'parameters': {
+                    'url': 'URL of the faculty profile page (must be complete URL starting with http/https)'
                 }
             }
 
@@ -569,7 +577,10 @@ class OllamaAgentRuntime:
             doc += json.dumps({"param1": "value1", "param2": "value2"}, indent=2)
             doc += "\n[/TOOL_CALL]\n```\n\n"
 
-        doc += "**Important:** When you need to use a tool, output the [TOOL_CALL:tool_name] block with JSON parameters, then wait for the results before continuing your response.\n\n"
+        doc += "**CRITICAL FORMATTING:** Every tool call MUST have BOTH opening and closing tags:\n"
+        doc += "✅ CORRECT: [TOOL_CALL:web_search]{\"query\":\"test\"}[/TOOL_CALL]\n"
+        doc += "❌ WRONG: [TOOL_CALL:web_search]{\"query\":\"test\"} (missing closing tag - won't execute!)\n\n"
+        doc += "**CRITICAL:** Your FIRST response MUST include a tool call. Do NOT respond with explanations of what you would need - USE THE TOOLS IMMEDIATELY. You have the tools - USE THEM.\n\n"
 
         return doc
 
@@ -602,6 +613,27 @@ class OllamaAgentRuntime:
                 logger.info(f"Parsed tool call: {tool_name} with params: {list(parameters.keys())}")
             except json.JSONDecodeError as e:
                 logger.error(f"Failed to parse tool call JSON for {tool_name}: {e}")
+
+        # Fallback: Check for incomplete tool calls (missing closing tag)
+        if not tool_calls and '[TOOL_CALL:' in response:
+            logger.warning("⚠️  Found incomplete tool call (missing [/TOOL_CALL] closing tag)")
+            # Try to extract incomplete tool calls
+            incomplete_pattern = r'\[TOOL_CALL:(\w+)\](\{.*?\})(?!\[/TOOL_CALL\])'
+            incomplete_matches = re.finditer(incomplete_pattern, response, re.DOTALL)
+
+            for match in incomplete_matches:
+                tool_name = match.group(1)
+                json_str = match.group(2).strip()
+
+                try:
+                    parameters = json.loads(json_str)
+                    tool_calls.append({
+                        'tool_name': tool_name,
+                        'parameters': parameters
+                    })
+                    logger.info(f"✅ Recovered incomplete tool call: {tool_name}")
+                except json.JSONDecodeError as e:
+                    logger.error(f"Failed to parse incomplete tool call JSON: {e}")
 
         return tool_calls
 
@@ -656,6 +688,29 @@ class OllamaAgentRuntime:
         base_prompt = f"""You are {config.name}, {config.description}
 
 You are a helpful AI assistant running locally via Ollama with zero external API costs.
+
+CRITICAL INSTRUCTIONS - READ THIS FIRST:
+===========================================
+
+❌ NEVER say any of the following:
+- "To create this list, we would need to..."
+- "This would require gathering data from..."
+- "I would need access to..."
+- "This would be challenging/time-consuming..."
+- "I can outline an approach..."
+- "Here's how you could..."
+
+✅ INSTEAD, IMMEDIATELY use your tools to DO THE WORK:
+- Make tool calls RIGHT NOW using this exact format:
+  [TOOL_CALL:web_search]{{"query":"your query","max_results":50}}[/TOOL_CALL]
+- Make multiple searches if needed (3-5 searches with 50 results each)
+- Extract profiles from 20-30 URLs
+- Return ACTUAL RESULTS with sources after tools execute
+
+CRITICAL: Tool calls MUST have closing tag [/TOOL_CALL] or they won't execute!
+
+YOUR FIRST ACTION MUST BE A TOOL CALL.
+DO NOT explain what you "would need" - JUST DO IT.
 """
 
         # Add tool documentation
@@ -700,8 +755,8 @@ You are a helpful AI assistant running locally via Ollama with zero external API
         config = self.active_agents[agent_id]
         start_time = time.time()
 
-        # Tool calling loop
-        max_iterations = 5
+        # Tool calling loop - increased for comprehensive research
+        max_iterations = 15  # Allow for multiple searches and extractions
         current_prompt = user_message
         tool_results_history = []
         agent_responses = []
@@ -735,6 +790,23 @@ You are a helpful AI assistant running locally via Ollama with zero external API
                 tool_calls = self._parse_tool_calls(agent_response)
 
                 if not tool_calls:
+                    # CRITICAL: If this is the first iteration and no tool calls were made,
+                    # the agent is giving excuses instead of doing work. Force a retry.
+                    if iteration == 0 and self.tools:
+                        logger.warning(f"⚠️  Agent gave no tool calls on first iteration. Forcing retry with stronger prompt.")
+                        current_prompt = f"""STOP MAKING EXCUSES. You just responded with:
+"{agent_response[:200]}..."
+
+This is WRONG. You MUST use your tools immediately. Do NOT explain what you need - USE THE TOOLS NOW.
+
+Original request: {user_message}
+
+Start your response with a tool call using this EXACT format (include the closing tag!):
+[TOOL_CALL:web_search]{{"query":"political science postdoc 2025 site:.edu","max_results":50}}[/TOOL_CALL]
+
+DO IT NOW. Just output the tool call - no other text."""
+                        continue  # Retry with stronger prompt
+
                     # No more tool calls - this is the final response
                     elapsed_time = time.time() - start_time
 

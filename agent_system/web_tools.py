@@ -260,6 +260,7 @@ class FacultyPageParser:
     Specialized parser for academic faculty pages.
 
     Extracts hire information, faculty names, and profiles from .edu pages.
+    Extracts PhD institution, dissertation info, and research interests.
     """
 
     def __init__(self):
@@ -349,20 +350,144 @@ class FacultyPageParser:
 
         return names
 
+    def extract_profile_details(self, html_content: str, url: str) -> Dict[str, Any]:
+        """
+        Extract detailed profile information from a faculty member's page.
+
+        Args:
+            html_content: HTML content of the faculty profile page
+            url: Source URL
+
+        Returns:
+            Dictionary with name, position, phd_institution, dissertation, research_interests, etc.
+        """
+        soup = BeautifulSoup(html_content, 'html.parser')
+        profile = {
+            'name': None,
+            'position': None,
+            'department': None,
+            'institution': None,
+            'phd_institution': None,
+            'phd_year': None,
+            'dissertation_title': None,
+            'dissertation_url': None,
+            'research_interests': [],
+            'previous_positions': [],
+            'source_url': url
+        }
+
+        text = soup.get_text()
+
+        # Extract name from page title or h1
+        title_tag = soup.find('title')
+        if title_tag:
+            title_text = title_tag.get_text()
+            # Look for "Name - Department" pattern
+            if ' - ' in title_text:
+                potential_name = title_text.split(' - ')[0].strip()
+                if self._is_valid_name(potential_name):
+                    profile['name'] = potential_name
+
+        # Try h1 if name not found
+        if not profile['name']:
+            h1 = soup.find('h1')
+            if h1:
+                potential_name = h1.get_text(strip=True)
+                if self._is_valid_name(potential_name):
+                    profile['name'] = potential_name
+
+        # Extract position
+        position_patterns = [
+            r'(Assistant Professor|Associate Professor|Professor|Lecturer|Research Fellow)',
+            r'Title:\s*([A-Z][^.\n]+(?:Professor|Lecturer))',
+        ]
+        for pattern in position_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                profile['position'] = match.group(1).strip()
+                break
+
+        # Extract PhD institution and year
+        phd_patterns = [
+            r'Ph\.?D\.?,?\s+([A-Z][^,\n]+(?:University|Institute|College)),?\s+(\d{4})',
+            r'PhD\s+([A-Z][^,\n]+(?:University|Institute|College)),?\s+(\d{4})',
+            r'doctorate\s+.*?from\s+([A-Z][^,\n]+(?:University|Institute|College)),?\s+(\d{4})',
+            r'([A-Z][^,\n]+(?:University|Institute|College)),?\s+Ph\.?D\.?,?\s+(\d{4})',
+        ]
+        for pattern in phd_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                profile['phd_institution'] = match.group(1).strip()
+                profile['phd_year'] = match.group(2)
+                break
+
+        # Extract dissertation title
+        dissertation_patterns = [
+            r'Dissertation[:\s]+["\']([^"\']+)["\']',
+            r'Thesis[:\s]+["\']([^"\']+)["\']',
+            r'Ph\.?D\. thesis[:\s]+["\']([^"\']+)["\']',
+        ]
+        for pattern in dissertation_patterns:
+            match = re.search(pattern, text, re.IGNORECASE)
+            if match:
+                profile['dissertation_title'] = match.group(1).strip()
+                break
+
+        # Look for dissertation repository links
+        dissertation_links = soup.find_all('a', href=re.compile(r'(proquest|dspace|dash|repository|thesis|dissertation)', re.I))
+        if dissertation_links:
+            profile['dissertation_url'] = dissertation_links[0].get('href', '')
+
+        # Extract research interests
+        interests_section = soup.find(text=re.compile(r'Research Interests?|Research Areas?|Specialization', re.I))
+        if interests_section:
+            # Get the next sibling or parent's next text
+            parent = interests_section.find_parent()
+            if parent:
+                interests_text = parent.get_text()
+                # Split by common separators
+                interests = re.split(r'[,;]|\sand\s', interests_text)
+                profile['research_interests'] = [i.strip() for i in interests if len(i.strip()) > 3][:5]
+
+        # Extract institution from URL
+        institution_match = re.search(r'https?://(?:www\.)?([^.]+)\.edu', url)
+        if institution_match:
+            profile['institution'] = institution_match.group(1).replace('-', ' ').title()
+
+        self.logger.info(f"Extracted profile for {profile.get('name', 'Unknown')} from {url}")
+        return profile
+
+    def _is_valid_name(self, text: str) -> bool:
+        """Check if text looks like a person's name."""
+        # Should be 2-4 words, each starting with capital letter
+        words = text.split()
+        if not (2 <= len(words) <= 4):
+            return False
+        # Check for common non-name words
+        non_name_words = {'department', 'university', 'college', 'faculty', 'profile', 'page', 'home'}
+        if any(word.lower() in non_name_words for word in words):
+            return False
+        # Each word should start with capital
+        return all(word[0].isupper() for word in words if word)
+
 
 # Convenience functions for agent use
 
-def web_search(query: str, max_results: int = 10, site: Optional[str] = None) -> List[Dict[str, str]]:
+def web_search(query: str, max_results: int = 50, site: Optional[str] = None) -> List[Dict[str, str]]:
     """
     Search the web and return results.
 
     Args:
         query: Search query
-        max_results: Maximum results to return
+        max_results: Maximum results to return (default: 50 for comprehensive searches)
         site: Optional site filter (e.g., ".edu")
 
     Returns:
         List of search results as dictionaries
+
+    Note:
+        For comprehensive research, use max_results=50 or higher.
+        Make multiple searches with different queries for complete coverage.
     """
     searcher = WebSearchTool()
     results = searcher.search(query, max_results, site)
@@ -458,3 +583,42 @@ def search_faculty_hires(
 
     logger.info(f"Found {len(all_hires)} total hires from {pages_checked} pages")
     return all_hires
+
+
+def extract_faculty_profile(url: str) -> Dict[str, Any]:
+    """
+    Extract detailed profile information from a faculty member's page.
+
+    Args:
+        url: URL of the faculty profile page
+
+    Returns:
+        Dictionary with structured profile data including:
+        - name: Faculty member's name
+        - position: Academic position/title
+        - institution: University name
+        - phd_institution: Where they got their PhD
+        - phd_year: Year PhD was awarded
+        - dissertation_title: Title of dissertation
+        - dissertation_url: Link to dissertation repository
+        - research_interests: List of research areas
+        - source_url: Original page URL
+    """
+    fetcher = WebFetchTool()
+    parser = FacultyPageParser()
+
+    # Fetch the page
+    content = fetcher.fetch(url, extract_text=False)  # Get HTML
+
+    if content.error:
+        logger.error(f"Failed to fetch {url}: {content.error}")
+        return {
+            'name': None,
+            'error': content.error,
+            'source_url': url
+        }
+
+    # Parse the profile
+    profile = parser.extract_profile_details(content.html_content, url)
+
+    return profile
