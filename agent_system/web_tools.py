@@ -60,11 +60,13 @@ class WebSearchTool:
         site: Optional[str] = None
     ) -> List[SearchResult]:
         """
-        Search the web using DuckDuckGo.
+        Search the web using DuckDuckGo with pagination support.
+
+        PHASE 4: Enhanced with pagination to fetch up to 50 results across multiple pages.
 
         Args:
             query: Search query
-            max_results: Maximum number of results to return
+            max_results: Maximum number of results to return (supports up to 100)
             site: Optional site filter (e.g., ".edu" for academic sites)
 
         Returns:
@@ -74,58 +76,73 @@ class WebSearchTool:
         if site:
             query = f"{query} site:{site}"
 
-        logger.info(f"Searching: {query}")
+        logger.info(f"Searching (target: {max_results} results): {query}")
 
-        # Rate limiting
-        self._respect_rate_limit()
+        all_results = []
+        page = 0
+        max_pages = 5  # DDG typically supports 5 pages (~10-20 results per page)
+        results_per_page = 20  # DDG returns ~10-20 per page
 
         try:
-            # DuckDuckGo HTML search
-            response = self.session.post(
-                self.base_url,
-                data={
-                    "q": query,
-                    "b": "",
-                    "kl": "us-en"
-                },
-                timeout=10
-            )
-            response.raise_for_status()
+            while len(all_results) < max_results and page < max_pages:
+                # Rate limiting between pages
+                if page > 0:
+                    self._respect_rate_limit()
 
-            # Parse results
-            soup = BeautifulSoup(response.content, 'html.parser')
-            results = []
+                # DuckDuckGo HTML search with pagination
+                response = self.session.post(
+                    self.base_url,
+                    data={
+                        "q": query,
+                        "b": str(page * results_per_page),  # PHASE 4: Pagination offset
+                        "kl": "us-en"
+                    },
+                    timeout=10
+                )
+                response.raise_for_status()
 
-            for i, result in enumerate(soup.select('.result'), 1):
-                if i > max_results:
+                # Parse results from this page
+                soup = BeautifulSoup(response.content, 'html.parser')
+                page_results = soup.select('.result')
+
+                if not page_results:
+                    # No more results on this page
+                    logger.info(f"No more results found on page {page + 1}")
                     break
 
-                # Extract title and URL
-                title_elem = result.select_one('.result__a')
-                snippet_elem = result.select_one('.result__snippet')
+                for i, result in enumerate(page_results):
+                    if len(all_results) >= max_results:
+                        break
 
-                if title_elem and snippet_elem:
-                    title = title_elem.get_text(strip=True)
-                    url = title_elem.get('href', '')
-                    snippet = snippet_elem.get_text(strip=True)
+                    # Extract title and URL
+                    title_elem = result.select_one('.result__a')
+                    snippet_elem = result.select_one('.result__snippet')
 
-                    # Clean URL (DuckDuckGo uses redirect)
-                    url = self._clean_url(url)
+                    if title_elem and snippet_elem:
+                        title = title_elem.get_text(strip=True)
+                        url = title_elem.get('href', '')
+                        snippet = snippet_elem.get_text(strip=True)
 
-                    if url:
-                        results.append(SearchResult(
-                            title=title,
-                            url=url,
-                            snippet=snippet,
-                            position=i
-                        ))
+                        # Clean URL (DuckDuckGo uses redirect)
+                        url = self._clean_url(url)
 
-            logger.info(f"Found {len(results)} search results")
-            return results
+                        if url:
+                            all_results.append(SearchResult(
+                                title=title,
+                                url=url,
+                                snippet=snippet,
+                                position=len(all_results) + 1
+                            ))
+
+                logger.info(f"Page {page + 1}: Found {len(page_results)} results (total: {len(all_results)})")
+                page += 1
+
+            logger.info(f"✅ Search complete: {len(all_results)} total results from {page} page(s)")
+            return all_results
 
         except Exception as e:
             logger.error(f"Search error: {e}")
-            return []
+            return all_results  # Return what we got so far
 
     def _clean_url(self, url: str) -> str:
         """Extract actual URL from DuckDuckGo redirect."""

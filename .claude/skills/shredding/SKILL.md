@@ -19,7 +19,69 @@ This skill automates the "shredding" process for government RFPs, particularly S
 
 ## Quick Start
 
-### Basic RFP Shredding
+### For Agents: Tool Calling
+
+**IMPORTANT**: When asked to process RFPs, use the appropriate tool based on the request:
+
+#### Process Multiple Documents (Directory)
+Use `shred_directory` when the user asks to process:
+- "documents" (plural)
+- "all files in a directory"
+- "everything in data/JADC2"
+- "process the RFPs in..."
+
+```
+[TOOL_CALL:shred_directory]
+{
+    "directory_path": "data/JADC2",
+    "default_due_date": "2025-12-31",
+    "agency": "Air Force"
+}
+[/TOOL_CALL]
+```
+
+**Response Format**: After the tool completes, summarize the results:
+```
+✅ Processed {files_processed} RFP documents from data/JADC2:
+
+1. FA8612-21-S-C001.txt: 41 requirements (40 mandatory, 1 optional)
+   Compliance Matrix: outputs/shredding/compliance-matrices/FA8612-21-S-C001_compliance_matrix_2026-01-06.csv
+
+2. CSO-001.pdf: 35 requirements (33 mandatory, 2 optional)
+   Compliance Matrix: outputs/shredding/compliance-matrices/CSO-001_compliance_matrix_2026-01-06.csv
+
+Total: {total_requirements} requirements extracted
+Generated {files_processed} compliance matrices
+```
+
+#### Process Single Document
+Use `shred_rfp` when the user specifies a single file with complete details:
+
+```
+[TOOL_CALL:shred_rfp]
+{
+    "file_path": "data/JADC2/FA8612-21-S-C001.txt",
+    "rfp_number": "FA8612-21-S-C001",
+    "opportunity_name": "JADC2 Cloud Services",
+    "due_date": "2025-02-15",
+    "agency": "Air Force",
+    "create_tasks": true
+}
+[/TOOL_CALL]
+```
+
+**Required Fields**:
+- `file_path`: Path to single file (NOT a directory)
+- `rfp_number`: RFP/solicitation number
+- `opportunity_name`: Descriptive name
+- `due_date`: YYYY-MM-DD format (e.g., "2025-02-15")
+
+**Common Errors to Avoid**:
+- ❌ Using shred_rfp with a directory path → Use shred_directory instead
+- ❌ Forgetting due_date → Causes "Invalid isoformat string" error
+- ❌ Empty rfp_number → Use filename or generate one
+
+### Basic RFP Shredding (Python)
 
 ```python
 #!/usr/bin/env python3

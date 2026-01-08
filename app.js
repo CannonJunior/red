@@ -1955,10 +1955,10 @@ class Navigation {
         return 'AI language model with general conversation capabilities.';
     }
 
-    loadSettingsPage() {
+    async loadSettingsPage() {
         const themeSelector = document.getElementById('theme-selector');
         const defaultModelSelector = document.getElementById('default-model-selector');
-        
+
         if (themeSelector && window.app?.themeManager) {
             themeSelector.value = window.app.themeManager.theme;
             themeSelector.addEventListener('change', (e) => {
@@ -1967,7 +1967,26 @@ class Navigation {
         }
 
         if (defaultModelSelector) {
-            this.populateModelSelector(['qwen2.5:3b', 'incept5/llama3.1-claude:latest'], defaultModelSelector);
+            // Fetch available models from API instead of hardcoding
+            try {
+                const response = await fetch('/api/models', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' }
+                });
+
+                if (response.ok) {
+                    const data = await response.json();
+                    this.populateModelSelector(data.models || [], defaultModelSelector);
+                } else {
+                    // Fallback to default models if API fails
+                    console.warn('Failed to fetch models, using defaults');
+                    this.populateModelSelector(['qwen2.5:3b'], defaultModelSelector);
+                }
+            } catch (error) {
+                console.error('Error fetching models:', error);
+                // Fallback to default model
+                this.populateModelSelector(['qwen2.5:3b'], defaultModelSelector);
+            }
         }
     }
 

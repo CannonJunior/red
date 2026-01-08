@@ -18,6 +18,10 @@ from typing import Dict, List, Optional, Any
 from dataclasses import dataclass, asdict
 import requests
 
+# Configure logging FIRST
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
 # Import path utilities
 from project_paths import get_project_root, resolve_path
 
@@ -29,9 +33,13 @@ except ImportError as e:
     logger.warning(f"Web tools not available: {e}")
     WEB_TOOLS_AVAILABLE = False
 
-# Configure logging
-logging.basicConfig(level=logging.INFO)
-logger = logging.getLogger(__name__)
+# Import shredding tools for agent function calling
+try:
+    from agent_system.shredding_tools import shred_rfp, get_opportunity_status, shred_directory
+    SHREDDING_TOOLS_AVAILABLE = True
+except ImportError as e:
+    logger.warning(f"Shredding tools not available: {e}")
+    SHREDDING_TOOLS_AVAILABLE = False
 
 
 @dataclass
@@ -558,15 +566,86 @@ class OllamaAgentRuntime:
         else:
             logger.warning("Web tools not available - agents cannot perform web searches")
 
-    def _get_tool_documentation(self) -> str:
-        """Generate tool documentation for agent system prompts."""
+        if SHREDDING_TOOLS_AVAILABLE:
+            self.tools['shred_rfp'] = {
+                'function': shred_rfp,
+                'description': 'Analyze government RFP documents to extract structured requirements. Returns opportunity ID, requirement counts, and compliance matrix path.',
+                'parameters': {
+                    'file_path': 'Path to RFP PDF or text file (e.g., "data/JADC2/FA8612-21-S-C001.txt")',
+                    'rfp_number': 'RFP/solicitation number (e.g., "FA8612-21-S-C001")',
+                    'opportunity_name': 'Name of the opportunity (e.g., "JADC2 Cloud Services")',
+                    'due_date': 'Proposal due date in YYYY-MM-DD format (e.g., "2025-02-15")',
+                    'agency': 'Issuing agency (optional, e.g., "Air Force")',
+                    'naics_code': 'NAICS code (optional, e.g., "541512")',
+                    'set_aside': 'Set-aside type (optional, e.g., "Small Business")',
+                    'create_tasks': 'Whether to create tasks for each requirement (default: true)',
+                    'auto_assign': 'Whether to auto-assign tasks to agents (default: false)'
+                }
+            }
+
+            self.tools['get_opportunity_status'] = {
+                'function': get_opportunity_status,
+                'description': 'Get status and statistics for a previously shredded RFP opportunity. Returns requirement counts, compliance progress, and task status.',
+                'parameters': {
+                    'opportunity_id': 'UUID of the opportunity (returned from shred_rfp)'
+                }
+            }
+
+            self.tools['shred_directory'] = {
+                'function': shred_directory,
+                'description': 'Process ALL RFP documents in a directory. Use this when asked to process multiple files or "documents" (plural). Automatically extracts RFP numbers from filenames and generates compliance matrices for each file.',
+                'parameters': {
+                    'directory_path': 'Path to directory containing RFP files (e.g., "data/JADC2")',
+                    'default_due_date': 'Default due date for all RFPs in YYYY-MM-DD format (default: "2025-12-31")',
+                    'agency': 'Issuing agency (optional, e.g., "Air Force")',
+                    'create_tasks': 'Whether to create tasks for each requirement (default: true)'
+                }
+            }
+
+            logger.info(f"✅ Loaded {len([k for k in self.tools.keys() if k.startswith('shred') or k.startswith('get_opportunity')])} shredding tools for agents")
+        else:
+            logger.warning("Shredding tools not available - agents cannot shred RFPs")
+
+    def _get_tool_documentation(self, agent_config: 'OllamaAgentConfig' = None) -> str:
+        """
+        Generate tool documentation for agent system prompts.
+
+        Args:
+            agent_config: Agent configuration to filter tools by skills (optional)
+
+        Returns:
+            Tool documentation string
+        """
         if not self.tools:
+            return ""
+
+        # Map skills to their tools
+        skill_tool_mapping = {
+            'shredding': ['shred_rfp', 'shred_directory', 'get_opportunity_status'],
+            'career-researcher': ['web_search', 'web_fetch', 'search_faculty_hires', 'extract_faculty_profile'],
+            'career-monster': ['web_search', 'web_fetch', 'search_faculty_hires', 'extract_faculty_profile']
+        }
+
+        # Determine which tools this agent can use
+        if agent_config and agent_config.skills:
+            allowed_tools = set()
+            for skill in agent_config.skills:
+                if skill in skill_tool_mapping:
+                    allowed_tools.update(skill_tool_mapping[skill])
+
+            # Filter tools
+            agent_tools = {k: v for k, v in self.tools.items() if k in allowed_tools}
+        else:
+            # No filtering - show all tools (backward compatibility)
+            agent_tools = self.tools
+
+        if not agent_tools:
             return ""
 
         doc = "\n\n## Available Tools\n\n"
         doc += "You can use the following tools to gather information:\n\n"
 
-        for tool_name, tool_info in self.tools.items():
+        for tool_name, tool_info in agent_tools.items():
             doc += f"### {tool_name}\n"
             doc += f"{tool_info['description']}\n\n"
             doc += "**Parameters:**\n"
@@ -713,8 +792,8 @@ YOUR FIRST ACTION MUST BE A TOOL CALL.
 DO NOT explain what you "would need" - JUST DO IT.
 """
 
-        # Add tool documentation
-        tool_docs = self._get_tool_documentation()
+        # Add tool documentation (filtered by agent's skills)
+        tool_docs = self._get_tool_documentation(config)
         if tool_docs:
             base_prompt += tool_docs
 
@@ -732,10 +811,98 @@ DO NOT explain what you "would need" - JUST DO IT.
                     # Extract content after frontmatter
                     parts = skill_content.split('---', 2)
                     if len(parts) >= 3:
-                        skill_instructions = parts[2].strip()
-                        base_prompt += f"\n## Skill: {skill.name}\n{skill.description}\n\n{skill_instructions}\n\n"
+                        full_instructions = parts[2].strip()
+
+                        # PHASE 2 OPTIMIZATION: Extract only critical sections
+                        # Reduces prompt from ~26,500 chars to ~3,000 chars
+                        skill_summary = self._extract_skill_summary(full_instructions)
+
+                        base_prompt += f"\n## Skill: {skill.name}\n{skill.description}\n\n{skill_summary}\n\n"
+
+                        logger.debug(f"Skill '{skill.name}': {len(full_instructions)} → {len(skill_summary)} chars")
+
+        # Log total system prompt size for monitoring
+        logger.info(f"📏 System prompt size: {len(base_prompt)} chars (~{len(base_prompt)//4} tokens)")
 
         return base_prompt
+
+    def _extract_skill_summary(self, skill_content: str) -> str:
+        """
+        Extract critical sections from skill documentation INCLUDING examples.
+
+        PHASE 4: Enhanced to preserve search strategy examples and tool call patterns.
+
+        Reduces prompt size by extracting only:
+        - What NOT to Do section
+        - Required Workflow section (with examples!)
+        - Mandatory Process section
+        - Critical Instructions
+        - Search Strategy examples
+
+        Args:
+            skill_content: Full SKILL.md content
+
+        Returns:
+            Condensed summary with critical examples preserved
+        """
+        lines = skill_content.split('\n')
+        summary_lines = []
+        include = False
+        current_section = None
+        section_line_count = 0
+        in_code_block = False
+        max_lines_per_section = 50  # PHASE 4: Increased from 25 to 50 for examples
+
+        # Critical section headers to include
+        critical_sections = [
+            '## What NOT to Do',
+            '## Required Workflow',
+            '## Mandatory Process',
+            '## MANDATORY PROCESS',
+            '## Required Output Format',
+            '## CRITICAL INSTRUCTIONS',
+            '## Query Diversity Requirements',  # PHASE 4: New section
+        ]
+
+        for line in lines:
+            # Track code blocks - never truncate inside them
+            if line.strip().startswith('```') or '[TOOL_CALL:' in line:
+                in_code_block = not in_code_block
+
+            # Check if this is a critical section header
+            is_critical_header = any(line.startswith(section) for section in critical_sections)
+
+            if is_critical_header:
+                include = True
+                current_section = line
+                section_line_count = 0
+                summary_lines.append('\n' + line)
+            elif line.startswith('##') and include and not in_code_block:
+                # Hit a new section, stop including previous (unless in code block)
+                include = False
+                current_section = None
+            elif include:
+                # PHASE 4: Always include if in code block (preserve examples)
+                if in_code_block or section_line_count < max_lines_per_section:
+                    summary_lines.append(line)
+                    section_line_count += 1
+                elif section_line_count == max_lines_per_section and not in_code_block:
+                    summary_lines.append('... [additional content truncated]')
+                    section_line_count += 1
+
+        # If we got very little, include the overview section too
+        if len(summary_lines) < 10:
+            for line in lines[:30]:  # First 30 lines usually have overview
+                if line.startswith('#') and 'Overview' in line:
+                    include = True
+                elif line.startswith('##') and include:
+                    break
+                elif include:
+                    summary_lines.insert(0, line)
+
+        result = '\n'.join(summary_lines[:150])  # PHASE 4: Increased from 100 to 150 lines
+        logger.debug(f"Skill summary: {len(skill_content)} chars → {len(result)} chars ({len(result)/len(skill_content)*100:.1f}%)")
+        return result
 
     def invoke_agent(self, agent_id: str, user_message: str, **kwargs) -> Dict[str, Any]:
         """
@@ -760,8 +927,24 @@ DO NOT explain what you "would need" - JUST DO IT.
         current_prompt = user_message
         tool_results_history = []
         agent_responses = []
+        synthesis_attempts = 0  # Track attempts to synthesize without making tool calls
+        max_synthesis_attempts = 3  # PHASE 4: Increased from 2 to 3 for better quality
+
+        # PHASE 3: Multi-search enforcement for career research
+        requires_multi_search = 'career-researcher' in config.skills
+        min_searches_required = 3 if requires_multi_search else 1
+        search_enforced = False  # Track if we've already enforced search requirement
+
+        # PHASE 4: Deduplication tracking
+        search_query_history = set()  # Track unique search queries
+        extracted_urls = set()  # Track extracted URLs to prevent duplicates
 
         for iteration in range(max_iterations):
+            # Progress logging
+            search_count = sum(1 for tr in tool_results_history if tr.get('tool_name') == 'web_search')
+            extract_count = sum(1 for tr in tool_results_history if tr.get('tool_name') == 'extract_faculty_profile')
+            logger.info(f"🔄 Iteration {iteration+1}/{max_iterations} | Searches: {search_count} | Profiles: {extract_count} | Results: {len(tool_results_history)}")
+
             # Prepare request to Ollama
             ollama_request = {
                 'model': config.model,
@@ -807,8 +990,102 @@ Start your response with a tool call using this EXACT format (include the closin
 DO IT NOW. Just output the tool call - no other text."""
                         continue  # Retry with stronger prompt
 
+                    # PHASE 3: Check if we need to enforce multi-search requirement
+                    if requires_multi_search and not search_enforced:
+                        search_count = sum(1 for tr in tool_results_history if tr.get('tool_name') == 'web_search')
+
+                        if search_count < min_searches_required and len(tool_results_history) > 0:
+                            # Agent has made some searches but not enough - enforce more
+                            searches_needed = min_searches_required - search_count
+                            logger.warning(f"⚠️  Multi-search requirement not met: {search_count}/{min_searches_required} searches. Forcing {searches_needed} more.")
+
+                            current_prompt = f"""INCOMPLETE RESEARCH. You have only made {search_count} search(es) but need at least {min_searches_required}.
+
+Original request: {user_message}
+
+You MUST make {searches_needed} more web searches with DIFFERENT queries before synthesizing.
+
+Use varied search strategies:
+- Different keywords (e.g., "new faculty", "assistant professor", "postdoc", "recent hire")
+- Different years if applicable
+- Different institution types
+- Different field variations
+
+Make {searches_needed} [TOOL_CALL:web_search] calls RIGHT NOW with max_results=50.
+Use DIFFERENT queries for each search. DO NOT repeat the same search."""
+
+                            search_enforced = True  # Only enforce once
+                            synthesis_attempts = 0  # Reset synthesis counter
+                            continue  # Retry with enforcement prompt
+
+                    # Check if we're in synthesis phase (have tool results but no new tool calls)
+                    if len(tool_results_history) > 0:
+                        synthesis_attempts += 1
+                        logger.info(f"📝 Synthesis attempt {synthesis_attempts}/{max_synthesis_attempts} | Searches: {sum(1 for tr in tool_results_history if tr.get('tool_name') == 'web_search')}/{min_searches_required}")
+
+                        if synthesis_attempts >= max_synthesis_attempts:
+                            # PHASE 4: Validate diversity before forcing completion
+                            unique_queries = len(search_query_history)
+                            final_search_count = sum(1 for tr in tool_results_history if tr.get('tool_name') == 'web_search')
+
+                            # If multi-search required, ensure we have enough UNIQUE queries
+                            if requires_multi_search and unique_queries < min_searches_required:
+                                logger.warning(f"⚠️  Insufficient unique queries: {unique_queries}/{min_searches_required}. Forcing more searches.")
+
+                                current_prompt = f"""INSUFFICIENT SEARCH DIVERSITY
+
+You have only made {unique_queries} UNIQUE search(es) but need {min_searches_required}.
+
+Your searches so far:
+{chr(10).join(f'   {i+1}. "{q}"' for i, q in enumerate(sorted(search_query_history)))}
+
+Original request: {user_message}
+
+Make {min_searches_required - unique_queries} MORE searches with completely DIFFERENT queries.
+Use the diversity guidelines: different roles, institutions, time periods, keywords.
+Each search should return NEW results, not duplicates."""
+
+                                synthesis_attempts = 0  # Reset to allow more attempts
+                                continue  # Force another iteration
+
+                            # OK to force completion - we have diverse data
+                            logger.info(f"✅ Forcing completion after {synthesis_attempts} synthesis attempts | Unique queries: {unique_queries} | Tool calls: {len(tool_results_history)}")
+                            elapsed_time = time.time() - start_time
+
+                            return {
+                                'status': 'success',
+                                'agent_id': agent_id,
+                                'response': agent_response,
+                                'model': config.model,
+                                'elapsed_time_ms': int(elapsed_time * 1000),
+                                'cost': 0.00,
+                                'tool_calls_made': len(tool_results_history),
+                                'searches_made': final_search_count,
+                                'searches_required': min_searches_required if requires_multi_search else None,
+                                'unique_queries': unique_queries,
+                                'unique_urls': len(extracted_urls),
+                                'iterations': iteration + 1,
+                                'total_duration': result.get('total_duration', 0),
+                                'eval_count': result.get('eval_count', 0),
+                                'forced_completion': True
+                            }
+
                     # No more tool calls - this is the final response
+                    final_search_count = sum(1 for tr in tool_results_history if tr.get('tool_name') == 'web_search')
                     elapsed_time = time.time() - start_time
+
+                    # PHASE 4: Comprehensive completion logging
+                    logger.info(f"""
+📊 Agent Research Complete:
+   Iterations: {iteration + 1}/{max_iterations}
+   Unique Searches: {len(search_query_history)}
+   Unique URLs Extracted: {len(extracted_urls)}
+   Total Tool Calls: {len(tool_results_history)}
+   Elapsed Time: {elapsed_time:.1f}s
+
+   Search Queries Used:
+{chr(10).join(f'      {i+1}. "{q}"' for i, q in enumerate(sorted(search_query_history)))}
+""")
 
                     return {
                         'status': 'success',
@@ -818,20 +1095,98 @@ DO IT NOW. Just output the tool call - no other text."""
                         'elapsed_time_ms': int(elapsed_time * 1000),
                         'cost': 0.00,  # Zero cost - local Ollama
                         'tool_calls_made': len(tool_results_history),
+                        'searches_made': final_search_count,
+                        'searches_required': min_searches_required if requires_multi_search else None,
+                        'unique_queries': len(search_query_history),
+                        'unique_urls': len(extracted_urls),
                         'iterations': iteration + 1,
                         'total_duration': result.get('total_duration', 0),
                         'eval_count': result.get('eval_count', 0)
                     }
+                else:
+                    # Tool calls made - reset synthesis counter
+                    synthesis_attempts = 0
 
-                # Execute tool calls
+                # Execute tool calls with deduplication
                 tool_results = []
+                duplicate_query_detected = False
+
                 for tool_call in tool_calls:
-                    result = self._execute_tool(
-                        tool_call['tool_name'],
-                        tool_call['parameters']
-                    )
+                    tool_name = tool_call['tool_name']
+                    parameters = tool_call['parameters']
+
+                    # PHASE 4: Check for duplicate search queries
+                    if tool_name == 'web_search':
+                        query = parameters.get('query', '').lower().strip()
+
+                        if query in search_query_history:
+                            logger.warning(f"⚠️  Duplicate search query detected: '{query}'")
+                            duplicate_query_detected = True
+
+                            # Add error result instead of executing
+                            tool_results.append({
+                                'status': 'skipped',
+                                'tool_name': tool_name,
+                                'result': {'error': f'Duplicate query: {query}', 'items': []}
+                            })
+                            continue
+
+                        # Record unique query
+                        search_query_history.add(query)
+                        logger.info(f"🔍 New unique search: '{query}' (Total unique: {len(search_query_history)})")
+
+                    # PHASE 4: Check for duplicate URL extractions
+                    elif tool_name == 'extract_faculty_profile':
+                        url = parameters.get('url', '')
+
+                        if url in extracted_urls:
+                            logger.info(f"⏭️  Skipping duplicate URL: {url}")
+
+                            # Add skipped result
+                            tool_results.append({
+                                'status': 'skipped',
+                                'tool_name': tool_name,
+                                'result': {'message': 'Already extracted this URL', 'name': None}
+                            })
+                            continue
+
+                        # Record unique URL
+                        extracted_urls.add(url)
+
+                    # Execute the tool
+                    result = self._execute_tool(tool_name, parameters)
                     tool_results.append(result)
                     tool_results_history.append(result)
+
+                # PHASE 4: Diversity enforcement - if duplicate detected, force retry with guidance
+                if duplicate_query_detected:
+                    logger.warning(f"🔄 Forcing diversity retry due to duplicate query")
+
+                    current_prompt = f"""❌ DUPLICATE SEARCH DETECTED
+
+You just tried to search with a query you already used before.
+
+Already searched queries:
+{chr(10).join(f'   - "{q}"' for q in sorted(search_query_history))}
+
+Original user request: {user_message}
+
+Generate a NEW, DIFFERENT search query using:
+- Different role keywords (try: 'postdoc', 'lecturer', 'visiting professor', 'research fellow')
+- Different action verbs (try: 'appointed', 'hired', 'joining', 'welcomes', 'announces')
+- Different institution tiers (try: 'liberal arts college', 'R2 university', 'public university')
+- Different geographic focus (try: 'midwest', 'west coast', 'ivy league', 'UC system')
+- Different time periods (try: 'fall 2024', 'spring 2025', 'academic year 2024-2025')
+
+Make a NEW [TOOL_CALL:web_search] with max_results=50 using a completely different query. DO NOT repeat any query above."""
+
+                    continue  # Skip to next iteration with diversity prompt
+
+                # PHASE 3: Check if multi-search requirement is now met
+                if requires_multi_search and not search_enforced:
+                    current_search_count = sum(1 for tr in tool_results_history if tr.get('tool_name') == 'web_search')
+                    if current_search_count >= min_searches_required:
+                        logger.info(f"✅ Multi-search requirement met: {current_search_count}/{min_searches_required} searches completed")
 
                 # Build prompt for next iteration with tool results
                 results_text = "\n\n[TOOL_RESULTS]\n"
@@ -851,9 +1206,19 @@ DO IT NOW. Just output the tool call - no other text."""
                         results_text += f"Error: {tr.get('error', 'Unknown error')}\n"
 
                 results_text += "\n[/TOOL_RESULTS]\n\n"
-                results_text += "Based on these tool results, please provide your final response to the user's question."
 
-                current_prompt = results_text
+                # CRITICAL: Preserve context - include original user request
+                current_prompt = f"""ORIGINAL USER REQUEST: {user_message}
+
+{results_text}
+
+Now provide your final, formatted response answering the user's request above.
+
+IMPORTANT:
+- List each hire with: Name, Position, Institution, PhD info, Source URL
+- DO NOT make more tool calls unless you need additional data
+- If you have sufficient results, synthesize them now
+- Use clear formatting"""
 
             except requests.exceptions.RequestException as e:
                 logger.error(f"Ollama request failed: {e}")
@@ -865,7 +1230,21 @@ DO IT NOW. Just output the tool call - no other text."""
                 }
 
         # Max iterations reached
+        final_search_count = sum(1 for tr in tool_results_history if tr.get('tool_name') == 'web_search')
         elapsed_time = time.time() - start_time
+
+        # PHASE 4: Log max iterations with full stats
+        logger.warning(f"""
+⚠️  Max Iterations Reached:
+   Iterations: {max_iterations}/{max_iterations}
+   Unique Searches: {len(search_query_history)}
+   Unique URLs: {len(extracted_urls)}
+   Tool Calls: {len(tool_results_history)}
+
+   Queries Used:
+{chr(10).join(f'      - "{q}"' for q in sorted(search_query_history))}
+""")
+
         return {
             'status': 'success',
             'agent_id': agent_id,
@@ -874,6 +1253,10 @@ DO IT NOW. Just output the tool call - no other text."""
             'elapsed_time_ms': int(elapsed_time * 1000),
             'cost': 0.00,
             'tool_calls_made': len(tool_results_history),
+            'searches_made': final_search_count,
+            'searches_required': min_searches_required if requires_multi_search else None,
+            'unique_queries': len(search_query_history),
+            'unique_urls': len(extracted_urls),
             'iterations': max_iterations,
             'warning': 'Max iterations reached'
         }

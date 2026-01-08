@@ -174,9 +174,9 @@ class RequirementExtractor:
             compliance_type, keywords = self._classify_sentence(para_text)
 
             if compliance_type != 'unknown':
-                # Extract requirement
+                # Extract requirement (use UUID for global uniqueness)
                 req = Requirement(
-                    id=f"{section}-{req_counter:03d}",
+                    id=str(uuid.uuid4()),
                     section=section,
                     text=para_text,
                     compliance_type=compliance_type,
@@ -222,9 +222,9 @@ class RequirementExtractor:
             compliance_type, keywords = self._classify_sentence(sentence)
 
             if compliance_type != 'unknown':
-                # Extract requirement
+                # Extract requirement (use UUID for global uniqueness)
                 req = Requirement(
-                    id=f"{section}-{req_counter:03d}",
+                    id=str(uuid.uuid4()),
                     section=section,
                     text=sentence.strip(),
                     compliance_type=compliance_type,

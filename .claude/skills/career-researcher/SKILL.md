@@ -68,6 +68,90 @@ For each hire found, provide:
 
 **Never report information without a verifiable source URL.**
 
+## Query Diversity Requirements
+
+**CRITICAL**: Your searches MUST use diverse queries to find comprehensive results. Making the same search multiple times wastes time and returns duplicate results.
+
+### Required Search Patterns (Use ALL 4)
+
+**Pattern 1: Role-Based Search**
+```
+[TOOL_CALL:web_search]
+{"query": "assistant professor political science 2025 site:.edu", "max_results": 50}
+[/TOOL_CALL]
+
+[TOOL_CALL:web_search]
+{"query": "postdoctoral fellow political science 2024 site:.edu", "max_results": 50}
+[/TOOL_CALL]
+
+[TOOL_CALL:web_search]
+{"query": "lecturer political science hired 2025 site:.edu", "max_results": 50}
+[/TOOL_CALL]
+```
+
+**Pattern 2: Action-Based Search**
+```
+[TOOL_CALL:web_search]
+{"query": "political science new faculty joining 2025 site:.edu", "max_results": 50}
+[/TOOL_CALL]
+
+[TOOL_CALL:web_search]
+{"query": "political science welcomes appointed 2024 site:.edu", "max_results": 50}
+[/TOOL_CALL]
+```
+
+**Pattern 3: Institution-Based Search**
+```
+[TOOL_CALL:web_search]
+{"query": "Harvard Yale Princeton political science new faculty site:.edu", "max_results": 50}
+[/TOOL_CALL]
+
+[TOOL_CALL:web_search]
+{"query": "Amherst Williams Swarthmore political science hire site:.edu", "max_results": 50}
+[/TOOL_CALL]
+
+[TOOL_CALL:web_search]
+{"query": "Berkeley Michigan Wisconsin political science assistant professor site:.edu", "max_results": 50}
+[/TOOL_CALL]
+```
+
+**Pattern 4: Time-Based Search**
+```
+[TOOL_CALL:web_search]
+{"query": "political science fall 2024 new hire site:.edu", "max_results": 50}
+[/TOOL_CALL]
+
+[TOOL_CALL:web_search]
+{"query": "political science academic year 2024-2025 faculty site:.edu", "max_results": 50}
+[/TOOL_CALL]
+```
+
+### Diversity Validation Checklist
+
+Before synthesizing results, verify you have:
+- [ ] Used at least 3 different **role keywords** (assistant professor, postdoc, lecturer, research fellow)
+- [ ] Used at least 2 different **action verbs** (hired, joining, appointed, welcomes, announces)
+- [ ] Targeted at least 2 **institution tiers** (R1, liberal arts, public universities)
+- [ ] Covered 2+ **time periods** (2024, 2025, fall, spring, academic year)
+
+**If ANY checkbox is unchecked, make MORE searches before finalizing your response.**
+
+### Anti-Patterns (NEVER Do These)
+
+❌ **Repeating the same query:**
+```
+Search 1: "political science new faculty 2025 site:.edu"
+Search 2: "political science new faculty 2025 site:.edu"  ← DUPLICATE!
+Search 3: "political science new faculty 2025 site:.edu"  ← DUPLICATE!
+```
+
+✅ **Using diverse queries:**
+```
+Search 1: "political science new faculty 2025 site:.edu"
+Search 2: "postdoctoral fellow political science 2024 site:.edu"  ← DIFFERENT!
+Search 3: "Harvard Yale Princeton political science hire site:.edu"  ← DIFFERENT!
+```
+
 ## What NOT to Do ❌
 
 **NEVER give up or make excuses:**

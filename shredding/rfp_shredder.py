@@ -166,6 +166,11 @@ class RFPShredder:
                     'classification': classification
                 })
 
+            logger.info(f"DEBUG: Created {len(classified_requirements)} classified requirements")
+            if len(classified_requirements) > 0:
+                logger.info(f"DEBUG: First requirement: {classified_requirements[0]['requirement'].id}")
+                logger.info(f"DEBUG: First classification: {classified_requirements[0]['classification'].compliance_type}")
+
             # Step 4: Create opportunity
             logger.info("Step 4/6: Creating opportunity")
             opportunity_id = self._create_opportunity(
@@ -325,13 +330,18 @@ class RFPShredder:
             opportunity_id: Parent opportunity ID
             classified_requirements: List of {requirement, classification} dicts
         """
+        logger.info(f"DEBUG: _save_requirements called with {len(classified_requirements)} requirements for opportunity {opportunity_id[:8]}...")
+
         conn = sqlite3.connect(self.db_path)
         cursor = conn.cursor()
 
         try:
-            for cr in classified_requirements:
+            logger.info(f"DEBUG: Starting to insert requirements...")
+            for i, cr in enumerate(classified_requirements):
                 req: Requirement = cr['requirement']
                 classification: RequirementClassification = cr['classification']
+
+                logger.info(f"DEBUG: Inserting requirement {i+1}/{len(classified_requirements)}: {req.id}")
 
                 cursor.execute("""
                     INSERT INTO requirements (
@@ -360,6 +370,9 @@ class RFPShredder:
                     datetime.now().isoformat()
                 ))
 
+                logger.info(f"DEBUG: Successfully inserted requirement {req.id}")
+
+            logger.info(f"DEBUG: All inserts complete, committing...")
             conn.commit()
             logger.info(f"Saved {len(classified_requirements)} requirements")
 

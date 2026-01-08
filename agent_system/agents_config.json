@@ -47,13 +47,26 @@
     "agent_id": "agent_68b292cc",
     "name": "Career-Agent",
     "description": "Specialized career analysis and opportunity matching agent with web research capabilities",
-    "model": "qwen2.5:3b",
+    "model": "qwen2.5:7b",
     "capabilities": [],
     "skills": [
       "career-researcher",
       "career-monster"
     ],
-    "temperature": 0.5,
+    "temperature": 0.8,
+    "max_tokens": 4096,
+    "status": "active"
+  },
+  "agent_b17c1d01": {
+    "agent_id": "agent_b17c1d01",
+    "name": "RFP-Shredder",
+    "description": "Shreds me some RFPs.",
+    "model": "qwen2.5:3b",
+    "capabilities": [],
+    "skills": [
+      "shredding"
+    ],
+    "temperature": 0.7,
     "max_tokens": 2048,
     "status": "active"
   }

@@ -204,6 +204,8 @@ def handle_agent_invocation(handler, agent_id, message, model):
                 'agent_id': agent_id,
                 'agent_enabled': True,
                 'tool_calls_made': result.get('tool_calls_made', 0),
+                'searches_made': result.get('searches_made', 0),
+                'searches_required': result.get('searches_required'),
                 'iterations': result.get('iterations', 1),
                 'elapsed_time_ms': result.get('elapsed_time_ms', 0),
                 'tokens_used': result.get('eval_count', 0),
@@ -213,7 +215,8 @@ def handle_agent_invocation(handler, agent_id, message, model):
                 'connection_attempt': 1
             })
 
-            debug_log(f"Agent response completed - {result.get('tool_calls_made', 0)} tool calls", "✅")
+            search_info = f"{result.get('searches_made', 0)}/{result.get('searches_required', '?')} searches" if result.get('searches_required') else f"{result.get('searches_made', 0)} searches"
+            debug_log(f"Agent response completed - {result.get('tool_calls_made', 0)} tool calls ({search_info})", "✅")
 
         else:
             # Agent invocation failed
