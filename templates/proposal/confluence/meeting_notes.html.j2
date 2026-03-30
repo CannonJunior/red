@@ -1,0 +1,60 @@
+{# Confluence Meeting Notes Page — Jinja2 template #}
+{# Variables: meeting (dict: title, date, type, attendees, agenda_items, action_items) #}
+<h1>{{ meeting.title }}</h1>
+<p><strong>Date:</strong> {{ meeting.date }}&nbsp;&nbsp;
+   <strong>Type:</strong> {{ meeting.type }}&nbsp;&nbsp;
+   <strong>Facilitator:</strong> {{ meeting.facilitator }}</p>
+
+<h2>Attendees</h2>
+<ul>
+  {% for person in meeting.attendees %}
+  <li>{{ person }}</li>
+  {% endfor %}
+</ul>
+
+<h2>Agenda</h2>
+<ol>
+  {% for item in meeting.agenda_items %}
+  <li>{{ item }}</li>
+  {% endfor %}
+</ol>
+
+<h2>Discussion Notes</h2>
+<p><em>[ Add notes here ]</em></p>
+
+<h2>Decisions Made</h2>
+<ul>
+  {% for decision in meeting.decisions | default([]) %}
+  <li>{{ decision }}</li>
+  {% else %}
+  <li><em>None recorded</em></li>
+  {% endfor %}
+</ul>
+
+<h2>Action Items</h2>
+<table>
+  <thead>
+    <tr>
+      <th>#</th>
+      <th>Action</th>
+      <th>Owner</th>
+      <th>Due Date</th>
+      <th>Status</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for ai in meeting.action_items | default([]) %}
+    <tr>
+      <td>{{ loop.index }}</td>
+      <td>{{ ai.action }}</td>
+      <td>{{ ai.owner }}</td>
+      <td>{{ ai.due_date }}</td>
+      <td>Open</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="5"><em>No action items</em></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p><em>Notes recorded by: {{ meeting.recorder | default('TBD') }}</em></p>

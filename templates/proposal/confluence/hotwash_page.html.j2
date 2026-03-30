@@ -1,0 +1,76 @@
+{# Confluence Hotwash / Lessons Learned Page — Jinja2 template #}
+{# Variables: proposal, hotwash (dict: outcome, score, lessons, process_improvements, action_items) #}
+<h1>Hotwash — {{ proposal.title }}</h1>
+<p><strong>Solicitation:</strong> {{ proposal.solicitation_number }}&nbsp;&nbsp;
+   <strong>Outcome:</strong>
+   <span style="color:{% if hotwash.outcome == 'WIN' %}green{% else %}red{% endif %};">
+     <strong>{{ hotwash.outcome }}</strong>
+   </span></p>
+
+<ac:structured-macro ac:name="panel">
+  <ac:parameter ac:name="title">Proposal Debrief Summary</ac:parameter>
+  <ac:rich-text-body>
+    <table>
+      <tbody>
+        <tr><th>Outcome</th><td>{{ hotwash.outcome }}</td></tr>
+        <tr><th>Government Score</th><td>{{ hotwash.gov_score | default('N/A') }}</td></tr>
+        <tr><th>Price Position</th><td>{{ hotwash.price_position | default('Unknown') }}</td></tr>
+        <tr><th>Strengths Cited</th><td>{{ hotwash.strengths_cited | default('N/A') }}</td></tr>
+        <tr><th>Weaknesses Cited</th><td>{{ hotwash.weaknesses_cited | default('N/A') }}</td></tr>
+      </tbody>
+    </table>
+  </ac:rich-text-body>
+</ac:structured-macro>
+
+<h2>Lessons Learned</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Category</th>
+      <th>Lesson</th>
+      <th>Impact</th>
+      <th>Recommended Action</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for lesson in hotwash.lessons | default([]) %}
+    <tr>
+      <td>{{ lesson.category }}</td>
+      <td>{{ lesson.lesson }}</td>
+      <td>{{ lesson.impact }}</td>
+      <td>{{ lesson.recommended_action }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="4"><em>No lessons recorded</em></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<h2>Process Improvements</h2>
+<ol>
+  {% for item in hotwash.process_improvements | default([]) %}
+  <li>{{ item }}</li>
+  {% else %}
+  <li><em>None identified</em></li>
+  {% endfor %}
+</ol>
+
+<h2>Follow-Up Action Items</h2>
+<table>
+  <thead>
+    <tr><th>Action</th><th>Owner</th><th>Due Date</th></tr>
+  </thead>
+  <tbody>
+    {% for ai in hotwash.action_items | default([]) %}
+    <tr>
+      <td>{{ ai.action }}</td>
+      <td>{{ ai.owner }}</td>
+      <td>{{ ai.due_date }}</td>
+    </tr>
+    {% else %}
+    <tr><td colspan="3"><em>No action items</em></td></tr>
+    {% endfor %}
+  </tbody>
+</table>
+
+<p><em>Hotwash conducted: {{ hotwash.conducted_at }} | Facilitator: {{ hotwash.facilitator | default('TBD') }}</em></p>

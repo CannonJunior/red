@@ -994,190 +994,22 @@ class MCPAgentManager {
     }
 
     async showCreateAgentDialog() {
-        // Load available skills first
-        const skillsResponse = await this.apiCall('/api/ollama/skills');
-        const availableSkills = skillsResponse.skills || [];
-
-        // Create modal dialog for agent creation
-        const modal = document.createElement('div');
-        modal.className = 'fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50';
-        modal.innerHTML = `
-            <div class="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4 max-h-[90vh] overflow-y-auto">
-                <h3 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Create New Ollama Agent</h3>
-                <form id="create-agent-form">
-                    <div class="space-y-4">
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Name *</label>
-                            <input type="text" id="agent-name" required
-                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                placeholder="Enter agent name">
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
-                            <textarea id="agent-description" rows="3"
-                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
-                                placeholder="Describe what this agent does"></textarea>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model</label>
-                            <select id="agent-model"
-                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
-                                <option value="qwen2.5:3b">qwen2.5:3b (recommended - fast & free)</option>
-                                <option value="llama3.1:latest">llama3.1:latest</option>
-                                <option value="llama3.2:latest">llama3.2:latest</option>
-                                <option value="mistral:latest">mistral:latest</option>
-                            </select>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Skills</label>
-                            <!-- Tab buttons -->
-                            <div class="flex border-b border-gray-300 dark:border-gray-600 mb-2">
-                                <button type="button" class="skill-tab px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400" data-tab="plugin">
-                                    Plugin Skills
-                                </button>
-                                <button type="button" class="skill-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" data-tab="custom">
-                                    Custom Skills
-                                </button>
-                            </div>
-                            <!-- Plugin Skills Tab Content -->
-                            <div class="skill-tab-content border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto" data-tab-content="plugin">
-                                ${availableSkills.filter(s => s.source === 'plugin').length > 0 ? availableSkills.filter(s => s.source === 'plugin').map(skill => `
-                                    <label class="flex items-start">
-                                        <input type="checkbox" class="agent-skill mt-1" value="${skill.name}"
-                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <div class="ml-2 flex-1">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
-                                            <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
-                                        </div>
-                                    </label>
-                                `).join('') : '<div class="text-sm text-gray-500">No plugin skills available</div>'}
-                            </div>
-                            <!-- Custom Skills Tab Content -->
-                            <div class="skill-tab-content border border-gray-300 dark:border-gray-600 rounded-md p-3 space-y-2 max-h-40 overflow-y-auto hidden" data-tab-content="custom">
-                                ${availableSkills.filter(s => s.source === 'local').length > 0 ? availableSkills.filter(s => s.source === 'local').map(skill => `
-                                    <label class="flex items-start">
-                                        <input type="checkbox" class="agent-skill mt-1" value="${skill.name}"
-                                            class="rounded border-gray-300 text-blue-600 focus:ring-blue-500">
-                                        <div class="ml-2 flex-1">
-                                            <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
-                                            <div class="text-xs text-gray-600 dark:text-gray-400">${skill.description}</div>
-                                        </div>
-                                    </label>
-                                `).join('') : '<div class="text-sm text-gray-500">No custom skills available</div>'}
-                            </div>
-                        </div>
-                        <div>
-                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Capabilities</label>
-                            <select id="agent-capabilities" multiple
-                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
-                                <option value="general">General</option>
-                                <option value="nlp">Natural Language Processing</option>
-                                <option value="data-analysis">Data Analysis</option>
-                                <option value="automation">Automation</option>
-                                <option value="monitoring">Monitoring</option>
-                            </select>
-                        </div>
-                    </div>
-                    <div class="flex gap-3 mt-6">
-                        <button type="submit" class="flex-1 bg-blue-600 text-white py-2 px-4 rounded-md hover:bg-blue-700">
-                            Create Agent
-                        </button>
-                        <button type="button" id="cancel-agent" class="flex-1 bg-gray-300 dark:bg-gray-600 text-gray-700 dark:text-gray-300 py-2 px-4 rounded-md hover:bg-gray-400 dark:hover:bg-gray-500">
-                            Cancel
-                        </button>
-                    </div>
-                </form>
-            </div>
-        `;
-
-        document.body.appendChild(modal);
-
-        // Prevent clicks on modal content from closing the modal
-        const modalContent = modal.querySelector('div.bg-white');
-        if (modalContent) {
-            modalContent.addEventListener('click', (e) => {
-                e.stopPropagation();
-            });
-        }
-
-        // Handle skill tab switching
-        const skillTabs = modal.querySelectorAll('.skill-tab');
-        const skillTabContents = modal.querySelectorAll('.skill-tab-content');
-
-        skillTabs.forEach(tab => {
-            tab.addEventListener('click', (e) => {
-                e.preventDefault();
-                const targetTab = tab.dataset.tab;
-
-                // Update tab button styles
-                skillTabs.forEach(t => {
-                    if (t.dataset.tab === targetTab) {
-                        t.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                        t.classList.add('border-blue-600', 'text-blue-600', 'dark:border-blue-400', 'dark:text-blue-400');
-                    } else {
-                        t.classList.remove('border-blue-600', 'text-blue-600', 'dark:border-blue-400', 'dark:text-blue-400');
-                        t.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
-                    }
-                });
-
-                // Show/hide tab contents
-                skillTabContents.forEach(content => {
-                    if (content.dataset.tabContent === targetTab) {
-                        content.classList.remove('hidden');
-                    } else {
-                        content.classList.add('hidden');
-                    }
-                });
-            });
-        });
-
-        // Handle form submission
-        const form = modal.querySelector('#create-agent-form');
-        form.addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const name = modal.querySelector('#agent-name').value;
-            const description = modal.querySelector('#agent-description').value;
-            const model = modal.querySelector('#agent-model').value;
-            const capabilities = Array.from(modal.querySelector('#agent-capabilities').selectedOptions).map(o => o.value);
-
-            // Get selected skills
-            const skillCheckboxes = modal.querySelectorAll('.agent-skill:checked');
-            const skills = Array.from(skillCheckboxes).map(cb => cb.value);
-
-            try {
-                await this.createAgent({ name, description, model, capabilities, skills });
-                if (modal && modal.parentNode) {
-                    modal.parentNode.removeChild(modal);
-                }
-            } catch (error) {
-                console.error('Failed to create agent:', error);
-                alert('Failed to create agent: ' + error.message);
-            }
-        });
-
-        // Handle cancel
-        const cancelButton = modal.querySelector('#cancel-agent');
-        if (cancelButton) {
-            cancelButton.addEventListener('click', (e) => {
-                e.preventDefault();
-                e.stopPropagation();
-                console.log('Cancel agent button clicked');
-                if (modal && modal.parentNode) {
-                    modal.parentNode.removeChild(modal);
-                }
-            });
+        // Navigate to the full-screen create agent page instead of a modal
+        if (window.app && typeof window.app.navigateTo === 'function') {
+            window.app.navigateTo('ollama-agent-create');
         } else {
-            console.error('Cancel agent button not found in modal');
-        }
-
-        // Close on background click
-        modal.addEventListener('click', (e) => {
-            if (e.target === modal) {
-                if (modal && modal.parentNode) {
-                    modal.parentNode.removeChild(modal);
-                }
+            // Fallback: directly show the full-screen area
+            document.querySelectorAll('main[id$="-area"]').forEach(el => el.classList.add('hidden'));
+            const createArea = document.getElementById('ollama-agent-create-area');
+            if (createArea) {
+                createArea.classList.remove('hidden');
             }
-        });
+            const pageTitle = document.getElementById('page-title');
+            if (pageTitle) pageTitle.textContent = 'Create New Ollama Agent';
+            if (window.app && typeof window.app.loadOllamaAgentCreatePage === 'function') {
+                window.app.loadOllamaAgentCreatePage();
+            }
+        }
     }
 
     async showAddMCPServerDialog() {

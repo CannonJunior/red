@@ -112,3 +112,10 @@
 ### 📝 Memoization Instructions
 - **Memoize any input given in MEMOIZE.md file.**
 - **This project focuses on agent-native RAG features to help users with document analysis and knowledge synthesis.**
+
+### BUGS
+  - Bug: document.querySelector('.flex-1.overflow-y-auto') — matched the sidebar <nav> first (since <nav            
+  class="flex-1 p-3 overflow-y-auto"> was added during the nav restructure), then called innerHTML = '' on it,      
+  erasing all nav items.                                                                                            
+  - Fix: Changed to document.querySelector('#chat-area .flex-1.overflow-y-auto') — scopes the search to the chat
+  panel.

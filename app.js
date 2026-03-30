@@ -150,8 +150,10 @@ class ChatInterface {
     }
 
     setupMessagesContainer() {
-        // Find the messages area and clear the welcome message
-        const chatArea = document.querySelector('.flex-1.overflow-y-auto');
+        // Find the messages area inside #chat-area specifically.
+        // The generic '.flex-1.overflow-y-auto' selector would also match the
+        // sidebar <nav> element, which would wipe out all nav items.
+        const chatArea = document.querySelector('#chat-area .flex-1.overflow-y-auto');
         if (chatArea) {
             // Create messages container
             this.messagesContainer = document.createElement('div');
@@ -1542,39 +1544,45 @@ class Navigation {
     }
 
     setupNavigation() {
-        const navItems = document.querySelectorAll('.nav-item');
+        // Top-level nav items identified by data-page attribute
+        const navItems = document.querySelectorAll('.nav-item[data-page]');
         navItems.forEach(item => {
             item.addEventListener('click', (e) => {
-                const itemText = item.textContent.trim().toLowerCase();
+                const page = item.dataset.page;
 
-                // Handle expandable nav items (Lists)
                 if (item.classList.contains('expandable-nav-item')) {
                     e.stopPropagation();
-                    this.toggleExpandableNavItem(item, itemText);
+                    this.toggleExpandableNavItem(item, page);
+                    // Skills also navigates to the management page
+                    if (page === 'skills') {
+                        this.navigateTo('skills-interface');
+                        this.setActiveNavItem(item);
+                    }
+                    // Knowledge and Lists: expand only, no area navigation
                     return;
                 }
 
-                this.navigateTo(itemText);
+                this.navigateTo(page);
                 this.setActiveNavItem(item);
-
-                // Show/hide knowledge base list when Knowledge is selected
-                if (itemText === 'knowledge') {
-                    this.toggleKnowledgeBaseList(true);
-                } else {
-                    this.toggleKnowledgeBaseList(false);
-                }
             });
         });
 
-        // Setup sub-nav items (Opportunities, Skills)
+        // Sub-nav items (data-list, data-skill, data-nav)
         const subNavItems = document.querySelectorAll('.sub-nav-item');
         subNavItems.forEach(item => {
             item.addEventListener('click', (e) => {
                 e.stopPropagation();
-                const listType = item.getAttribute('data-list');
+                const listType  = item.getAttribute('data-list');
                 const skillType = item.getAttribute('data-skill');
+                const navType   = item.getAttribute('data-nav');
 
-                // Handle skill interface items
+                // Knowledge sub-items: CAG Knowledge / RAG Knowledge
+                if (navType) {
+                    this.navigateTo(navType);
+                    return;
+                }
+
+                // Skills sub-items: career-monster, etc.
                 if (skillType) {
                     if (skillType === 'career-monster') {
                         this.showCareerMonster();
@@ -1582,7 +1590,7 @@ class Navigation {
                     return;
                 }
 
-                // Handle career-analysis list
+                // Lists sub-items
                 if (listType === 'career-analysis') {
                     if (window.careerList) {
                         window.careerList.showCareerAnalysisList();
@@ -1592,14 +1600,11 @@ class Navigation {
 
                 if (item.classList.contains('expandable-nav-item')) {
                     this.toggleExpandableNavItem(item, listType);
-                    // Navigate to appropriate area based on list type
                     if (listType === 'todos') {
-                        // Show TODO area
                         if (window.todoUI) {
                             window.todoUI.showTodoArea();
                         }
                     } else {
-                        // Navigate to opportunities area for other expandable items
                         this.navigateTo('opportunities');
                         if (window.app?.opportunitiesManager) {
                             window.app.opportunitiesManager.loadOpportunities();
@@ -1611,34 +1616,255 @@ class Navigation {
     }
 
     showCareerMonster() {
-        // Hide all other areas
         this.navigateTo('career-monster');
-
-        // Show career-monster area
         const careerArea = document.getElementById('career-monster-area');
         if (careerArea) {
             careerArea.classList.remove('hidden');
         }
-
-        // Update page title
         const pageTitle = document.getElementById('page-title');
         if (pageTitle) {
             pageTitle.textContent = 'Career-Monster';
         }
     }
 
+    loadSkillsManagementPage() {
+        const STORAGE_KEY = 'skills_enabled_state';
+        const savedState = JSON.parse(localStorage.getItem(STORAGE_KEY) || '{}');
+
+        fetch(`${this.baseUrl || ''}/api/ollama/skills`)
+            .then(r => r.json())
+            .then(data => {
+                const skills = data.skills || [];
+                const pluginSkills = skills.filter(s => s.source === 'plugin');
+                const customSkills = skills.filter(s => s.source === 'local');
+
+                this._renderSkillsManagementList('plugin-skills-list', pluginSkills, savedState, STORAGE_KEY);
+                this._renderSkillsManagementList('custom-skills-list', customSkills, savedState, STORAGE_KEY);
+                this.refreshSkillsSubmenu(skills, savedState);
+            })
+            .catch(() => {
+                // Fallback: show only the built-in Career Monster skill
+                const builtinSkills = [{ name: 'career-monster', description: 'Academic hiring pattern analysis', source: 'local', hasInterface: true }];
+                this._renderSkillsManagementList('plugin-skills-list', [], savedState, STORAGE_KEY);
+                this._renderSkillsManagementList('custom-skills-list', builtinSkills, savedState, STORAGE_KEY);
+                this.refreshSkillsSubmenu(builtinSkills, savedState);
+            });
+    }
+
+    _renderSkillsManagementList(containerId, skills, savedState, storageKey) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+
+        if (skills.length === 0) {
+            container.innerHTML = '<p class="text-sm text-gray-400 dark:text-gray-500">No skills available</p>';
+            return;
+        }
+
+        container.innerHTML = skills.map(skill => {
+            const enabled = savedState[skill.name] !== false; // default enabled
+            return `
+                <div class="flex items-start justify-between p-3 border border-gray-200 dark:border-gray-600 rounded-lg">
+                    <div class="flex-1 min-w-0 mr-4">
+                        <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                        <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${skill.description || ''}</div>
+                        ${skill.hasInterface ? '<span class="inline-block mt-1 text-xs bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300 px-2 py-0.5 rounded">Has sub-tab interface</span>' : ''}
+                    </div>
+                    <label class="relative inline-flex items-center cursor-pointer flex-shrink-0">
+                        <input type="checkbox" class="skill-toggle sr-only" data-skill="${skill.name}" ${enabled ? 'checked' : ''}>
+                        <div class="skill-toggle-track w-11 h-6 bg-gray-200 dark:bg-gray-600 rounded-full transition-colors ${enabled ? '!bg-blue-600' : ''}"></div>
+                        <div class="skill-toggle-thumb absolute left-0.5 top-0.5 w-5 h-5 bg-white rounded-full shadow transition-transform ${enabled ? 'translate-x-5' : ''}"></div>
+                    </label>
+                </div>
+            `;
+        }).join('');
+
+        // Bind toggle events
+        container.querySelectorAll('.skill-toggle').forEach(toggle => {
+            toggle.addEventListener('change', (e) => {
+                const skillName = e.target.dataset.skill;
+                const isEnabled = e.target.checked;
+                const state = JSON.parse(localStorage.getItem(storageKey) || '{}');
+                state[skillName] = isEnabled;
+                localStorage.setItem(storageKey, JSON.stringify(state));
+
+                // Update visual track/thumb
+                const label = e.target.closest('label');
+                const track = label.querySelector('.skill-toggle-track');
+                const thumb = label.querySelector('.skill-toggle-thumb');
+                if (isEnabled) {
+                    track.classList.add('!bg-blue-600');
+                    thumb.classList.add('translate-x-5');
+                } else {
+                    track.classList.remove('!bg-blue-600');
+                    thumb.classList.remove('translate-x-5');
+                }
+
+                // Refresh the sidebar submenu
+                fetch(`${this.baseUrl || ''}/api/ollama/skills`)
+                    .then(r => r.json())
+                    .then(data => this.refreshSkillsSubmenu(data.skills || [], state))
+                    .catch(() => {});
+            });
+        });
+    }
+
+    refreshSkillsSubmenu(skills, savedState) {
+        const submenu = document.getElementById('skills-submenu');
+        if (!submenu) return;
+
+        // Keep only skills with a UI interface that are enabled
+        const interfaceSkills = skills.filter(s => s.hasInterface && savedState[s.name] !== false);
+        // Always include career-monster if enabled
+        const cmEnabled = savedState['career-monster'] !== false;
+
+        let html = '';
+
+        // Career Monster (built-in interface skill)
+        if (cmEnabled) {
+            html += `
+                <button class="sub-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-skill="career-monster">
+                    <span class="flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                        </svg>
+                        Career-Monster
+                    </span>
+                </button>`;
+        }
+
+        // Other interface skills from the API
+        interfaceSkills.filter(s => s.name !== 'career-monster').forEach(skill => {
+            html += `
+                <button class="sub-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-skill="${skill.name}">
+                    <span class="flex items-center">
+                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
+                        </svg>
+                        ${skill.name}
+                    </span>
+                </button>`;
+        });
+
+        submenu.innerHTML = html;
+
+        // Re-bind sub-nav click events for newly created buttons
+        submenu.querySelectorAll('.sub-nav-item').forEach(item => {
+            item.addEventListener('click', (e) => {
+                e.stopPropagation();
+                const skillType = item.getAttribute('data-skill');
+                if (skillType === 'career-monster') {
+                    this.showCareerMonster();
+                }
+            });
+        });
+    }
+
+    loadOllamaAgentCreatePage() {
+        // Load skills into the full-screen form
+        fetch(`${this.baseUrl || ''}/api/ollama/skills`)
+            .then(r => r.json())
+            .then(data => {
+                const skills = data.skills || [];
+                this._renderAgentSkillsGrid('fs-plugin-skills-grid', skills.filter(s => s.source === 'plugin'));
+                this._renderAgentSkillsGrid('fs-custom-skills-grid', skills.filter(s => s.source === 'local'));
+            })
+            .catch(() => {
+                document.getElementById('fs-plugin-skills-grid').innerHTML = '<p class="text-sm text-gray-400 col-span-2">No plugin skills available</p>';
+                document.getElementById('fs-custom-skills-grid').innerHTML = '<p class="text-sm text-gray-400 col-span-2">No custom skills available</p>';
+            });
+
+        // Tab switching
+        const fsSkillTabs = document.querySelectorAll('.fs-skill-tab');
+        const fsSkillContents = document.querySelectorAll('.fs-skill-tab-content');
+        fsSkillTabs.forEach(tab => {
+            tab.onclick = (e) => {
+                e.preventDefault();
+                const target = tab.dataset.tab;
+                fsSkillTabs.forEach(t => {
+                    if (t.dataset.tab === target) {
+                        t.classList.remove('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                        t.classList.add('border-blue-600', 'text-blue-600', 'dark:border-blue-400', 'dark:text-blue-400');
+                    } else {
+                        t.classList.remove('border-blue-600', 'text-blue-600', 'dark:border-blue-400', 'dark:text-blue-400');
+                        t.classList.add('border-transparent', 'text-gray-500', 'dark:text-gray-400');
+                    }
+                });
+                fsSkillContents.forEach(c => {
+                    c.dataset.tabContent === target ? c.classList.remove('hidden') : c.classList.add('hidden');
+                });
+            };
+        });
+
+        // Back/Cancel buttons
+        const backBtn = document.getElementById('back-to-agents-btn');
+        const cancelBtn = document.getElementById('cancel-agent-fullscreen');
+        const goBack = () => {
+            this.navigateTo('agents');
+            const agentsNavItem = document.querySelector('.nav-item[data-page="agents"]') ||
+                Array.from(document.querySelectorAll('.nav-item')).find(el => el.textContent.trim().toLowerCase() === 'agents');
+            if (agentsNavItem) this.setActiveNavItem(agentsNavItem);
+        };
+        if (backBtn) backBtn.onclick = goBack;
+        if (cancelBtn) cancelBtn.onclick = goBack;
+
+        // Form submission
+        const form = document.getElementById('create-agent-fullscreen-form');
+        if (form) {
+            form.onsubmit = async (e) => {
+                e.preventDefault();
+                const name = document.getElementById('fs-agent-name').value;
+                const description = document.getElementById('fs-agent-description').value;
+                const model = document.getElementById('fs-agent-model').value;
+                const capabilities = Array.from(document.querySelectorAll('.fs-capability:checked')).map(c => c.value);
+                const skills = Array.from(document.querySelectorAll('.fs-agent-skill:checked')).map(c => c.value);
+
+                try {
+                    if (window.mcpAgentManager) {
+                        await window.mcpAgentManager.createAgent({ name, description, model, capabilities, skills });
+                    }
+                    goBack();
+                } catch (err) {
+                    console.error('Failed to create agent:', err);
+                    alert('Failed to create agent: ' + err.message);
+                }
+            };
+        }
+    }
+
+    _renderAgentSkillsGrid(containerId, skills) {
+        const container = document.getElementById(containerId);
+        if (!container) return;
+        if (skills.length === 0) {
+            container.innerHTML = '<p class="text-sm text-gray-400 col-span-2">No skills available</p>';
+            return;
+        }
+        container.innerHTML = skills.map(skill => `
+            <label class="flex items-start p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                <input type="checkbox" class="fs-agent-skill mt-0.5 rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="${skill.name}">
+                <div class="ml-2">
+                    <div class="text-sm font-medium text-gray-900 dark:text-white">${skill.name}</div>
+                    <div class="text-xs text-gray-500 dark:text-gray-400">${skill.description || ''}</div>
+                </div>
+            </label>
+        `).join('');
+    }
+
     toggleExpandableNavItem(item, itemName) {
         const expandIcon = item.querySelector('.expand-icon');
         let submenu = null;
 
-        if (itemName === 'lists') {
-            submenu = document.getElementById('lists-submenu');
-        } else if (itemName === 'opportunities') {
-            submenu = document.getElementById('opportunities-list');
-        } else if (itemName === 'todos') {
-            submenu = document.getElementById('todo-lists-dropdown');
-        } else if (itemName === 'skills interface') {
-            submenu = document.getElementById('skills-submenu');
+        switch (itemName) {
+            case 'lists':
+                submenu = document.getElementById('lists-submenu'); break;
+            case 'knowledge':
+                submenu = document.getElementById('knowledge-submenu'); break;
+            case 'skills':
+            case 'skills interface': // legacy fallback
+                submenu = document.getElementById('skills-submenu'); break;
+            case 'opportunities':
+                submenu = document.getElementById('opportunities-list'); break;
+            case 'todos':
+                submenu = document.getElementById('todo-lists-dropdown'); break;
         }
 
         if (submenu) {
@@ -1671,6 +1897,10 @@ class Navigation {
         document.getElementById('opportunities-area')?.classList.add('hidden');
         document.getElementById('todos-area')?.classList.add('hidden');
         document.getElementById('career-monster-area')?.classList.add('hidden');
+        document.getElementById('career-analysis-area')?.classList.add('hidden');
+        document.getElementById('skills-interface-area')?.classList.add('hidden');
+        document.getElementById('ollama-agent-create-area')?.classList.add('hidden');
+        document.getElementById('workflows-area')?.classList.add('hidden');
 
         // Hide expandable submenu panels ONLY when navigating away from Lists-related pages
         // Don't hide them when navigating TO opportunities or todos pages
@@ -1696,7 +1926,7 @@ class Navigation {
                 break;
             case 'models':
                 document.getElementById('models-area')?.classList.remove('hidden');
-                pageTitle.textContent = 'Models';
+                pageTitle.textContent = 'Ollama';
                 this.currentPage = 'models';
                 this.loadModelsPage();
                 break;
@@ -1721,6 +1951,7 @@ class Navigation {
                 this.currentPage = 'settings';
                 this.loadSettingsPage();
                 break;
+            case 'rag-knowledge':
             case 'rag knowledge':
             case 'knowledge':
                 document.getElementById('knowledge-area')?.classList.remove('hidden');
@@ -1728,12 +1959,29 @@ class Navigation {
                 this.currentPage = 'knowledge';
                 this.loadKnowledgePage();
                 break;
+            case 'cag-knowledge':
             case 'cag knowledge':
                 document.getElementById('cag-knowledge-area')?.classList.remove('hidden');
                 pageTitle.textContent = 'CAG Knowledge';
                 this.currentPage = 'cag-knowledge';
                 if (this.cagManager) {
                     this.cagManager.loadCAGStatus();
+                }
+                break;
+            case 'workflows':
+                document.getElementById('workflows-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Workflows';
+                this.currentPage = 'workflows';
+                if (window.workflowsManager) {
+                    window.workflowsManager.load();
+                }
+                // Wire refresh button each time we navigate here
+                const refreshBtn = document.getElementById('refresh-workflows-btn');
+                if (refreshBtn && !refreshBtn._wired) {
+                    refreshBtn._wired = true;
+                    refreshBtn.addEventListener('click', () => {
+                        if (window.workflowsManager) window.workflowsManager.load();
+                    });
                 }
                 break;
             case 'mcp':
@@ -1755,6 +2003,18 @@ class Navigation {
                 if (window.app?.opportunitiesManager) {
                     window.app.opportunitiesManager.loadOpportunities();
                 }
+                break;
+            case 'skills-interface':
+                document.getElementById('skills-interface-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Skills Interface';
+                this.currentPage = 'skills-interface';
+                this.loadSkillsManagementPage();
+                break;
+            case 'ollama-agent-create':
+                document.getElementById('ollama-agent-create-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Create New Ollama Agent';
+                this.currentPage = 'ollama-agent-create';
+                this.loadOllamaAgentCreatePage();
                 break;
         }
     }
@@ -3630,11 +3890,16 @@ class App {
         const splash = document.getElementById('splash');
         const app = document.getElementById('app');
 
-        // Hide splash and show app after loading
+        // Hide splash and reveal app after brief loading delay.
+        // #app starts at opacity:0 (CSS) — adding .loaded triggers the fade-in.
+        // The CSS animation fallback in styles.css will reveal the app after
+        // 3.5s even if this timer never fires (e.g. due to a JS error).
         setTimeout(() => {
             if (splash) splash.style.display = 'none';
             if (app) {
-                app.classList.remove('hidden');
+                app.classList.remove('hidden'); // no-op but harmless
+                // Force a reflow so the opacity transition fires correctly
+                void app.offsetHeight;
                 app.classList.add('loaded');
             }
         }, 2000);

@@ -44,7 +44,7 @@
     </div>
 
     <!-- Main App -->
-    <div id="app" class="hidden">
+    <div id="app">
         <!-- Desktop Layout -->
         <div class="flex h-screen">
             <!-- Sidebar -->
@@ -58,162 +58,64 @@
                 </div>
                 
                 <!-- Navigation -->
-                <nav class="flex-1 p-4">
-                    <div class="space-y-2">
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400">
+                <nav class="flex-1 p-3 overflow-y-auto">
+                    <div class="space-y-1">
+
+                        <!-- Chat -->
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium bg-blue-50 dark:bg-blue-900/50 text-blue-600 dark:text-blue-400" data-page="chat">
                             <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z"></path>
                                 </svg>
                                 Chat
                             </span>
                         </button>
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+
+                        <!-- ── MODEL Section ─────────────────── -->
+                        <div class="pt-4 pb-1 px-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Model</span>
+                        </div>
+
+                        <!-- Ollama (was "Models") -->
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="models">
                             <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 11H5m14 0a2 2 0 012 2v6a2 2 0 01-2 2H5a2 2 0 01-2-2v-6a2 2 0 012-2m14 0V9a2 2 0 00-2-2M5 11V9a2 2 0 012-2m0 0V5a2 2 0 012-2h6a2 2 0 012 2v2M7 7h10"></path>
                                 </svg>
-                                Models
+                                Ollama
                             </span>
                         </button>
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+
+                        <!-- Agents -->
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="agents">
                             <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
-                                </svg>
-                                CAG Knowledge
-                            </span>
-                        </button>
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
-                                </svg>
-                                RAG Knowledge
-                            </span>
-                        </button>
-
-                        <!-- Knowledge Base List (hidden by default) -->
-                        <div id="knowledge-base-list" class="ml-6 mt-1 space-y-1 hidden">
-                            <!-- Knowledge bases will be populated here -->
-                        </div>
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
-                                </svg>
-                                Prompts
-                            </span>
-                        </button>
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
-                                </svg>
-                                MCP
-                            </span>
-                        </button>
-                        <button class="nav-item expandable-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <span class="flex items-center justify-between">
-                                <span class="flex items-center">
-                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
-                                    </svg>
-                                    Lists
-                                </span>
-                                <svg class="w-4 h-4 expand-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </span>
-                        </button>
-
-                        <!-- Lists Sub-menu (hidden by default) -->
-                        <div id="lists-submenu" class="ml-6 mt-1 space-y-1 hidden">
-                            <button class="sub-nav-item expandable-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-list="opportunities">
-                                <span class="flex items-center justify-between">
-                                    <span class="flex items-center">
-                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                        </svg>
-                                        Opportunities
-                                    </span>
-                                    <svg class="w-3 h-3 expand-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </span>
-                            </button>
-
-                            <!-- Opportunities List (hidden by default) -->
-                            <div id="opportunities-list" class="ml-6 mt-1 space-y-1 hidden">
-                                <!-- Opportunities will be populated here -->
-                            </div>
-
-                            <!-- Career Analysis -->
-                            <button class="sub-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-list="career-analysis">
-                                <span class="flex items-center">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
-                                    </svg>
-                                    Career Analysis
-                                </span>
-                            </button>
-
-                            <!-- TODO Lists (Phase 5) -->
-                            <button class="sub-nav-item expandable-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-list="todos">
-                                <span class="flex items-center justify-between">
-                                    <span class="flex items-center">
-                                        <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
-                                        </svg>
-                                        TODO Lists
-                                    </span>
-                                    <svg class="w-3 h-3 expand-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
-                                    </svg>
-                                </span>
-                            </button>
-
-                            <!-- TODO Lists Dropdown (hidden by default) -->
-                            <div id="todo-lists-dropdown" class="ml-6 mt-1 space-y-1 hidden">
-                                <!-- User's todo lists will be populated here dynamically -->
-                            </div>
-                        </div>
-
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
-                                </svg>
-                                Visualizations
-                            </span>
-                        </button>
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
-                            <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0zm6 3a2 2 0 11-4 0 2 2 0 014 0zM7 10a2 2 0 11-4 0 2 2 0 014 0z"></path>
                                 </svg>
                                 Agents
                             </span>
                         </button>
-                        <button class="nav-item expandable-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+
+                        <!-- Skills (expandable, was "Skills Interface") -->
+                        <button class="nav-item expandable-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="skills">
                             <span class="flex items-center justify-between">
                                 <span class="flex items-center">
-                                    <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19.428 15.428a2 2 0 00-1.022-.547l-2.387-.477a6 6 0 00-3.86.517l-.318.158a6 6 0 01-3.86.517L6.05 15.21a2 2 0 00-1.806.547M8 4h8l-1 1v5.172a2 2 0 00.586 1.414l5 5c1.26 1.26.367 3.414-1.415 3.414H4.828c-1.782 0-2.674-2.154-1.414-3.414l5-5A2 2 0 009 10.172V5L8 4z"></path>
                                     </svg>
-                                    Skills Interface
+                                    Skills
                                 </span>
-                                <svg class="w-4 h-4 expand-icon transition-transform" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <svg class="w-4 h-4 expand-icon transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
                                 </svg>
                             </span>
                         </button>
 
-                        <!-- Skills Interface Sub-menu (hidden by default) -->
-                        <div id="skills-submenu" class="ml-6 mt-1 space-y-1 hidden">
-                            <button class="sub-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-skill="career-monster">
+                        <!-- Skills Sub-menu -->
+                        <div id="skills-submenu" class="ml-5 mt-0.5 space-y-0.5 hidden">
+                            <button class="sub-nav-item w-full text-left px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-skill="career-monster">
                                 <span class="flex items-center">
-                                    <svg class="w-4 h-4 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
                                     </svg>
                                     Career-Monster
@@ -221,14 +123,145 @@
                             </button>
                         </div>
 
-                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700">
+                        <!-- MCP -->
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="mcp">
                             <span class="flex items-center">
-                                <svg class="w-4 h-4 mr-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 100 4m0-4v2m0-6V4"></path>
+                                <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M8 9l3 3-3 3m5 0h3M5 20h14a2 2 0 002-2V6a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path>
                                 </svg>
-                                Settings
+                                MCP
                             </span>
                         </button>
+
+                        <!-- Prompts -->
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="prompts">
+                            <span class="flex items-center">
+                                <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 8h10M7 12h4m1 8l-4-4H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-3l-4 4z"/>
+                                </svg>
+                                Prompts
+                            </span>
+                        </button>
+
+                        <!-- ── ENVIRONMENT Section ─────────────── -->
+                        <div class="pt-4 pb-1 px-2">
+                            <span class="text-xs font-semibold uppercase tracking-wider text-gray-400 dark:text-gray-500">Environment</span>
+                        </div>
+
+                        <!-- Knowledge (expandable) -->
+                        <button class="nav-item expandable-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="knowledge">
+                            <span class="flex items-center justify-between">
+                                <span class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                    </svg>
+                                    Knowledge
+                                </span>
+                                <svg class="w-4 h-4 expand-icon transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </span>
+                        </button>
+
+                        <!-- Knowledge Sub-menu -->
+                        <div id="knowledge-submenu" class="ml-5 mt-0.5 space-y-0.5 hidden">
+                            <!-- Knowledge Base List injected by app.js -->
+                            <div id="knowledge-base-list" class="space-y-0.5"></div>
+                            <button class="sub-nav-item w-full text-left px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-nav="cag-knowledge">
+                                <span class="flex items-center">
+                                    <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 7v10c0 2.21 3.582 4 8 4s8-1.79 8-4V7M4 7c0 2.21 3.582 4 8 4s8-1.79 8-4M4 7c0-2.21 3.582-4 8-4s8 1.79 8 4m0 5c0 2.21-3.582 4-8 4s-8-1.79-8-4"></path>
+                                    </svg>
+                                    CAG Knowledge
+                                </span>
+                            </button>
+                            <button class="sub-nav-item w-full text-left px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-nav="rag-knowledge">
+                                <span class="flex items-center">
+                                    <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6.253v13m0-13C10.832 5.477 9.246 5 7.5 5S4.168 5.477 3 6.253v13C4.168 18.477 5.754 18 7.5 18s3.332.477 4.5 1.253m0-13C13.168 5.477 14.754 5 16.5 5c1.746 0 3.332.477 4.5 1.253v13C19.832 18.477 18.246 18 16.5 18c-1.746 0-3.332.477-4.5 1.253"/>
+                                    </svg>
+                                    RAG Knowledge
+                                </span>
+                            </button>
+                        </div>
+
+                        <!-- Lists (expandable) -->
+                        <button class="nav-item expandable-nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="lists">
+                            <span class="flex items-center justify-between">
+                                <span class="flex items-center">
+                                    <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-3 7h3m-3 4h3m-6-4h.01M9 16h.01"></path>
+                                    </svg>
+                                    Lists
+                                </span>
+                                <svg class="w-4 h-4 expand-icon transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                            </span>
+                        </button>
+
+                        <!-- Lists Sub-menu -->
+                        <div id="lists-submenu" class="ml-5 mt-0.5 space-y-0.5 hidden">
+                            <button class="sub-nav-item expandable-nav-item w-full text-left px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-list="opportunities">
+                                <span class="flex items-center justify-between">
+                                    <span class="flex items-center">
+                                        <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
+                                        </svg>
+                                        Opportunities
+                                    </span>
+                                    <svg class="w-3 h-3 expand-icon transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </span>
+                            </button>
+                            <div id="opportunities-list" class="ml-5 mt-0.5 space-y-0.5 hidden"></div>
+
+                            <button class="sub-nav-item w-full text-left px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-list="career-analysis">
+                                <span class="flex items-center">
+                                    <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z"></path>
+                                    </svg>
+                                    Career Analysis
+                                </span>
+                            </button>
+
+                            <button class="sub-nav-item expandable-nav-item w-full text-left px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-list="todos">
+                                <span class="flex items-center justify-between">
+                                    <span class="flex items-center">
+                                        <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"></path>
+                                        </svg>
+                                        TODO Lists
+                                    </span>
+                                    <svg class="w-3 h-3 expand-icon transition-transform flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                    </svg>
+                                </span>
+                            </button>
+                            <div id="todo-lists-dropdown" class="ml-5 mt-0.5 space-y-0.5 hidden"></div>
+                        </div>
+
+                        <!-- Visualizations -->
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="visualizations">
+                            <span class="flex items-center">
+                                <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                                Visualizations
+                            </span>
+                        </button>
+
+                        <!-- Workflows (Kanban board) -->
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="workflows">
+                            <span class="flex items-center">
+                                <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
+                                </svg>
+                                Workflows
+                            </span>
+                        </button>
+
                     </div>
                 </nav>
 
@@ -845,9 +878,175 @@
                     </div>
                 </main>
 
+                <!-- Skills Interface Management Area (hidden by default) -->
+                <main id="skills-interface-area" class="flex-1 flex flex-col hidden">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="mb-6">
+                                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Skills Interface</h3>
+                                <p class="text-gray-600 dark:text-gray-400">Enable or disable skills to control which sub-tabs are shown in the sidebar.</p>
+                            </div>
+
+                            <!-- Plugin Skills -->
+                            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-1">Plugin Skills</h4>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Anthropic plugin skills available to agents</p>
+                                <div id="plugin-skills-list" class="space-y-3">
+                                    <p class="text-sm text-gray-400 dark:text-gray-500">Loading plugin skills...</p>
+                                </div>
+                            </div>
+
+                            <!-- Custom Skills -->
+                            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                                <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-1">Custom Skills</h4>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Local project skills with sub-tab interfaces</p>
+                                <div id="custom-skills-list" class="space-y-3">
+                                    <p class="text-sm text-gray-400 dark:text-gray-500">Loading custom skills...</p>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+
                 <!-- Career-Monster Area (hidden by default) -->
                 <main id="career-monster-area" class="flex-1 flex flex-col hidden">
                     <iframe id="career-monster-iframe" src="/career-monster.html" class="w-full h-full border-0" title="Career Monster"></iframe>
+                </main>
+
+                <!-- Create New Ollama Agent Full-Screen Area (hidden by default) -->
+                <main id="ollama-agent-create-area" class="flex-1 flex flex-col hidden">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-3xl mx-auto">
+                            <div class="flex items-center mb-6">
+                                <button id="back-to-agents-btn" class="mr-4 p-2 rounded-lg text-gray-500 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">
+                                    <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15 19l-7-7 7-7"></path>
+                                    </svg>
+                                </button>
+                                <div>
+                                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Create New Ollama Agent</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 mt-1">Configure a zero-cost local AI agent powered by Ollama</p>
+                                </div>
+                            </div>
+
+                            <form id="create-agent-fullscreen-form" class="space-y-6">
+                                <!-- Basic Info -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 class="text-base font-medium text-gray-900 dark:text-white mb-4">Basic Information</h4>
+                                    <div class="grid grid-cols-1 md:grid-cols-2 gap-4">
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agent Name *</label>
+                                            <input type="text" id="fs-agent-name" required
+                                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                placeholder="Enter agent name">
+                                        </div>
+                                        <div>
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Model *</label>
+                                            <select id="fs-agent-model"
+                                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white">
+                                                <option value="qwen2.5:3b">qwen2.5:3b (recommended — fast &amp; free)</option>
+                                                <option value="llama3.1:latest">llama3.1:latest</option>
+                                                <option value="llama3.2:latest">llama3.2:latest</option>
+                                                <option value="mistral:latest">mistral:latest</option>
+                                            </select>
+                                        </div>
+                                        <div class="md:col-span-2">
+                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                                            <textarea id="fs-agent-description" rows="3"
+                                                class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-700 dark:text-white"
+                                                placeholder="Describe what this agent does"></textarea>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Capabilities -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 class="text-base font-medium text-gray-900 dark:text-white mb-4">Capabilities</h4>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="fs-capabilities-grid">
+                                        <label class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            <input type="checkbox" class="fs-capability rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="general">
+                                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">General</span>
+                                        </label>
+                                        <label class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            <input type="checkbox" class="fs-capability rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="nlp">
+                                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Natural Language Processing</span>
+                                        </label>
+                                        <label class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            <input type="checkbox" class="fs-capability rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="data-analysis">
+                                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Data Analysis</span>
+                                        </label>
+                                        <label class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            <input type="checkbox" class="fs-capability rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="automation">
+                                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Automation</span>
+                                        </label>
+                                        <label class="flex items-center p-3 border border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-700">
+                                            <input type="checkbox" class="fs-capability rounded border-gray-300 text-blue-600 focus:ring-blue-500" value="monitoring">
+                                            <span class="ml-2 text-sm text-gray-700 dark:text-gray-300">Monitoring</span>
+                                        </label>
+                                    </div>
+                                </div>
+
+                                <!-- Skills -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
+                                    <h4 class="text-base font-medium text-gray-900 dark:text-white mb-2">Skills</h4>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Select skills to attach to this agent</p>
+                                    <!-- Tab buttons -->
+                                    <div class="flex border-b border-gray-300 dark:border-gray-600 mb-4">
+                                        <button type="button" class="fs-skill-tab px-4 py-2 text-sm font-medium border-b-2 border-blue-600 text-blue-600 dark:border-blue-400 dark:text-blue-400" data-tab="plugin">
+                                            Plugin Skills
+                                        </button>
+                                        <button type="button" class="fs-skill-tab px-4 py-2 text-sm font-medium border-b-2 border-transparent text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-300" data-tab="custom">
+                                            Custom Skills
+                                        </button>
+                                    </div>
+                                    <!-- Plugin Skills Tab Content -->
+                                    <div class="fs-skill-tab-content space-y-2" data-tab-content="plugin">
+                                        <div id="fs-plugin-skills-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <p class="text-sm text-gray-400 col-span-2">Loading plugin skills...</p>
+                                        </div>
+                                    </div>
+                                    <!-- Custom Skills Tab Content -->
+                                    <div class="fs-skill-tab-content space-y-2 hidden" data-tab-content="custom">
+                                        <div id="fs-custom-skills-grid" class="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                            <p class="text-sm text-gray-400 col-span-2">Loading custom skills...</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <!-- Actions -->
+                                <div class="flex justify-end gap-3 pb-6">
+                                    <button type="button" id="cancel-agent-fullscreen" class="px-6 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                        Cancel
+                                    </button>
+                                    <button type="submit" class="px-6 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                        Create Agent
+                                    </button>
+                                </div>
+                            </form>
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Workflows Kanban Board (hidden by default) -->
+                <main id="workflows-area" class="flex-1 flex flex-col hidden overflow-hidden">
+                    <div class="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Proposal Workflow</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Pipeline Kanban — drag cards to update stage</p>
+                        </div>
+                        <button id="refresh-workflows-btn" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                            <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                            </svg>
+                            Refresh
+                        </button>
+                    </div>
+                    <!-- Kanban board — horizontally scrollable -->
+                    <div class="flex-1 overflow-x-auto overflow-y-hidden">
+                        <div id="kanban-board" class="flex h-full gap-3 p-4 min-w-max items-start">
+                            <!-- Columns built dynamically by workflows.js -->
+                        </div>
+                    </div>
                 </main>
 
                 <!-- Career Analysis List Area (hidden by default) -->
@@ -984,66 +1183,306 @@
                 </main>
 
                 <!-- Settings Area (hidden by default) -->
-                <main id="settings-area" class="flex-1 flex flex-col hidden">
-                    <div class="flex-1 overflow-y-auto p-6">
-                        <div class="max-w-4xl mx-auto">
-                            <div class="mb-6">
-                                <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Settings</h3>
-                                <p class="text-gray-600 dark:text-gray-400">Configure your application preferences</p>
-                            </div>
+                <!-- ═══════════════════════════════════════════════════════
+                     SETTINGS — unified vertical-tab panel (no modal)
+                     ═══════════════════════════════════════════════════════ -->
+                <main id="settings-area" class="flex-1 flex hidden overflow-hidden">
 
-                            <!-- Settings Sections -->
-                            <div class="space-y-6">
-                                <!-- Theme Settings -->
-                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Appearance</h4>
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                Theme
-                                            </label>
-                                            <select id="theme-selector" class="w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                    <!-- ── Vertical Tab Sidebar ── -->
+                    <aside class="w-52 flex-none flex flex-col border-r border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900 overflow-y-auto">
+                        <div class="px-4 pt-5 pb-4">
+                            <h2 class="text-base font-semibold text-gray-900 dark:text-white tracking-tight">Settings</h2>
+                        </div>
+                        <nav class="flex-1 px-2 space-y-0.5 pb-4">
+
+                            <!-- General -->
+                            <button class="settings-tab active w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors bg-blue-50 dark:bg-blue-900/20 text-blue-700 dark:text-blue-300" data-tab="general">
+                                <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4"></path>
+                                </svg>
+                                General
+                            </button>
+
+                            <!-- Color Manager -->
+                            <button class="settings-tab w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" data-tab="colors">
+                                <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 21a4 4 0 01-4-4V5a2 2 0 012-2h4a2 2 0 012 2v12a4 4 0 01-4 4zm0 0h12a2 2 0 002-2v-4a2 2 0 00-2-2h-2.343M11 7.343l1.657-1.657a2 2 0 012.828 0l2.829 2.829a2 2 0 010 2.828l-8.486 8.485M7 17h.01"></path>
+                                </svg>
+                                Color Manager
+                            </button>
+
+                            <!-- Typography -->
+                            <button class="settings-tab w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" data-tab="typography">
+                                <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M3 5h12M9 3v2m1.048 9.5A18.022 18.022 0 016.412 9m6.088 9h7M11 21l5-10 5 10M12.751 5C11.783 10.77 8.07 15.61 3 18.129"></path>
+                                </svg>
+                                Typography
+                            </button>
+
+                            <!-- Source Code -->
+                            <button class="settings-tab w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" data-tab="source-code">
+                                <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
+                                </svg>
+                                Source Code
+                            </button>
+
+                        </nav>
+                    </aside>
+
+                    <!-- ── Tab Content Panel ── -->
+                    <div class="flex-1 overflow-y-auto">
+                        <div class="max-w-3xl mx-auto px-8 py-8">
+
+                            <!-- ── GENERAL TAB ── -->
+                            <div id="general-tab" class="settings-tab-content space-y-8">
+
+                                <div>
+                                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-1">General</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Application preferences and configuration.</p>
+                                </div>
+
+                                <!-- Appearance -->
+                                <section>
+                                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Appearance</h4>
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 divide-y divide-gray-100 dark:divide-gray-700">
+                                        <div class="flex items-center justify-between px-5 py-4">
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900 dark:text-white">Theme</div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Light, dark, or follow system preference</div>
+                                            </div>
+                                            <select id="theme-selector" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500">
                                                 <option value="system">System (Auto)</option>
                                                 <option value="light">Light</option>
                                                 <option value="dark">Dark</option>
                                             </select>
                                         </div>
+                                        <div class="flex items-center justify-between px-5 py-4">
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900 dark:text-white">Dark Mode</div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Toggle light/dark directly</div>
+                                            </div>
+                                            <button class="theme-toggle-setting relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 dark:bg-blue-600 transition-colors focus:outline-none">
+                                                <span class="inline-block h-4 w-4 transform rounded-full bg-white shadow transition-transform translate-x-1 dark:translate-x-6"></span>
+                                            </button>
+                                        </div>
                                     </div>
-                                </div>
+                                </section>
 
-                                <!-- Chat Settings -->
-                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">Chat</h4>
-                                    <div class="space-y-4">
-                                        <div>
-                                            <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-2">
-                                                Default Model
-                                            </label>
-                                            <select id="default-model-selector" class="w-full max-w-md px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-800 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                <!-- Chat -->
+                                <section>
+                                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Chat</h4>
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700">
+                                        <div class="flex items-center justify-between px-5 py-4">
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900 dark:text-white">Default Model</div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">Model used for new conversations</div>
+                                            </div>
+                                            <select id="default-model-selector" class="px-3 py-1.5 text-sm border border-gray-300 dark:border-gray-600 rounded-md bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500">
                                                 <option value="qwen2.5:3b">qwen2.5:3b (Fast)</option>
                                             </select>
                                         </div>
                                     </div>
-                                </div>
+                                </section>
 
-                                <!-- About Section -->
-                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
-                                    <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-4">About</h4>
-                                    <div class="space-y-2">
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                                            <strong>Robobrain</strong> - Your AI Assistant Interface
-                                        </p>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                                            Powered by Ollama • Running on localhost:9090
-                                        </p>
-                                        <p class="text-sm text-gray-600 dark:text-gray-400">
-                                            Open source interface inspired by Open WebUI
-                                        </p>
+                                <!-- About -->
+                                <section>
+                                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">About</h4>
+                                    <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 px-5 py-5 space-y-2">
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-500 dark:text-gray-400">Application</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-white">Robobrain RED</span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-500 dark:text-gray-400">Port</span>
+                                            <span class="text-sm font-mono text-gray-900 dark:text-white">9090</span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-500 dark:text-gray-400">LLM Backend</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-white">Ollama (local)</span>
+                                        </div>
+                                        <div class="flex items-center justify-between">
+                                            <span class="text-sm text-gray-500 dark:text-gray-400">AI Model</span>
+                                            <span class="text-sm font-medium text-gray-900 dark:text-white">Claude Sonnet 4.6</span>
+                                        </div>
+                                    </div>
+                                </section>
+
+                            </div>
+
+                            <!-- ── COLOR MANAGER TAB ── -->
+                            <div id="colors-tab" class="settings-tab-content hidden space-y-8">
+
+                                <div class="flex items-start justify-between">
+                                    <div>
+                                        <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-1">Color Manager</h3>
+                                        <p class="text-sm text-gray-500 dark:text-gray-400">Edit the named theme colors. Changes apply instantly and can be saved as a custom theme.</p>
+                                    </div>
+                                    <div class="flex items-center space-x-2 flex-shrink-0 ml-4">
+                                        <button id="restore-defaults-btn" class="px-3 py-1.5 text-xs bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                            Restore Defaults
+                                        </button>
+                                        <button id="apply-theme-btn" class="px-3 py-1.5 text-xs bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
+                                            Apply
+                                        </button>
                                     </div>
                                 </div>
+
+                                <!-- Color variable groups — injected by ColorManager -->
+                                <div id="color-grid" class="space-y-8">
+                                    <div class="text-sm text-gray-400 dark:text-gray-500">Loading colors…</div>
+                                </div>
+
+                                <!-- Save / Load Themes -->
+                                <div class="border-t border-gray-200 dark:border-gray-700 pt-6 space-y-4">
+                                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">Saved Themes</h4>
+                                    <div class="flex items-center space-x-2">
+                                        <input type="text" id="theme-name-input" placeholder="Theme name…"
+                                            class="flex-1 max-w-xs px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500">
+                                        <button id="save-theme-btn" class="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
+                                            Save Theme
+                                        </button>
+                                    </div>
+                                    <div id="saved-themes-list" class="space-y-2">
+                                        <div class="text-sm text-gray-500 dark:text-gray-400">No custom themes saved yet</div>
+                                    </div>
+                                </div>
+
                             </div>
-                        </div>
-                    </div>
+
+                            <!-- ── TYPOGRAPHY TAB ── -->
+                            <div id="typography-tab" class="settings-tab-content hidden space-y-8">
+
+                                <div>
+                                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-1">Typography</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Adjust text appearance for long proposal reading sessions. Changes apply instantly.</p>
+                                </div>
+
+                                <!-- Font Family -->
+                                <section>
+                                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Font Family</h4>
+                                    <div class="grid grid-cols-2 md:grid-cols-3 gap-3" id="font-family-options">
+                                        <label class="font-option-card flex flex-col items-center p-3 border-2 border-blue-500 rounded-lg cursor-pointer bg-blue-50 dark:bg-blue-900/20" data-font="Montserrat">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-white mb-1" style="font-family:'Montserrat',sans-serif">Montserrat</span>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400" style="font-family:'Montserrat',sans-serif">Aa Bb Cc 123</span>
+                                            <input type="radio" name="font-family" value="Montserrat" class="sr-only" checked>
+                                        </label>
+                                        <label class="font-option-card flex flex-col items-center p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" data-font="Inter">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-white mb-1" style="font-family:'Inter',sans-serif">Inter</span>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400" style="font-family:'Inter',sans-serif">Aa Bb Cc 123</span>
+                                            <input type="radio" name="font-family" value="Inter" class="sr-only">
+                                        </label>
+                                        <label class="font-option-card flex flex-col items-center p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" data-font="system-ui">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-white mb-1" style="font-family:system-ui,sans-serif">System UI</span>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400" style="font-family:system-ui,sans-serif">Aa Bb Cc 123</span>
+                                            <input type="radio" name="font-family" value="system-ui" class="sr-only">
+                                        </label>
+                                        <label class="font-option-card flex flex-col items-center p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" data-font="Georgia">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-white mb-1" style="font-family:Georgia,serif">Georgia</span>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400" style="font-family:Georgia,serif">Aa Bb Cc 123</span>
+                                            <input type="radio" name="font-family" value="Georgia" class="sr-only">
+                                        </label>
+                                        <label class="font-option-card flex flex-col items-center p-3 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" data-font="'Courier New'">
+                                            <span class="text-sm font-medium text-gray-900 dark:text-white mb-1" style="font-family:'Courier New',monospace">Courier New</span>
+                                            <span class="text-xs text-gray-500 dark:text-gray-400" style="font-family:'Courier New',monospace">Aa Bb Cc 123</span>
+                                            <input type="radio" name="font-family" value="'Courier New'" class="sr-only">
+                                        </label>
+                                    </div>
+                                </section>
+
+                                <!-- Font Size -->
+                                <section>
+                                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Font Size</h4>
+                                    <div class="flex items-center space-x-3">
+                                        <span class="text-xs text-gray-500 dark:text-gray-400 w-5">A</span>
+                                        <input type="range" id="font-scale-slider" min="0.85" max="1.3" step="0.05" value="1.0"
+                                            class="flex-1 h-2 bg-gray-200 dark:bg-gray-700 rounded-full appearance-none cursor-pointer accent-blue-600">
+                                        <span class="text-base text-gray-500 dark:text-gray-400 w-5">A</span>
+                                    </div>
+                                    <div class="flex justify-between mt-1.5">
+                                        <span class="text-xs text-gray-400 dark:text-gray-500">Compact</span>
+                                        <span id="font-scale-label" class="text-xs font-medium text-blue-600 dark:text-blue-400">Normal (100%)</span>
+                                        <span class="text-xs text-gray-400 dark:text-gray-500">Large</span>
+                                    </div>
+                                </section>
+
+                                <!-- Line Spacing -->
+                                <section>
+                                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Line Spacing</h4>
+                                    <div class="flex space-x-3">
+                                        <label class="line-height-card flex-1 flex items-center p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" data-lh="1.5">
+                                            <input type="radio" name="line-height" value="1.5" class="mr-3 accent-blue-600" checked>
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900 dark:text-white">Normal</div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400">1.5× spacing</div>
+                                            </div>
+                                        </label>
+                                        <label class="line-height-card flex-1 flex items-center p-4 border-2 border-gray-200 dark:border-gray-600 rounded-lg cursor-pointer hover:border-blue-300 dark:hover:border-blue-500 transition-colors" data-lh="1.75">
+                                            <input type="radio" name="line-height" value="1.75" class="mr-3 accent-blue-600">
+                                            <div>
+                                                <div class="text-sm font-medium text-gray-900 dark:text-white">Relaxed</div>
+                                                <div class="text-xs text-gray-500 dark:text-gray-400">1.75× — easier on long reads</div>
+                                            </div>
+                                        </label>
+                                    </div>
+                                </section>
+
+                                <!-- Preview -->
+                                <section>
+                                    <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-4">Preview</h4>
+                                    <div id="typography-preview" class="p-5 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                        <p class="font-semibold text-gray-900 dark:text-white mb-2">Proposal: FA8612-26-R-0001 — Cyber Defense Platform</p>
+                                        <p class="text-gray-700 dark:text-gray-300 text-sm">The Government requires a contractor to provide advanced cybersecurity services including threat detection, incident response, and continuous monitoring. Offerors shall demonstrate relevant past performance on contracts of similar scope and complexity.</p>
+                                    </div>
+                                </section>
+
+                                <div class="flex justify-end">
+                                    <button id="reset-typography-btn" class="px-4 py-2 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                        Reset to Defaults
+                                    </button>
+                                </div>
+
+                            </div>
+
+                            <!-- ── SOURCE CODE TAB ── -->
+                            <div id="source-code-tab" class="settings-tab-content hidden space-y-6">
+
+                                <div>
+                                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-1">Source Code</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Live statistics and file tree for this project.</p>
+                                </div>
+
+                                <!-- Stat cards -->
+                                <div id="source-stats-cards" class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                                    <div class="col-span-full text-center py-8 text-gray-400 dark:text-gray-500 text-sm" id="source-loading-msg">
+                                        <svg class="animate-spin mx-auto mb-2 h-6 w-6 text-blue-500" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+                                            <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                            <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8H4z"></path>
+                                        </svg>
+                                        Loading project statistics…
+                                    </div>
+                                </div>
+
+                                <!-- File Tree -->
+                                <div>
+                                    <div class="flex items-center justify-between mb-3">
+                                        <h4 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest">File Tree</h4>
+                                        <div class="flex space-x-2">
+                                            <button id="source-expand-all" class="hidden px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Expand All</button>
+                                            <button id="source-collapse-all" class="hidden px-2 py-1 text-xs bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-400 rounded hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">Collapse All</button>
+                                        </div>
+                                    </div>
+                                    <div id="source-tree-container"
+                                        class="bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg overflow-auto"
+                                        style="max-height: 420px; font-family: 'Courier New', monospace; font-size: 12px;">
+                                    </div>
+                                </div>
+
+                            </div>
+
+                        </div><!-- /max-w -->
+                    </div><!-- /content panel -->
+
                 </main>
 
                 <!-- Prompts Area (hidden by default) -->
@@ -1773,113 +2212,7 @@
                     </div>
                 </div>
 
-                <!-- Settings Modal -->
-                <div id="settings-modal" class="hidden fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-                    <div class="bg-white dark:bg-gray-800 rounded-lg shadow-xl max-w-4xl w-full m-4 max-h-[90vh] overflow-y-auto">
-                        <div class="p-6">
-                            <div class="flex items-center justify-between mb-6">
-                                <h3 class="text-2xl font-semibold text-gray-900 dark:text-white">Settings</h3>
-                                <button id="close-settings-modal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-300">
-                                    <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"></path>
-                                    </svg>
-                                </button>
-                            </div>
-
-                            <!-- Settings Tabs -->
-                            <div class="border-b border-gray-200 dark:border-gray-700 mb-6">
-                                <nav class="flex space-x-4">
-                                    <button class="settings-tab active px-4 py-2 text-sm font-medium text-blue-600 dark:text-blue-400 border-b-2 border-blue-600 dark:border-blue-400" data-tab="colors">
-                                        Color Manager
-                                    </button>
-                                    <button class="settings-tab px-4 py-2 text-sm font-medium text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white border-b-2 border-transparent" data-tab="general">
-                                        General
-                                    </button>
-                                </nav>
-                            </div>
-
-                            <!-- Color Manager Tab -->
-                            <div id="colors-tab" class="settings-tab-content">
-                                <div class="mb-6">
-                                    <div class="flex items-center justify-between mb-4">
-                                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white">Theme Colors</h4>
-                                        <div class="flex items-center space-x-2">
-                                            <button id="detect-colors-btn" class="px-3 py-1.5 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                                                Detect Colors
-                                            </button>
-                                            <select id="theme-selector" class="px-3 py-1.5 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white">
-                                                <option value="light">Light Mode</option>
-                                                <option value="dark">Dark Mode</option>
-                                                <option value="custom">Custom Theme</option>
-                                            </select>
-                                        </div>
-                                    </div>
-
-                                    <div class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                                        <p>Customize the color scheme of your application. Colors are organized by category.</p>
-                                    </div>
-
-                                    <!-- Color Grid -->
-                                    <div id="color-grid" class="grid grid-cols-2 md:grid-cols-3 gap-4 mb-6">
-                                        <!-- Colors will be dynamically populated here -->
-                                        <div class="text-center text-gray-500 dark:text-gray-400 col-span-full py-8">
-                                            Click "Detect Colors" to scan the application for current color values
-                                        </div>
-                                    </div>
-
-                                    <!-- Theme Actions -->
-                                    <div class="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-700">
-                                        <div class="flex items-center space-x-2">
-                                            <input type="text" id="theme-name-input" placeholder="My Custom Theme" class="px-3 py-2 text-sm bg-white dark:bg-gray-700 border border-gray-300 dark:border-gray-600 rounded-md text-gray-900 dark:text-white w-48">
-                                            <button id="save-theme-btn" class="px-4 py-2 text-sm bg-green-600 text-white rounded-md hover:bg-green-700 transition-colors">
-                                                Save Theme
-                                            </button>
-                                        </div>
-                                        <div class="flex items-center space-x-2">
-                                            <button id="restore-defaults-btn" class="px-4 py-2 text-sm bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-md hover:bg-gray-300 dark:hover:bg-gray-600 transition-colors">
-                                                Restore Defaults
-                                            </button>
-                                            <button id="apply-theme-btn" class="px-4 py-2 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700 transition-colors">
-                                                Apply Changes
-                                            </button>
-                                        </div>
-                                    </div>
-
-                                    <!-- Saved Themes -->
-                                    <div class="mt-6">
-                                        <h5 class="text-sm font-semibold text-gray-900 dark:text-white mb-3">Saved Themes</h5>
-                                        <div id="saved-themes-list" class="space-y-2">
-                                            <!-- Saved themes will be listed here -->
-                                            <div class="text-sm text-gray-500 dark:text-gray-400">
-                                                No custom themes saved yet
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-
-                            <!-- General Tab -->
-                            <div id="general-tab" class="settings-tab-content hidden">
-                                <div class="space-y-6">
-                                    <div>
-                                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white mb-4">General Settings</h4>
-                                        <div class="space-y-4">
-                                            <div class="flex items-center justify-between">
-                                                <div>
-                                                    <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Dark Mode</label>
-                                                    <p class="text-xs text-gray-500 dark:text-gray-400">Toggle between light and dark themes</p>
-                                                </div>
-                                                <button class="theme-toggle-setting relative inline-flex h-6 w-11 items-center rounded-full bg-gray-200 dark:bg-gray-600 transition-colors">
-                                                    <span class="inline-block h-4 w-4 transform rounded-full bg-white transition-transform translate-x-1 dark:translate-x-6"></span>
-                                                </button>
-                                            </div>
-                                        </div>
-                                    </div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <!-- Settings Modal removed — settings now live in the main panel -->
             </div>
         </div>
     </div>
@@ -1894,5 +2227,7 @@
     <script src="gantt_chart_manager.js"></script>
     <script src="todos.js"></script>
     <script src="color_manager.js"></script>
+    <script src="settings_manager.js"></script>
+    <script src="workflows.js"></script>
 </body>
 </html>

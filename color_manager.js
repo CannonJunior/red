@@ -1,364 +1,275 @@
 /**
- * Color Manager - Manages application color themes and customization
+ * Color Manager — theme color editing via CSS custom properties.
+ *
+ * All named colors from styles.css :root are displayed by name, grouped by
+ * category, each with a live color swatch and picker. Changes write directly
+ * to document.documentElement.style (CSS variable overrides) so they take
+ * effect on every element that references the variable.
+ *
+ * Saved themes store the full set of CSS variable overrides in localStorage.
  */
+
+// ─── Named CSS variable definitions ──────────────────────────────────────────
+// Order matches styles.css. Labels are shown in the UI.
+const CSS_VAR_GROUPS = [
+    {
+        group: 'Background',
+        vars: [
+            { name: '--bg-primary',      label: 'Primary Background' },
+            { name: '--bg-secondary',    label: 'Secondary Background' },
+            { name: '--bg-tertiary',     label: 'Tertiary Background' },
+            { name: '--bg-accent',       label: 'Accent Background' },
+            { name: '--bg-accent-hover', label: 'Accent Background (Hover)' },
+        ],
+    },
+    {
+        group: 'Text',
+        vars: [
+            { name: '--text-primary',    label: 'Primary Text' },
+            { name: '--text-secondary',  label: 'Secondary Text' },
+            { name: '--text-tertiary',   label: 'Tertiary Text' },
+            { name: '--text-accent',     label: 'Accent Text' },
+            { name: '--text-on-accent',  label: 'Text on Accent' },
+        ],
+    },
+    {
+        group: 'Border',
+        vars: [
+            { name: '--border-primary',  label: 'Primary Border' },
+            { name: '--border-secondary','label': 'Secondary Border' },
+            { name: '--border-accent',   label: 'Accent Border' },
+        ],
+    },
+];
 
 class ColorManager {
     constructor() {
-        this.detectedColors = [];
-        this.currentTheme = 'light';
-        this.customColors = {};
-        this.savedThemes = this.loadSavedThemes();
-
-        this.init();
+        this.savedThemes   = this._loadSavedThemes();
+        this.customColors  = {};   // varName → hex override currently staged
+        this._colorInputs  = [];   // track pickers for Apply / restore
+        this._init();
     }
 
-    init() {
-        this.attachEventListeners();
-        this.loadCurrentTheme();
+    // ─── Bootstrap ──────────────────────────────────────────────────────────
+
+    _init() {
+        this._attachListeners();
+        this._renderSavedThemes();
+        // Render color grid immediately (colors tab is visible on first open)
+        this._renderColorGrid();
     }
 
-    attachEventListeners() {
-        // Settings button
-        const settingsBtn = document.getElementById('settings-btn');
-        if (settingsBtn) {
-            settingsBtn.addEventListener('click', () => this.openSettings());
-        }
-
-        // Close settings
-        const closeBtn = document.getElementById('close-settings-modal');
-        if (closeBtn) {
-            closeBtn.addEventListener('click', () => this.closeSettings());
-        }
-
-        // Settings tabs
-        const tabs = document.querySelectorAll('.settings-tab');
-        tabs.forEach(tab => {
-            tab.addEventListener('click', (e) => this.switchTab(e.target.dataset.tab));
+    _attachListeners() {
+        // Settings button at the bottom of the sidebar → navigate to settings page
+        document.getElementById('settings-btn')?.addEventListener('click', () => {
+            window.app?.navigateTo('settings');
         });
 
-        // Detect colors button
-        const detectBtn = document.getElementById('detect-colors-btn');
-        if (detectBtn) {
-            detectBtn.addEventListener('click', () => this.detectColors());
-        }
+        // Vertical tab buttons
+        document.addEventListener('click', (e) => {
+            const tab = e.target.closest('.settings-tab');
+            if (tab?.dataset.tab) this.switchTab(tab.dataset.tab);
+        });
 
-        // Theme selector
-        const themeSelector = document.getElementById('theme-selector');
-        if (themeSelector) {
-            themeSelector.addEventListener('change', (e) => this.loadTheme(e.target.value));
-        }
+        // Color Manager buttons
+        document.getElementById('restore-defaults-btn')?.addEventListener('click', () => this.restoreDefaults());
+        document.getElementById('apply-theme-btn')?.addEventListener('click', () => this.applyTheme());
+        document.getElementById('save-theme-btn')?.addEventListener('click', () => this.saveTheme());
 
-        // Save theme button
-        const saveThemeBtn = document.getElementById('save-theme-btn');
-        if (saveThemeBtn) {
-            saveThemeBtn.addEventListener('click', () => this.saveTheme());
-        }
-
-        // Restore defaults button
-        const restoreBtn = document.getElementById('restore-defaults-btn');
-        if (restoreBtn) {
-            restoreBtn.addEventListener('click', () => this.restoreDefaults());
-        }
-
-        // Apply theme button
-        const applyBtn = document.getElementById('apply-theme-btn');
-        if (applyBtn) {
-            applyBtn.addEventListener('click', () => this.applyTheme());
+        // Re-render when settings area becomes visible (colors may depend on dark/light)
+        const settingsArea = document.getElementById('settings-area');
+        if (settingsArea) {
+            new MutationObserver(() => {
+                if (!settingsArea.classList.contains('hidden')) {
+                    this._renderColorGrid();
+                    this._renderSavedThemes();
+                }
+            }).observe(settingsArea, { attributes: true, attributeFilter: ['class'] });
         }
     }
 
-    openSettings() {
-        const modal = document.getElementById('settings-modal');
-        if (modal) {
-            modal.classList.remove('hidden');
-        }
-    }
-
-    closeSettings() {
-        const modal = document.getElementById('settings-modal');
-        if (modal) {
-            modal.classList.add('hidden');
-        }
-    }
+    // ─── Tab switching (vertical style) ─────────────────────────────────────
 
     switchTab(tabName) {
-        // Update tab buttons
-        const tabs = document.querySelectorAll('.settings-tab');
-        tabs.forEach(tab => {
-            if (tab.dataset.tab === tabName) {
-                tab.classList.add('active', 'text-blue-600', 'dark:text-blue-400', 'border-blue-600', 'dark:border-blue-400');
-                tab.classList.remove('text-gray-600', 'dark:text-gray-400', 'border-transparent');
-            } else {
-                tab.classList.remove('active', 'text-blue-600', 'dark:text-blue-400', 'border-blue-600', 'dark:border-blue-400');
-                tab.classList.add('text-gray-600', 'dark:text-gray-400', 'border-transparent');
-            }
+        document.querySelectorAll('.settings-tab').forEach(btn => {
+            const isActive = btn.dataset.tab === tabName;
+            btn.classList.toggle('active',                isActive);
+            btn.classList.toggle('bg-blue-50',            isActive);
+            btn.classList.toggle('dark:bg-blue-900/20',   isActive);
+            btn.classList.toggle('text-blue-700',         isActive);
+            btn.classList.toggle('dark:text-blue-300',    isActive);
+            btn.classList.toggle('font-medium',           isActive);
+            // inactive state
+            btn.classList.toggle('text-gray-600',         !isActive);
+            btn.classList.toggle('dark:text-gray-400',    !isActive);
+            btn.classList.toggle('hover:bg-gray-100',     !isActive);
+            btn.classList.toggle('dark:hover:bg-gray-700',!isActive);
+            btn.classList.toggle('hover:text-gray-900',   !isActive);
+            btn.classList.toggle('dark:hover:text-white', !isActive);
         });
 
-        // Update tab content
-        const contents = document.querySelectorAll('.settings-tab-content');
-        contents.forEach(content => {
-            if (content.id === `${tabName}-tab`) {
-                content.classList.remove('hidden');
-            } else {
-                content.classList.add('hidden');
-            }
+        document.querySelectorAll('.settings-tab-content').forEach(panel => {
+            panel.classList.toggle('hidden', panel.id !== `${tabName}-tab`);
         });
     }
 
-    async detectColors() {
-        console.log('🎨 Detecting colors from DOM...');
+    // ─── Color Grid — CSS variable display ──────────────────────────────────
 
-        const colors = new Map();
-
-        // Get all elements
-        const allElements = document.querySelectorAll('*');
-
-        allElements.forEach(element => {
-            const computed = window.getComputedStyle(element);
-
-            // Extract colors from computed styles
-            const properties = [
-                { name: 'Background', prop: 'backgroundColor' },
-                { name: 'Text', prop: 'color' },
-                { name: 'Border', prop: 'borderColor' }
-            ];
-
-            properties.forEach(({ name, prop }) => {
-                const value = computed[prop];
-                if (value && value !== 'rgba(0, 0, 0, 0)' && value !== 'transparent') {
-                    const hexValue = this.rgbToHex(value);
-                    if (hexValue && hexValue !== '#000000' && hexValue !== '#ffffff') {
-                        const key = `${name}-${hexValue}`;
-                        if (!colors.has(key)) {
-                            // Get element identifier for the first occurrence
-                            let elementId = element.id;
-                            if (!elementId) {
-                                // Generate a simple identifier if no ID exists
-                                const tagName = element.tagName.toLowerCase();
-                                elementId = `${tagName}`;
-                            }
-
-                            colors.set(key, {
-                                category: name,
-                                value: hexValue,
-                                elementId: elementId,
-                                count: 1
-                            });
-                        } else {
-                            colors.get(key).count++;
-                        }
-                    }
-                }
-            });
-        });
-
-        // Convert Map to array and sort by usage count
-        this.detectedColors = Array.from(colors.values())
-            .sort((a, b) => b.count - a.count);
-
-        console.log(`✅ Detected ${this.detectedColors.length} unique colors`);
-
-        this.renderColorGrid();
+    _getCurrentValue(varName) {
+        // Read the current computed CSS variable value
+        const raw = getComputedStyle(document.documentElement)
+            .getPropertyValue(varName)
+            .trim();
+        return raw || '#000000';
     }
 
-    rgbToHex(rgb) {
-        if (!rgb) return null;
-
-        // Check if already hex
-        if (rgb.startsWith('#')) return rgb;
-
-        // Parse RGB/RGBA
-        const match = rgb.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
-        if (!match) return null;
-
-        const r = parseInt(match[1]);
-        const g = parseInt(match[2]);
-        const b = parseInt(match[3]);
-
-        return '#' + [r, g, b].map(x => {
-            const hex = x.toString(16);
-            return hex.length === 1 ? '0' + hex : hex;
-        }).join('');
-    }
-
-    hexToRgb(hex) {
-        const result = /^#?([a-f\d]{2})([a-f\d]{2})([a-f\d]{2})$/i.exec(hex);
-        return result ? {
-            r: parseInt(result[1], 16),
-            g: parseInt(result[2], 16),
-            b: parseInt(result[3], 16)
-        } : null;
-    }
-
-    renderColorGrid() {
+    _renderColorGrid() {
         const grid = document.getElementById('color-grid');
         if (!grid) return;
 
-        if (this.detectedColors.length === 0) {
-            grid.innerHTML = '<div class="text-center text-gray-500 dark:text-gray-400 col-span-full py-8">No colors detected</div>';
-            return;
-        }
-
         grid.innerHTML = '';
+        this._colorInputs = [];
 
-        this.detectedColors.forEach((colorData, index) => {
-            const colorItem = document.createElement('div');
-            colorItem.className = 'bg-white dark:bg-gray-700 border border-gray-200 dark:border-gray-600 rounded-lg p-4';
-
-            // Build display name with element ID
-            const displayName = colorData.elementId
-                ? `${colorData.category} - ${colorData.elementId}`
-                : colorData.category;
-
-            colorItem.innerHTML = `
-                <div class="flex items-center justify-between mb-2">
-                    <span class="text-xs font-medium text-gray-600 dark:text-gray-400">${displayName}</span>
-                    <span class="text-xs text-gray-500 dark:text-gray-500">Used ${colorData.count}x</span>
-                </div>
-                <div class="flex items-center space-x-3">
-                    <div class="w-12 h-12 rounded-lg border-2 border-gray-300 dark:border-gray-600" style="background-color: ${colorData.value}"></div>
-                    <div class="flex-1">
-                        <input type="color"
-                               id="color-${index}"
-                               value="${colorData.value}"
-                               class="w-full h-8 rounded cursor-pointer"
-                               data-original="${colorData.value}">
-                        <input type="text"
-                               value="${colorData.value}"
-                               class="w-full mt-1 px-2 py-1 text-xs bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white font-mono"
-                               id="color-text-${index}"
-                               readonly>
-                    </div>
-                </div>
+        CSS_VAR_GROUPS.forEach(({ group, vars }) => {
+            // Group header
+            const header = document.createElement('div');
+            header.className = 'col-span-full';
+            header.innerHTML = `
+                <h5 class="text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-widest mb-3 pt-2">${group}</h5>
             `;
+            grid.appendChild(header);
 
-            // Add event listener for color picker
-            const colorInput = colorItem.querySelector(`#color-${index}`);
-            const colorText = colorItem.querySelector(`#color-text-${index}`);
-            const preview = colorItem.querySelector('div[style*="background-color"]');
+            vars.forEach((v) => {
+                const currentHex = this._toHex(this._getCurrentValue(v.name));
+                const row = document.createElement('div');
+                row.className = 'flex items-center justify-between py-3 border-b border-gray-100 dark:border-gray-700/50 last:border-0';
+                row.innerHTML = `
+                    <div class="flex items-center space-x-3 min-w-0">
+                        <div class="color-swatch w-8 h-8 rounded-md border border-gray-300 dark:border-gray-600 flex-shrink-0 shadow-sm"
+                             style="background-color:${currentHex}"></div>
+                        <div class="min-w-0">
+                            <div class="text-sm font-medium text-gray-900 dark:text-white truncate">${v.label}</div>
+                            <div class="text-xs text-gray-400 dark:text-gray-500 font-mono">${v.name}</div>
+                        </div>
+                    </div>
+                    <div class="flex items-center space-x-2 flex-shrink-0 ml-4">
+                        <input type="text"
+                               class="color-hex-input w-20 px-2 py-1 text-xs font-mono bg-gray-50 dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded text-gray-900 dark:text-white focus:ring-1 focus:ring-blue-500"
+                               value="${currentHex}" maxlength="7" spellcheck="false">
+                        <input type="color"
+                               class="color-picker w-8 h-8 rounded cursor-pointer border border-gray-300 dark:border-gray-600 p-0.5 bg-white dark:bg-gray-700"
+                               value="${currentHex}">
+                    </div>
+                `;
 
-            colorInput.addEventListener('input', (e) => {
-                const newColor = e.target.value;
-                colorText.value = newColor;
-                preview.style.backgroundColor = newColor;
-                this.customColors[colorData.value] = newColor;
+                const swatch    = row.querySelector('.color-swatch');
+                const hexInput  = row.querySelector('.color-hex-input');
+                const picker    = row.querySelector('.color-picker');
+
+                // Color picker → update swatch + hex input + stage override
+                picker.addEventListener('input', (e) => {
+                    const hex = e.target.value;
+                    hexInput.value = hex;
+                    swatch.style.backgroundColor = hex;
+                    this.customColors[v.name] = hex;
+                    // Live preview
+                    document.documentElement.style.setProperty(v.name, hex);
+                });
+
+                // Hex text input → sync picker + swatch
+                hexInput.addEventListener('change', (e) => {
+                    const hex = e.target.value.trim();
+                    if (/^#[0-9a-fA-F]{6}$/.test(hex)) {
+                        picker.value = hex;
+                        swatch.style.backgroundColor = hex;
+                        this.customColors[v.name] = hex;
+                        document.documentElement.style.setProperty(v.name, hex);
+                    }
+                });
+
+                this._colorInputs.push({ varName: v.name, picker, hexInput, swatch });
+                grid.appendChild(row);
             });
-
-            grid.appendChild(colorItem);
         });
     }
 
-    loadTheme(themeName) {
-        console.log(`Loading theme: ${themeName}`);
-
-        if (themeName === 'light' || themeName === 'dark') {
-            // Toggle theme
-            if (themeName === 'dark') {
-                document.documentElement.classList.add('dark');
-            } else {
-                document.documentElement.classList.remove('dark');
-            }
-            this.currentTheme = themeName;
-        } else if (themeName === 'custom') {
-            // Load custom theme
-            const customTheme = this.savedThemes.find(t => t.name === 'custom');
-            if (customTheme) {
-                this.applyCustomTheme(customTheme);
-            }
-        }
-
-        // Re-detect colors after theme change
-        setTimeout(() => this.detectColors(), 100);
-    }
-
-    applyCustomTheme(theme) {
-        if (!theme || !theme.colors) return;
-
-        // Apply each color mapping
-        Object.entries(theme.colors).forEach(([original, custom]) => {
-            this.customColors[original] = custom;
-        });
-
-        this.applyTheme();
-    }
+    // ─── Apply / Restore ────────────────────────────────────────────────────
 
     applyTheme() {
-        console.log('🎨 Applying theme changes...');
-
-        // Create style element for custom colors
-        let styleEl = document.getElementById('custom-theme-styles');
-        if (!styleEl) {
-            styleEl = document.createElement('style');
-            styleEl.id = 'custom-theme-styles';
-            document.head.appendChild(styleEl);
-        }
-
-        // Build CSS rules
-        const cssRules = [];
-
-        Object.entries(this.customColors).forEach(([original, custom]) => {
-            // This is a simplified approach - in production you'd need more sophisticated color replacement
-            cssRules.push(`
-                [style*="background-color: ${original}"] {
-                    background-color: ${custom} !important;
-                }
-                [style*="color: ${original}"] {
-                    color: ${custom} !important;
-                }
-            `);
-        });
-
-        styleEl.textContent = cssRules.join('\n');
-
-        console.log(`✅ Applied ${Object.keys(this.customColors).length} custom colors`);
+        // Changes are already applied live; this is a no-op confirm action
+        console.log(`✅ Theme applied (${Object.keys(this.customColors).length} overrides active)`);
     }
 
+    restoreDefaults() {
+        if (!confirm('Restore default colors? All unsaved changes will be lost.')) return;
+
+        this.customColors = {};
+
+        // Clear all inline CSS variable overrides
+        CSS_VAR_GROUPS.forEach(({ vars }) => {
+            vars.forEach(v => {
+                document.documentElement.style.removeProperty(v.name);
+            });
+        });
+
+        // Refresh grid to show reverted values
+        this._renderColorGrid();
+    }
+
+    // ─── Save / Load themes ──────────────────────────────────────────────────
+
     saveTheme() {
-        const themeNameInput = document.getElementById('theme-name-input');
-        const themeName = themeNameInput.value.trim() || 'Custom Theme';
+        const nameInput = document.getElementById('theme-name-input');
+        const name = nameInput?.value.trim() || 'Custom Theme';
 
-        const theme = {
-            name: themeName,
-            colors: { ...this.customColors },
-            createdAt: new Date().toISOString(),
-            baseTheme: this.currentTheme
-        };
+        // Snapshot all current CSS variable values (not just staged overrides)
+        const colors = {};
+        CSS_VAR_GROUPS.forEach(({ vars }) => {
+            vars.forEach(v => {
+                colors[v.name] = this._toHex(this._getCurrentValue(v.name));
+            });
+        });
 
-        // Add or update theme
-        const existingIndex = this.savedThemes.findIndex(t => t.name === themeName);
-        if (existingIndex >= 0) {
-            this.savedThemes[existingIndex] = theme;
+        const theme = { name, colors, createdAt: new Date().toISOString() };
+        const idx = this.savedThemes.findIndex(t => t.name === name);
+        if (idx >= 0) {
+            this.savedThemes[idx] = theme;
         } else {
             this.savedThemes.push(theme);
         }
 
-        // Save to localStorage
         localStorage.setItem('customThemes', JSON.stringify(this.savedThemes));
-
-        console.log(`✅ Saved theme: ${themeName}`);
-
-        // Update saved themes list
-        this.renderSavedThemes();
-
-        // Clear input
-        themeNameInput.value = '';
+        if (nameInput) nameInput.value = '';
+        this._renderSavedThemes();
+        console.log(`✅ Saved theme: ${name}`);
     }
 
-    renderSavedThemes() {
-        const listContainer = document.getElementById('saved-themes-list');
-        if (!listContainer) return;
+    _applyLoadedTheme(theme) {
+        if (!theme?.colors) return;
+
+        this.customColors = { ...theme.colors };
+        Object.entries(theme.colors).forEach(([varName, hex]) => {
+            document.documentElement.style.setProperty(varName, hex);
+        });
+
+        // Refresh grid to reflect loaded values
+        this._renderColorGrid();
+    }
+
+    _renderSavedThemes() {
+        const list = document.getElementById('saved-themes-list');
+        if (!list) return;
 
         if (this.savedThemes.length === 0) {
-            listContainer.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400">No custom themes saved yet</div>';
+            list.innerHTML = '<div class="text-sm text-gray-500 dark:text-gray-400">No custom themes saved yet</div>';
             return;
         }
 
-        listContainer.innerHTML = '';
-
+        list.innerHTML = '';
         this.savedThemes.forEach(theme => {
-            const themeItem = document.createElement('div');
-            themeItem.className = 'flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-700 rounded-lg';
-            themeItem.innerHTML = `
+            const item = document.createElement('div');
+            item.className = 'flex items-center justify-between p-3 bg-gray-50 dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700';
+            item.innerHTML = `
                 <div>
                     <div class="text-sm font-medium text-gray-900 dark:text-white">${theme.name}</div>
                     <div class="text-xs text-gray-500 dark:text-gray-400">
@@ -366,74 +277,50 @@ class ColorManager {
                     </div>
                 </div>
                 <div class="flex items-center space-x-2">
-                    <button class="load-theme-btn px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700" data-theme="${theme.name}">
-                        Load
-                    </button>
-                    <button class="delete-theme-btn px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700" data-theme="${theme.name}">
-                        Delete
-                    </button>
+                    <button class="load-btn px-3 py-1 text-xs bg-blue-600 text-white rounded hover:bg-blue-700 transition-colors"
+                            data-theme="${theme.name}">Load</button>
+                    <button class="delete-btn px-3 py-1 text-xs bg-red-600 text-white rounded hover:bg-red-700 transition-colors"
+                            data-theme="${theme.name}">Delete</button>
                 </div>
             `;
 
-            // Add event listeners
-            themeItem.querySelector('.load-theme-btn').addEventListener('click', () => {
-                this.applyCustomTheme(theme);
-            });
-
-            themeItem.querySelector('.delete-theme-btn').addEventListener('click', () => {
-                this.deleteTheme(theme.name);
-            });
-
-            listContainer.appendChild(themeItem);
+            item.querySelector('.load-btn').addEventListener('click', () => this._applyLoadedTheme(theme));
+            item.querySelector('.delete-btn').addEventListener('click', () => this._deleteTheme(theme.name));
+            list.appendChild(item);
         });
     }
 
-    deleteTheme(themeName) {
-        if (!confirm(`Delete theme "${themeName}"?`)) return;
-
-        this.savedThemes = this.savedThemes.filter(t => t.name !== themeName);
+    _deleteTheme(name) {
+        if (!confirm(`Delete theme "${name}"?`)) return;
+        this.savedThemes = this.savedThemes.filter(t => t.name !== name);
         localStorage.setItem('customThemes', JSON.stringify(this.savedThemes));
-        this.renderSavedThemes();
+        this._renderSavedThemes();
     }
 
-    restoreDefaults() {
-        if (!confirm('Restore default color scheme? This will remove all customizations.')) return;
-
-        this.customColors = {};
-
-        // Remove custom styles
-        const styleEl = document.getElementById('custom-theme-styles');
-        if (styleEl) {
-            styleEl.remove();
-        }
-
-        // Reset to system theme
-        this.loadTheme(this.currentTheme);
-
-        console.log('✅ Restored default colors');
-    }
-
-    loadSavedThemes() {
+    _loadSavedThemes() {
         try {
-            const saved = localStorage.getItem('customThemes');
-            return saved ? JSON.parse(saved) : [];
-        } catch (error) {
-            console.error('Failed to load saved themes:', error);
+            return JSON.parse(localStorage.getItem('customThemes') || '[]');
+        } catch (_) {
             return [];
         }
     }
 
-    loadCurrentTheme() {
-        // Check if user has dark mode preference
-        const isDark = document.documentElement.classList.contains('dark');
-        this.currentTheme = isDark ? 'dark' : 'light';
+    // ─── Utility ─────────────────────────────────────────────────────────────
 
-        // Render saved themes
-        this.renderSavedThemes();
+    _toHex(value) {
+        if (!value) return '#000000';
+        if (value.startsWith('#') && value.length === 7) return value;
+
+        // RGB/RGBA → hex
+        const m = value.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)/);
+        if (!m) return '#000000';
+        return '#' + [m[1], m[2], m[3]]
+            .map(n => parseInt(n).toString(16).padStart(2, '0'))
+            .join('');
     }
 }
 
-// Initialize color manager when DOM is ready
+// ─── Init ────────────────────────────────────────────────────────────────────
 if (document.readyState === 'loading') {
     document.addEventListener('DOMContentLoaded', () => {
         window.colorManager = new ColorManager();

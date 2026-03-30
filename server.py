@@ -131,6 +131,24 @@ from server.routes.opportunities import (
     handle_task_delete_api as handle_task_delete_route,
     handle_task_history_api as handle_task_history_route
 )
+try:
+    from server.routes.proposals import (
+        handle_proposals_list_api as handle_proposals_list_route,
+        handle_proposals_create_api as handle_proposals_create_route,
+        handle_proposals_detail_api as handle_proposals_detail_route,
+        handle_proposals_update_api as handle_proposals_update_route,
+        handle_proposals_delete_api as handle_proposals_delete_route,
+        handle_proposals_advance_api as handle_proposals_advance_route,
+        handle_proposals_schedule_api as handle_proposals_schedule_route,
+        handle_proposals_folders_api as handle_proposals_folders_route,
+        handle_proposals_bid_no_bid_get_api as handle_proposals_bnb_get_route,
+        handle_proposals_bid_no_bid_post_api as handle_proposals_bnb_post_route,
+    )
+    PROPOSALS_AVAILABLE = True
+except ImportError:
+    PROPOSALS_AVAILABLE = False
+
+from server.routes.source_tree import handle_source_tree_api as handle_source_tree_route
 
 # Import TODO functionality
 try:
@@ -402,6 +420,23 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 elif self.path.startswith('/api/opportunities/'):
                     self.handle_opportunities_detail_api()
                     return
+                # Source code tree (Settings > Source Code tab)
+                elif self.path == '/api/source-tree':
+                    self.handle_source_tree_api()
+                    return
+                # Proposals API endpoints (GovCon proposal lifecycle)
+                elif self.path == '/api/proposals' and PROPOSALS_AVAILABLE:
+                    self.handle_proposals_list_api()
+                    return
+                elif self.path.startswith('/api/proposals/') and self.path.endswith('/schedule') and PROPOSALS_AVAILABLE:
+                    self.handle_proposals_schedule_api()
+                    return
+                elif self.path.startswith('/api/proposals/') and self.path.endswith('/bid-no-bid') and PROPOSALS_AVAILABLE:
+                    self.handle_proposals_bid_no_bid_get_api()
+                    return
+                elif self.path.startswith('/api/proposals/') and PROPOSALS_AVAILABLE:
+                    self.handle_proposals_detail_api()
+                    return
                 else:
                     self.send_error(404, f"API endpoint not found: {self.path}")
                     return
@@ -569,9 +604,18 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             elif self.path.startswith('/api/opportunities/'):
                 # Could be PATCH/PUT for update
                 self.handle_opportunities_update_api()
+            # Proposals API endpoints (GovCon proposal lifecycle)
+            elif self.path == '/api/proposals' and PROPOSALS_AVAILABLE:
+                self.handle_proposals_create_api()
+            elif self.path.startswith('/api/proposals/') and self.path.endswith('/advance') and PROPOSALS_AVAILABLE:
+                self.handle_proposals_advance_api()
+            elif self.path.startswith('/api/proposals/') and self.path.endswith('/folders') and PROPOSALS_AVAILABLE:
+                self.handle_proposals_folders_api()
+            elif self.path.startswith('/api/proposals/') and self.path.endswith('/bid-no-bid') and PROPOSALS_AVAILABLE:
+                self.handle_proposals_bid_no_bid_post_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
-                
+
         except Exception as e:
             print(f"❌ Error handling POST {self.path}: {e}")
             self.send_error(500, f"Internal server error: {e}")
@@ -624,6 +668,8 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract opportunity ID from path
                 opportunity_id = self.path.split('/')[-1]
                 self.handle_opportunities_delete_api(opportunity_id)
+            elif self.path.startswith('/api/proposals/') and PROPOSALS_AVAILABLE:
+                self.handle_proposals_delete_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
 
@@ -656,6 +702,8 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
                 # Handle PUT /api/todos/{id} - Update individual todo
                 self.handle_todos_update_api()
+            elif self.path.startswith('/api/proposals/') and PROPOSALS_AVAILABLE:
+                self.handle_proposals_update_api()
             else:
                 self.send_error(404, f"API endpoint not found: {self.path}")
         except Exception as e:
@@ -1488,6 +1536,54 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_opportunities_delete_api(self, opportunity_id):
         """Handle DELETE /api/opportunities/{id} - Delete opportunity."""
         handle_opportunities_delete_route(self, opportunity_id)
+
+    # ========== Source Tree API Handler ==========
+
+    def handle_source_tree_api(self):
+        """Handle GET /api/source-tree - Project statistics and file tree."""
+        handle_source_tree_route(self)
+
+    # ========== Proposals API Handlers ==========
+
+    def handle_proposals_list_api(self):
+        """Handle GET /api/proposals - List proposals."""
+        handle_proposals_list_route(self)
+
+    def handle_proposals_create_api(self):
+        """Handle POST /api/proposals - Create proposal."""
+        handle_proposals_create_route(self)
+
+    def handle_proposals_detail_api(self):
+        """Handle GET /api/proposals/{id} - Get proposal."""
+        handle_proposals_detail_route(self)
+
+    def handle_proposals_update_api(self):
+        """Handle PUT /api/proposals/{id} - Update proposal."""
+        handle_proposals_update_route(self)
+
+    def handle_proposals_delete_api(self):
+        """Handle DELETE /api/proposals/{id} - Delete proposal."""
+        handle_proposals_delete_route(self)
+
+    def handle_proposals_advance_api(self):
+        """Handle POST /api/proposals/{id}/advance - Advance pipeline stage."""
+        handle_proposals_advance_route(self)
+
+    def handle_proposals_schedule_api(self):
+        """Handle GET /api/proposals/{id}/schedule - Get milestone schedule."""
+        handle_proposals_schedule_route(self)
+
+    def handle_proposals_folders_api(self):
+        """Handle POST /api/proposals/{id}/folders - Create folder structure."""
+        handle_proposals_folders_route(self)
+
+    def handle_proposals_bid_no_bid_get_api(self):
+        """Handle GET /api/proposals/{id}/bid-no-bid - Get B/NB assessment."""
+        handle_proposals_bnb_get_route(self)
+
+    def handle_proposals_bid_no_bid_post_api(self):
+        """Handle POST /api/proposals/{id}/bid-no-bid - Run B/NB assessment."""
+        handle_proposals_bnb_post_route(self)
 
     # ========== Tasks API Handlers ==========
 

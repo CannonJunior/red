@@ -1,0 +1,35 @@
+{# Confluence Home Page for a Proposal — Jinja2 template #}
+{# Variables: proposal (dict with title, solicitation_number, agency, due_date, pwin, stage, owner) #}
+<h1>{{ proposal.title }}</h1>
+
+<ac:structured-macro ac:name="panel">
+  <ac:parameter ac:name="title">Opportunity Summary</ac:parameter>
+  <ac:rich-text-body>
+    <table>
+      <tbody>
+        <tr><th>Solicitation</th><td>{{ proposal.solicitation_number }}</td></tr>
+        <tr><th>Agency</th><td>{{ proposal.agency }}</td></tr>
+        <tr><th>Due Date</th><td>{{ proposal.due_date }}</td></tr>
+        <tr><th>Stage</th><td>{{ proposal.stage | upper }}</td></tr>
+        <tr><th>Pwin</th><td>{{ proposal.pwin }}%</td></tr>
+        <tr><th>Capture Owner</th><td><ac:link><ri:user ri:username="{{ proposal.owner }}" /></ac:link></td></tr>
+      </tbody>
+    </table>
+  </ac:rich-text-body>
+</ac:structured-macro>
+
+<h2>Quick Links</h2>
+<ul>
+  <li><a href="./Bid-No-Bid Assessment">Bid/No-Bid Assessment</a></li>
+  <li><a href="./Proposal Schedule">Proposal Schedule</a></li>
+  <li><a href="./Pink Team">Pink Team Review</a></li>
+  <li><a href="./Red Team">Red Team Review</a></li>
+  <li><a href="./Gold Team">Gold Team Review</a></li>
+  <li><a href="./Hotwash">Hotwash &amp; Lessons Learned</a></li>
+</ul>
+
+<h2>Status Updates</h2>
+<ac:structured-macro ac:name="recently-updated">
+  <ac:parameter ac:name="spaces">{{ confluence_space_key }}</ac:parameter>
+  <ac:parameter ac:name="max">10</ac:parameter>
+</ac:structured-macro>

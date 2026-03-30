@@ -1,0 +1,55 @@
+{
+  "_comment": "Maps local proposal fields to Unanet CRM field names. Edit here — no code changes needed.",
+  "_stage_comment": "Unanet stage codes are the canonical reference. Local PipelineStage values map to these.",
+
+  "field_mapping": {
+    "solicitation_number": "external_id",
+    "title": "name",
+    "pipeline_stage": "stage_code",
+    "estimated_value": "potential_revenue",
+    "proposal_due_date": "close_date",
+    "capture_manager": "owner_username",
+    "agency": "client_name",
+    "bid_decision": "bid_decision",
+    "pwin_score": "probability",
+    "naics_code": "naics",
+    "set_aside_type": "set_aside",
+    "notes": "description",
+    "contracting_office": "client_department",
+    "period_of_performance": "project_duration",
+    "teaming_partners": "partners"
+  },
+
+  "stage_mapping": {
+    "_comment": "local PipelineStage value → Unanet stage code",
+    "identified":               "01-Qualification",
+    "qualifying":               "01-Qualification",
+    "long_lead":                "02-Long Lead",
+    "bid_decision":             "03-Bid Decision",
+    "active":                   "04-In Progress",
+    "submitted":                "05-Waiting/Review",
+    "negotiating":              "06-In Negotiation",
+    "awarded":                  "07-Closed Won",
+    "lost":                     "08-Closed Lost",
+    "no_bid":                   "09-Closed No Bid",
+    "cancelled":                "20-Closed Other Reason",
+    "contract_vehicle_won":     "98-Awarded-Contract Vehicle",
+    "contract_vehicle_complete":"99-Completed Contract Vehicle"
+  },
+
+  "reverse_stage_mapping": {
+    "_comment": "Unanet stage code → local PipelineStage value (for pull-from-CRM sync)",
+    "01-Qualification":                 "qualifying",
+    "02-Long Lead":                     "long_lead",
+    "03-Bid Decision":                  "bid_decision",
+    "04-In Progress":                   "active",
+    "05-Waiting/Review":                "submitted",
+    "06-In Negotiation":                "negotiating",
+    "07-Closed Won":                    "awarded",
+    "08-Closed Lost":                   "lost",
+    "09-Closed No Bid":                 "no_bid",
+    "20-Closed Other Reason":           "cancelled",
+    "98-Awarded-Contract Vehicle":      "contract_vehicle_won",
+    "99-Completed Contract Vehicle":    "contract_vehicle_complete"
+  }
+}

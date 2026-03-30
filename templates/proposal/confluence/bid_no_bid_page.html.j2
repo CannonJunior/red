@@ -1,0 +1,62 @@
+{# Confluence Bid/No-Bid Assessment Page — Jinja2 template #}
+{# Variables: proposal, assessment (dict), criteria (list of dicts) #}
+<h1>Bid/No-Bid Assessment — {{ proposal.solicitation_number }}</h1>
+
+<ac:structured-macro ac:name="panel" ac:schema-version="1">
+  <ac:parameter ac:name="title">Decision</ac:parameter>
+  <ac:parameter ac:name="borderColor">
+    {%- if assessment.recommendation == 'BID' %}#00B050
+    {%- elif assessment.recommendation == 'NO_BID' %}#FF0000
+    {%- else %}#FFC000{%- endif %}
+  </ac:parameter>
+  <ac:rich-text-body>
+    <p><strong>Recommendation:</strong> {{ assessment.recommendation }}</p>
+    <p><strong>Total Score:</strong> {{ assessment.total_score }} / 100</p>
+    <p><strong>Rationale:</strong> {{ assessment.rationale }}</p>
+  </ac:rich-text-body>
+</ac:structured-macro>
+
+<h2>Shipley Scoring Matrix</h2>
+<table>
+  <thead>
+    <tr>
+      <th>Criterion</th>
+      <th>Weight</th>
+      <th>Score (0–10)</th>
+      <th>Weighted</th>
+      <th>Notes</th>
+    </tr>
+  </thead>
+  <tbody>
+    {% for c in criteria %}
+    <tr>
+      <td>{{ c.name }}</td>
+      <td>{{ c.weight }}</td>
+      <td>{{ c.score }}</td>
+      <td>{{ (c.score * c.weight / 10) | round(1) }}</td>
+      <td>{{ c.notes }}</td>
+    </tr>
+    {% endfor %}
+    <tr style="font-weight:bold;">
+      <td colspan="3">Total</td>
+      <td>{{ assessment.total_score }}</td>
+      <td></td>
+    </tr>
+  </tbody>
+</table>
+
+<h2>Win Themes</h2>
+<ul>
+  {% for theme in assessment.win_themes %}
+  <li>{{ theme }}</li>
+  {% endfor %}
+</ul>
+
+<h2>Key Risks</h2>
+<ul>
+  {% for risk in assessment.risks %}
+  <li>{{ risk }}</li>
+  {% endfor %}
+</ul>
+
+<p><em>Assessment completed: {{ assessment.completed_at }} by {{ assessment.completed_by }}</em></p>

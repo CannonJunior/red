@@ -3,6 +3,9 @@
 
 :root {
   --font-family: 'Montserrat', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  /* Typography settings — overridden at runtime by SettingsManager */
+  --user-font-scale: 1;
+  --user-line-height: 1.5;
   
   /* Light mode colors - Clean and minimal */
   --bg-primary: #ffffff;
@@ -29,6 +32,12 @@
 * {
   box-sizing: border-box;
   font-family: var(--font-family);
+}
+
+/* Typography scale — controlled by SettingsManager via CSS custom properties */
+body {
+  font-size: calc(14px * var(--user-font-scale));
+  line-height: var(--user-line-height);
 }
 
 /* Smooth transitions for all elements */
@@ -125,22 +134,33 @@ header {
 }
 
 /* Navigation items */
-.nav-item {
+.nav-item,
+.sub-nav-item {
+  /* Override global button styles — nav items must be transparent with no border */
+  background-color: transparent !important;
+  border: none !important;
+  box-shadow: none !important;
   color: var(--text-secondary);
   border-radius: 8px;
-  transition: all 200ms cubic-bezier(0.4, 0, 0.2, 1);
+  transition: background-color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              color 200ms cubic-bezier(0.4, 0, 0.2, 1),
+              transform 200ms cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.nav-item:hover {
-  background-color: var(--bg-tertiary);
+.nav-item:hover,
+.sub-nav-item:hover {
+  background-color: var(--bg-tertiary) !important;
   color: var(--text-primary);
-  transform: translateX(4px);
+  transform: translateX(2px);
+  border: none !important;
+  box-shadow: none !important;
 }
 
 .nav-item.active {
-  background-color: var(--bg-accent);
+  background-color: var(--bg-accent) !important;
   color: var(--text-on-accent);
-  box-shadow: var(--shadow-md);
+  box-shadow: var(--shadow-md) !important;
+  border: none !important;
 }
 
 .nav-item.active::before {
@@ -314,13 +334,29 @@ input::placeholder, textarea::placeholder {
 }
 
 /* Smooth fade-in for main app */
+@keyframes app-reveal {
+  to { opacity: 1; }
+}
+
+@keyframes splash-dismiss {
+  to { opacity: 0; visibility: hidden; pointer-events: none; }
+}
+
 #app {
   opacity: 0;
   transition: opacity 300ms ease;
+  /* CSS fallback: reveal after 3.5s even if JS fails */
+  animation: app-reveal 0.3s ease 3.5s both;
 }
 
 #app.loaded {
   opacity: 1;
+  animation: none;
+}
+
+/* CSS fallback: dismiss splash after 3.2s even if JS fails */
+#splash {
+  animation: splash-dismiss 0.3s ease 3.2s both;
 }
 
 /* Custom gradient backgrounds */
