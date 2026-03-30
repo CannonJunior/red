@@ -1613,6 +1613,14 @@ class Navigation {
                 }
             });
         });
+
+        // Settings button (bottom of sidebar)
+        const settingsBtn = document.getElementById('settings-btn');
+        if (settingsBtn) {
+            settingsBtn.addEventListener('click', () => {
+                this.navigateTo('settings');
+            });
+        }
     }
 
     showCareerMonster() {

@@ -98,12 +98,12 @@
 - [ ] Tests: `tests/proposal/integrations/test_sharepoint_client.py`
 
 ### P3-3: Confluence integration
-- [ ] `proposal/integrations/confluence.py` — Atlassian REST API client
-- [ ] Space creation per proposal
-- [ ] Page creation from Jinja2 templates
-- [ ] Meeting notes page workflow
-- [ ] Attachment upload support
-- [ ] Tests: `tests/proposal/integrations/test_confluence_client.py`
+- [x] `proposal/integrations/confluence.py` — Atlassian REST API client
+- [x] Space creation per proposal
+- [x] Page creation from Jinja2 templates
+- [x] Meeting notes page workflow
+- [x] Attachment upload support
+- [x] Tests: `tests/proposal/integrations/test_confluence.py` — 26 tests passing
 
 ---
 
@@ -153,6 +153,13 @@
 - [x] Skills Interface → management page with skill on/off toggles (2026-03-29)
 - [x] Create New Ollama Agent → full-screen view instead of modal (2026-03-29)
 - [x] Skills Interface submenu dynamically reflects enabled skills from management page (2026-03-29)
+
+### 🟡 Medium Priority — Failing Tests (pre-existing, discovered 2026-03-30)
+
+- [ ] **FIX: `tests/shredding/test_requirement_classifier.py`** — 12 tests failing (all `TestRequirementClassifier`)
+  - Likely cause: API/interface change in `shredding/requirement_classifier.py` after tests were written
+- [ ] **FIX: `tests/shredding/test_requirement_extractor.py`** — 23 tests failing (all `TestRequirementExtractor`)
+  - Likely cause: same as above — interface mismatch between tests and implementation
 
 ---
 
