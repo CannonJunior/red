@@ -3,219 +3,259 @@
 Unit tests for requirement_classifier.py
 
 Tests Ollama-based requirement classification including:
-- Compliance type classification
-- Category classification (technical, management, cost, etc.)
-- Priority assignment
-- Keyword extraction
-- Fallback behavior when Ollama unavailable
+- Compliance type classification (mocked for determinism)
+- Fallback keyword-based classification when Ollama is unavailable
+- Entity extraction
+- Batch classification
 """
 
+import json
 import pytest
 import sys
 from pathlib import Path
-from unittest.mock import Mock, patch
+from unittest.mock import MagicMock, patch
 
 # Add parent directory to path
 sys.path.insert(0, str(Path(__file__).parent.parent.parent))
 
-from shredding.requirement_classifier import RequirementClassifier
+from shredding.requirement_classifier import RequirementClassifier, RequirementClassification
 
+
+# ---------------------------------------------------------------------------
+# Helpers
+# ---------------------------------------------------------------------------
+
+def _mock_ollama_response(payload: dict) -> MagicMock:
+    """Return a mock requests.post response with given JSON payload."""
+    resp = MagicMock()
+    resp.status_code = 200
+    resp.json.return_value = {"response": json.dumps(payload)}
+    return resp
+
+
+_MANDATORY_RESPONSE = {
+    "compliance_type": "mandatory",
+    "category": "technical",
+    "priority": "high",
+    "risk_level": "red",
+    "keywords": ["security", "encryption", "data"],
+    "implicit_requirements": ["encryption at rest", "key management"],
+}
+
+_RECOMMENDED_RESPONSE = {
+    "compliance_type": "recommended",
+    "category": "compliance",
+    "priority": "medium",
+    "risk_level": "yellow",
+    "keywords": ["ISO 27001", "certification"],
+    "implicit_requirements": ["current certification"],
+}
+
+_OPTIONAL_RESPONSE = {
+    "compliance_type": "optional",
+    "category": "deliverable",
+    "priority": "low",
+    "risk_level": "green",
+    "keywords": ["additional", "references"],
+    "implicit_requirements": [],
+}
+
+
+# ---------------------------------------------------------------------------
+# Fixtures
+# ---------------------------------------------------------------------------
+
+@pytest.fixture
+def classifier():
+    """Create RequirementClassifier with mocked init connection check."""
+    with patch("shredding.requirement_classifier.requests.get") as mock_get:
+        mock_get.return_value = MagicMock(status_code=200,
+                                          json=lambda: {"models": []})
+        return RequirementClassifier(ollama_url="http://localhost:11434")
+
+
+# ---------------------------------------------------------------------------
+# TestRequirementClassifier
+# ---------------------------------------------------------------------------
 
 class TestRequirementClassifier:
     """Test suite for RequirementClassifier."""
 
-    @pytest.fixture
-    def classifier(self):
-        """Create RequirementClassifier instance."""
-        return RequirementClassifier(ollama_url="http://localhost:11434")
+    # --- classify(): mocked Ollama path ---
 
-    def test_technical_requirement_classification(self, classifier):
-        """Test classification of technical requirements."""
-        text = "The system shall use AES-256 encryption for data at rest."
+    def test_classify_returns_dataclass(self, classifier):
+        """classify() returns a RequirementClassification dataclass."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The contractor shall provide support.")
+        assert isinstance(result, RequirementClassification)
 
-        result = classifier.classify(text)
-
-        assert result is not None
-        assert 'category' in result
-        # Should classify as technical
-        assert result['category'] in ['technical', 'compliance']
-        assert 'compliance_type' in result
-        assert result['compliance_type'] == 'mandatory'
-
-    def test_management_requirement_classification(self, classifier):
-        """Test classification of management requirements."""
-        text = "The contractor shall submit monthly status reports to the COR."
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        assert 'category' in result
-        # Should classify as management or deliverable
-        assert result['category'] in ['management', 'deliverable']
-
-    def test_cost_requirement_classification(self, classifier):
-        """Test classification of cost/pricing requirements."""
-        text = "Offerors shall provide fixed-price proposals with cost breakdowns."
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        assert 'category' in result
-        # Should classify as cost or compliance
-        assert result['category'] in ['cost', 'compliance', 'deliverable']
+    def test_classify_has_all_fields(self, classifier):
+        """All expected fields are present on the returned dataclass."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The system shall use AES-256.")
+        assert hasattr(result, "compliance_type")
+        assert hasattr(result, "category")
+        assert hasattr(result, "priority")
+        assert hasattr(result, "risk_level")
+        assert hasattr(result, "keywords")
+        assert hasattr(result, "implicit_requirements")
+        assert hasattr(result, "extracted_entities")
 
     def test_mandatory_compliance_type(self, classifier):
-        """Test detection of mandatory compliance type."""
-        text = "The contractor must comply with all federal regulations."
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        assert result['compliance_type'] == 'mandatory'
+        """Ollama response with mandatory is surfaced correctly."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The contractor must comply with regulations.")
+        assert result.compliance_type == "mandatory"
 
     def test_recommended_compliance_type(self, classifier):
-        """Test detection of recommended compliance type."""
-        text = "Contractors should have ISO 27001 certification."
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        assert result['compliance_type'] in ['recommended', 'optional']
+        """Ollama response with recommended is surfaced correctly."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_RECOMMENDED_RESPONSE)):
+            result = classifier.classify("Contractors should have ISO 27001 certification.")
+        assert result.compliance_type == "recommended"
 
     def test_optional_compliance_type(self, classifier):
-        """Test detection of optional compliance type."""
-        text = "Offerors may provide additional references."
+        """Ollama response with optional is surfaced correctly."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_OPTIONAL_RESPONSE)):
+            result = classifier.classify("Offerors may provide additional references.")
+        assert result.compliance_type == "optional"
 
-        result = classifier.classify(text)
+    def test_category_technical(self, classifier):
+        """Category field is populated from Ollama response."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The system shall use AES-256.")
+        assert result.category == "technical"
 
-        assert result is not None
-        assert result['compliance_type'] == 'optional'
+    def test_priority_high(self, classifier):
+        """Priority field is populated from Ollama response."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The system shall maintain 99.99% uptime.")
+        assert result.priority == "high"
 
-    def test_priority_assignment(self, classifier):
-        """Test priority level assignment."""
-        high_priority_text = "The system shall maintain 99.99% uptime for critical operations."
+    def test_keywords_list(self, classifier):
+        """Keywords are returned as a list."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The system shall use AES-256 encryption.")
+        assert isinstance(result.keywords, list)
+        assert "security" in result.keywords
 
-        result = classifier.classify(high_priority_text)
+    def test_keywords_joinable(self, classifier):
+        """Keywords list is joinable for downstream processing."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The system shall implement NIST 800-53 controls.")
+        keyword_str = " ".join(result.keywords).lower()
+        assert len(keyword_str) > 0
 
-        assert result is not None
-        assert 'priority' in result
-        assert result['priority'] in ['high', 'medium', 'low']
+    def test_entity_extraction_returns_dict(self, classifier):
+        """extracted_entities is always a dict."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The contractor shall comply with NIST 800-171.")
+        assert isinstance(result.extracted_entities, dict)
 
-    def test_keyword_extraction(self, classifier):
-        """Test extraction of key terms from requirements."""
-        text = "The contractor shall implement NIST 800-53 security controls with multi-factor authentication."
+    def test_entity_extraction_has_standard_keys(self, classifier):
+        """extracted_entities contains expected sub-keys."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            result = classifier.classify("The system must comply with NIST 800-53.")
+        assert "standards" in result.extracted_entities or "acronyms" in result.extracted_entities
 
-        result = classifier.classify(text)
+    # --- classify(): fallback path (Ollama unavailable) ---
 
-        assert result is not None
-        assert 'keywords' in result
-        # Should extract important keywords
-        keywords_str = ' '.join(result['keywords']).lower()
-        # At least some relevant keywords should be present
-        assert any(term in keywords_str for term in ['nist', 'security', 'authentication', 'mfa'])
+    def test_fallback_mandatory_on_shall(self, classifier):
+        """Fallback classifies 'shall' as mandatory without Ollama."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   side_effect=Exception("Connection refused")):
+            result = classifier.classify("The contractor shall provide services.")
+        assert result.compliance_type == "mandatory"
 
-    def test_batch_classification(self, classifier):
-        """Test batch classification of multiple requirements."""
+    def test_fallback_mandatory_on_must(self, classifier):
+        """Fallback classifies 'must' as mandatory without Ollama."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   side_effect=Exception("Connection refused")):
+            result = classifier.classify("The system must comply with federal regulations.")
+        assert result.compliance_type == "mandatory"
+
+    def test_fallback_recommended_on_should(self, classifier):
+        """Fallback classifies 'should' as recommended without Ollama."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   side_effect=Exception("Connection refused")):
+            result = classifier.classify("Contractors should have prior experience.")
+        assert result.compliance_type == "recommended"
+
+    def test_fallback_optional_on_may(self, classifier):
+        """Fallback classifies 'may' as optional without Ollama."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   side_effect=Exception("Connection refused")):
+            result = classifier.classify("Offerors may provide additional references.")
+        assert result.compliance_type == "optional"
+
+    def test_fallback_returns_dataclass(self, classifier):
+        """Fallback still returns RequirementClassification dataclass."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   side_effect=Exception("down")):
+            result = classifier.classify("The contractor shall provide support.")
+        assert isinstance(result, RequirementClassification)
+
+    # --- classify_batch() ---
+
+    def test_batch_returns_same_count(self, classifier):
+        """classify_batch returns one result per requirement."""
         requirements = [
-            "The contractor shall provide technical support.",
-            "Monthly reports should be submitted.",
-            "Additional services may be requested."
+            {"text": "The contractor shall provide technical support.", "section": "C"},
+            {"text": "The system should integrate with infrastructure.", "section": "C"},
+            {"text": "Additional services may be requested.", "section": "C"},
         ]
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            results = classifier.classify_batch(requirements, show_progress=False)
+        assert len(results) == 3
 
-        results = classifier.classify_batch(requirements)
+    def test_batch_returns_dataclass_instances(self, classifier):
+        """classify_batch results are RequirementClassification instances."""
+        requirements = [
+            {"text": "The contractor shall comply.", "section": "C"},
+        ]
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            results = classifier.classify_batch(requirements, show_progress=False)
+        assert all(isinstance(r, RequirementClassification) for r in results)
 
-        assert len(results) == len(requirements)
-        assert all('compliance_type' in r for r in results)
-        assert all('category' in r for r in results)
+    def test_batch_has_compliance_type(self, classifier):
+        """All batch results have compliance_type attribute."""
+        requirements = [{"text": "The system shall support 10,000 users.", "section": "C"}]
+        with patch("shredding.requirement_classifier.requests.post",
+                   return_value=_mock_ollama_response(_MANDATORY_RESPONSE)):
+            results = classifier.classify_batch(requirements, show_progress=False)
+        assert all(hasattr(r, "compliance_type") for r in results)
 
-    @patch('shredding.requirement_classifier.requests.post')
-    def test_fallback_when_ollama_unavailable(self, mock_post, classifier):
-        """Test fallback to keyword-based classification when Ollama is down."""
-        # Simulate Ollama being unavailable
-        mock_post.side_effect = Exception("Connection refused")
+    # --- edge cases ---
 
-        text = "The contractor shall provide services."
-
-        result = classifier.classify(text)
-
-        # Should still return a result using fallback logic
+    def test_empty_text_does_not_crash(self, classifier):
+        """Empty text returns a RequirementClassification without crashing."""
+        with patch("shredding.requirement_classifier.requests.post",
+                   side_effect=Exception("down")):
+            result = classifier.classify("")
         assert result is not None
-        assert 'compliance_type' in result
-        assert result['compliance_type'] == 'mandatory'  # Based on "shall"
+        assert hasattr(result, "compliance_type")
 
-    def test_empty_text_handling(self, classifier):
-        """Test handling of empty text."""
-        result = classifier.classify("")
-
-        # Should handle gracefully
-        assert result is not None
-        assert 'compliance_type' in result
-
-    def test_very_long_text_handling(self, classifier):
-        """Test handling of very long requirement text."""
-        # Create a long but valid requirement
-        text = "The contractor shall " + "provide services and support " * 50
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        assert 'compliance_type' in result
-        assert result['compliance_type'] == 'mandatory'
-
-    def test_special_standards_detection(self, classifier):
-        """Test detection of industry standards (NIST, ISO, FIPS)."""
-        text = "The system shall comply with NIST 800-171 and ISO 27001 standards."
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        if 'entities' in result:
-            entities_str = str(result['entities']).lower()
-            assert 'nist' in entities_str or 'iso' in entities_str
-
-    def test_acronym_handling(self, classifier):
-        """Test proper handling of acronyms."""
-        text = "The contractor shall implement MFA, SSO, and RBAC for the IAM system."
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        # Should handle acronyms without errors
-        assert 'category' in result
-
-    def test_conditional_requirement_classification(self, classifier):
-        """Test classification of conditional requirements."""
-        text = "If the system is unavailable, the contractor shall activate backup within 4 hours."
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        assert result['compliance_type'] == 'mandatory'
-        # May have conditional indicator in keywords
-        if 'keywords' in result:
-            keywords_lower = [k.lower() for k in result['keywords']]
-            # Might detect conditional nature
-
-    def test_numeric_requirement_handling(self, classifier):
-        """Test handling of requirements with numeric specifications."""
-        text = "The system shall support 10,000 concurrent users with <100ms latency."
-
-        result = classifier.classify(text)
-
-        assert result is not None
-        assert result['compliance_type'] == 'mandatory'
-        assert 'category' in result
-
-    def test_classification_consistency(self, classifier):
-        """Test that same requirement classifies consistently."""
-        text = "The contractor shall provide 24/7 technical support."
-
-        result1 = classifier.classify(text)
-        result2 = classifier.classify(text)
-
-        # Should be consistent (allowing for minor variations in LLM output)
-        assert result1['compliance_type'] == result2['compliance_type']
-        # Category might vary slightly, but should be in same domain
+    def test_bad_json_from_ollama_falls_back(self, classifier):
+        """If Ollama returns invalid JSON, fallback classification is used."""
+        bad_resp = MagicMock()
+        bad_resp.status_code = 200
+        bad_resp.json.return_value = {"response": "NOT JSON AT ALL"}
+        with patch("shredding.requirement_classifier.requests.post", return_value=bad_resp):
+            result = classifier.classify("The contractor shall provide services.")
+        assert isinstance(result, RequirementClassification)
+        assert result.compliance_type == "mandatory"  # fallback via keyword
 
 
 if __name__ == "__main__":
