@@ -1,10 +1,36 @@
 // Opportunities Manager
+// Pipeline stage definitions — must match KANBAN_STAGES in workflows.js
+const PIPELINE_STAGE_OPTIONS = [
+    { value: 'identified',               label: '01 — Qualification (Identified)' },
+    { value: 'qualifying',               label: '01 — Qualification (Qualifying)' },
+    { value: 'long_lead',                label: '02 — Long Lead' },
+    { value: 'bid_decision',             label: '03 — Bid Decision' },
+    { value: 'active',                   label: '04 — In Progress' },
+    { value: 'submitted',                label: '05 — Submitted / Review' },
+    { value: 'negotiating',              label: '06 — In Negotiation' },
+    { value: 'awarded',                  label: '07 — Closed Won' },
+    { value: 'lost',                     label: '08 — Closed Lost' },
+    { value: 'no_bid',                   label: '09 — Closed No Bid' },
+    { value: 'cancelled',                label: '20 — Closed Other' },
+    { value: 'contract_vehicle_won',     label: '98 — Awarded Contract Vehicle' },
+    { value: 'contract_vehicle_complete',label: '99 — Completed Contract Vehicle' },
+];
+
+// Map legacy status values → pipeline_stage for existing records
+const LEGACY_STATUS_MAP = {
+    'open':        'identified',
+    'in_progress': 'active',
+    'won':         'awarded',
+    'lost':        'lost',
+};
+
 class OpportunitiesManager {
     constructor() {
         this.opportunities = [];
         this.currentOpportunity = null;
         this.calendarManager = null;
         this.ganttManager = null;
+        this._editMode = false;
         this.init();
     }
 
@@ -14,88 +40,65 @@ class OpportunitiesManager {
     }
 
     initializeVisualizations() {
-        // Initialize Calendar Manager
         if (typeof SVGCalendarManager !== 'undefined') {
             this.calendarManager = new SVGCalendarManager('svg-calendar-container');
         }
-
-        // Initialize Gantt Chart Manager
         if (typeof GanttChartManager !== 'undefined') {
             this.ganttManager = new GanttChartManager('gantt-chart-container');
         }
     }
 
     setupEventListeners() {
-        // Add opportunity button
+        // Add opportunity button (opens create modal)
         const addBtn = document.getElementById('add-opportunity-btn');
-        if (addBtn) {
-            addBtn.addEventListener('click', () => this.showCreateOpportunityModal());
-        }
+        if (addBtn) addBtn.addEventListener('click', () => this.showCreateOpportunityModal());
 
-        // Modal close buttons
+        // Create modal close/cancel
         const closeModal = document.getElementById('close-opportunity-modal');
         const cancelBtn = document.getElementById('cancel-opportunity-btn');
-        if (closeModal) {
-            closeModal.addEventListener('click', () => this.hideOpportunityModal());
-        }
-        if (cancelBtn) {
-            cancelBtn.addEventListener('click', () => this.hideOpportunityModal());
-        }
+        if (closeModal) closeModal.addEventListener('click', () => this.hideOpportunityModal());
+        if (cancelBtn) cancelBtn.addEventListener('click', () => this.hideOpportunityModal());
 
-        // Form submission
+        // Create modal form
         const form = document.getElementById('opportunity-form');
         if (form) {
             form.addEventListener('submit', (e) => {
                 e.preventDefault();
-                this.saveOpportunity();
+                this.saveNewOpportunity();
             });
         }
 
         // Detail view buttons
         const closeDetailBtn = document.getElementById('close-opportunity-detail-btn');
-        const editBtn = document.getElementById('edit-opportunity-btn');
-        const deleteBtn = document.getElementById('delete-opportunity-btn');
+        const editBtn        = document.getElementById('edit-opportunity-btn');
+        const saveBtn        = document.getElementById('save-opportunity-btn');
+        const cancelEditBtn  = document.getElementById('cancel-edit-btn');
+        const deleteBtn      = document.getElementById('delete-opportunity-btn');
 
-        if (closeDetailBtn) {
-            closeDetailBtn.addEventListener('click', () => this.closeOpportunityDetail());
-        }
-        if (editBtn) {
-            editBtn.addEventListener('click', () => this.editCurrentOpportunity());
-        }
-        if (deleteBtn) {
-            deleteBtn.addEventListener('click', () => this.deleteCurrentOpportunity());
-        }
+        if (closeDetailBtn) closeDetailBtn.addEventListener('click', () => this.closeOpportunityDetail());
+        if (editBtn)        editBtn.addEventListener('click',   () => this._enterEditMode());
+        if (saveBtn)        saveBtn.addEventListener('click',   () => this._saveInlineEdit());
+        if (cancelEditBtn)  cancelEditBtn.addEventListener('click', () => this._exitEditMode());
+        if (deleteBtn)      deleteBtn.addEventListener('click', () => this.deleteCurrentOpportunity());
 
-        // Calendar and Tasks toggle buttons
+        // View toggles
         const toggleCalendarBtn = document.getElementById('toggle-calendar-view');
-        const toggleTasksBtn = document.getElementById('toggle-tasks-view');
-        const listViewBtn = document.getElementById('tasks-list-view-btn');
+        const toggleTasksBtn    = document.getElementById('toggle-tasks-view');
+        const listViewBtn       = document.getElementById('tasks-list-view-btn');
 
-        if (toggleCalendarBtn) {
-            toggleCalendarBtn.addEventListener('click', () => this.showCalendarView());
-        }
-        if (toggleTasksBtn) {
-            toggleTasksBtn.addEventListener('click', () => this.showTasksView());
-        }
-        if (listViewBtn) {
-            listViewBtn.addEventListener('click', () => this.showListView());
-        }
+        if (toggleCalendarBtn) toggleCalendarBtn.addEventListener('click', () => this.showCalendarView());
+        if (toggleTasksBtn)    toggleTasksBtn.addEventListener('click',    () => this.showTasksView());
+        if (listViewBtn)       listViewBtn.addEventListener('click',       () => this.showListView());
 
-        // Task management buttons
-        const addTaskBtn = document.getElementById('add-task-btn');
+        // Task management
+        const addTaskBtn     = document.getElementById('add-task-btn');
         const closeTaskModal = document.getElementById('close-task-modal');
-        const cancelTaskBtn = document.getElementById('cancel-task-btn');
-        const taskForm = document.getElementById('task-form');
+        const cancelTaskBtn  = document.getElementById('cancel-task-btn');
+        const taskForm       = document.getElementById('task-form');
 
-        if (addTaskBtn) {
-            addTaskBtn.addEventListener('click', () => this.showCreateTaskModal());
-        }
-        if (closeTaskModal) {
-            closeTaskModal.addEventListener('click', () => this.hideTaskModal());
-        }
-        if (cancelTaskBtn) {
-            cancelTaskBtn.addEventListener('click', () => this.hideTaskModal());
-        }
+        if (addTaskBtn)     addTaskBtn.addEventListener('click',     () => this.showCreateTaskModal());
+        if (closeTaskModal) closeTaskModal.addEventListener('click', () => this.hideTaskModal());
+        if (cancelTaskBtn)  cancelTaskBtn.addEventListener('click',  () => this.hideTaskModal());
         if (taskForm) {
             taskForm.addEventListener('submit', (e) => {
                 e.preventDefault();
@@ -104,13 +107,16 @@ class OpportunitiesManager {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Load & Render list
+    // -----------------------------------------------------------------------
+
     async loadOpportunities() {
         try {
             const response = await fetch('/api/opportunities', {
                 method: 'GET',
                 headers: { 'Content-Type': 'application/json' }
             });
-
             if (response.ok) {
                 const data = await response.json();
                 this.opportunities = data.opportunities || [];
@@ -140,12 +146,8 @@ class OpportunitiesManager {
             item.className = 'flex-1 text-left px-3 py-2 rounded text-sm text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white transition-colors';
             item.textContent = opp.name;
             item.addEventListener('click', () => {
-                // Show the opportunity detail first
                 this.showOpportunityDetail(opp);
-
-                // Navigate to opportunities page to make it visible
                 if (window.app && window.app.currentPage !== 'opportunities') {
-                    // Hide all areas
                     document.getElementById('chat-area')?.classList.add('hidden');
                     document.getElementById('models-area')?.classList.add('hidden');
                     document.getElementById('settings-area')?.classList.add('hidden');
@@ -156,54 +158,31 @@ class OpportunitiesManager {
                     document.getElementById('agents-area')?.classList.add('hidden');
                     document.getElementById('prompts-area')?.classList.add('hidden');
                     document.getElementById('todos-area')?.classList.add('hidden');
-
-                    // Show opportunities area
                     document.getElementById('opportunities-area')?.classList.remove('hidden');
                     window.app.currentPage = 'opportunities';
-
-                    // Update page title
                     const pageTitle = document.getElementById('page-title');
                     if (pageTitle) pageTitle.textContent = 'Opportunities';
-
-                    // Set the Lists nav item as active
                     const navItems = document.querySelectorAll('.nav-item.expandable-nav-item');
                     navItems.forEach(nav => {
                         if (nav.textContent.trim().toLowerCase().includes('lists')) {
                             window.app.setActiveNavItem(nav);
-
-                            // Ensure the Lists submenu is expanded
                             const expandIcon = nav.querySelector('.expand-icon');
-                            if (expandIcon) {
-                                expandIcon.style.transform = 'rotate(180deg)';
-                            }
+                            if (expandIcon) expandIcon.style.transform = 'rotate(180deg)';
                         }
                     });
-
-                    // Ensure the opportunities list and lists submenu stay visible
                     const listsSubmenu = document.getElementById('lists-submenu');
-                    const opportunitiesList = document.getElementById('opportunities-list');
+                    const oppListEl = document.getElementById('opportunities-list');
                     if (listsSubmenu) listsSubmenu.classList.remove('hidden');
-                    if (opportunitiesList) opportunitiesList.classList.remove('hidden');
-
-                    // Rotate the Opportunities expand icon
-                    const oppSubNavItem = document.querySelector('.sub-nav-item[data-list="opportunities"]');
-                    if (oppSubNavItem) {
-                        const oppExpandIcon = oppSubNavItem.querySelector('.expand-icon');
-                        if (oppExpandIcon) {
-                            oppExpandIcon.style.transform = 'rotate(180deg)';
-                        }
-                    }
+                    if (oppListEl) oppListEl.classList.remove('hidden');
                 }
             });
 
             const deleteBtn = document.createElement('button');
             deleteBtn.className = 'p-2 text-gray-400 hover:text-red-500 dark:hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity';
             deleteBtn.title = 'Delete opportunity';
-            deleteBtn.innerHTML = `
-                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
-                </svg>
-            `;
+            deleteBtn.innerHTML = `<svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"></path>
+            </svg>`;
             deleteBtn.addEventListener('click', (e) => {
                 e.stopPropagation();
                 this.deleteOpportunityFromList(opp.id, opp.name);
@@ -215,12 +194,15 @@ class OpportunitiesManager {
         });
     }
 
+    // -----------------------------------------------------------------------
+    // Create modal (new opportunities only)
+    // -----------------------------------------------------------------------
+
     showCreateOpportunityModal() {
         this.currentOpportunity = null;
         const modal = document.getElementById('opportunity-modal');
         const modalTitle = document.getElementById('opportunity-modal-title');
         const form = document.getElementById('opportunity-form');
-
         if (modalTitle) modalTitle.textContent = 'Create Opportunity';
         if (form) form.reset();
         if (modal) modal.classList.remove('hidden');
@@ -231,152 +213,271 @@ class OpportunitiesManager {
         if (modal) modal.classList.add('hidden');
     }
 
-    async saveOpportunity() {
-        const name = document.getElementById('opportunity-name').value;
-        const description = document.getElementById('opportunity-description').value;
-        const status = document.getElementById('opportunity-status').value;
-        const priority = document.getElementById('opportunity-priority').value;
-        const value = parseFloat(document.getElementById('opportunity-value').value) || 0;
-        const tagsInput = document.getElementById('opportunity-tags').value;
-        const tags = tagsInput ? tagsInput.split(',').map(t => t.trim()).filter(t => t) : [];
+    async saveNewOpportunity() {
+        const name = document.getElementById('opportunity-name')?.value?.trim();
+        if (!name) return;
 
-        const opportunityData = {
-            name,
-            description,
-            status,
-            priority,
-            value,
-            tags
-        };
+        const pipelineStage = document.getElementById('opportunity-status')?.value || 'identified';
+        const priority      = document.getElementById('opportunity-priority')?.value || 'medium';
+        const value         = parseFloat(document.getElementById('opportunity-value')?.value) || 0;
+        const tagsRaw       = document.getElementById('opportunity-tags')?.value || '';
+        const tags          = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(t => t) : [];
+        const description   = document.getElementById('opportunity-description')?.value || '';
 
         try {
-            const url = this.currentOpportunity
-                ? `/api/opportunities/${this.currentOpportunity.id}`
-                : '/api/opportunities';
-
-            const method = 'POST';
-
-            const response = await fetch(url, {
-                method,
+            const response = await fetch('/api/opportunities', {
+                method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify(opportunityData)
+                body: JSON.stringify({
+                    name, description,
+                    pipeline_stage: pipelineStage,
+                    status: pipelineStage,
+                    priority, value, tags,
+                })
             });
-
             if (response.ok) {
                 const data = await response.json();
-                debugLog(`Opportunity ${this.currentOpportunity ? 'updated' : 'created'} successfully`);
                 this.hideOpportunityModal();
-                this.loadOpportunities();
-
-                // Show the newly created opportunity
-                if (data.opportunity) {
-                    this.showOpportunityDetail(data.opportunity);
-                }
-            } else {
-                console.error('Failed to save opportunity');
+                await this.loadOpportunities();
+                if (data.opportunity) this.showOpportunityDetail(data.opportunity);
+                this._refreshWorkflows();
             }
         } catch (error) {
-            console.error('Error saving opportunity:', error);
+            console.error('Error creating opportunity:', error);
         }
     }
+
+    // -----------------------------------------------------------------------
+    // Detail view — display
+    // -----------------------------------------------------------------------
 
     showOpportunityDetail(opportunity) {
         this.currentOpportunity = opportunity;
 
+        // Exit any active edit before switching
+        if (this._editMode) this._exitEditMode(false);
+
         const detailView = document.getElementById('opportunity-detail-view');
         const emptyState = document.getElementById('opportunities-empty-state');
-
-        if (!detailView) {
-            console.error('opportunity-detail-view element not found');
-            return;
-        }
-
-        if (detailView) detailView.classList.remove('hidden');
+        if (!detailView) return;
+        detailView.classList.remove('hidden');
         if (emptyState) emptyState.classList.add('hidden');
 
-        // Populate detail fields
+        this._populateDetailFields(opportunity);
+        this.loadTasks(opportunity.id);
+    }
+
+    /**
+     * Populate all the permanent form controls in the detail card with
+     * the opportunity's current data without changing layout or mode.
+     */
+    _populateDetailFields(opp) {
+        const stage = opp.pipeline_stage || LEGACY_STATUS_MAP[opp.status] || 'identified';
+
+        // Name input
         const nameEl = document.getElementById('opportunity-detail-name');
+        if (nameEl) nameEl.value = opp.name || '';
+
+        // Status select
         const statusEl = document.getElementById('opportunity-detail-status');
+        if (statusEl) statusEl.value = stage;
+
+        // Priority select
         const priorityEl = document.getElementById('opportunity-detail-priority');
+        if (priorityEl) priorityEl.value = opp.priority || 'medium';
+
+        // Value input
         const valueEl = document.getElementById('opportunity-detail-value');
+        if (valueEl) valueEl.value = opp.value || 0;
+
+        // Created (plain text — always read-only)
         const createdEl = document.getElementById('opportunity-detail-created');
-        const descriptionEl = document.getElementById('opportunity-detail-description');
+        if (createdEl) createdEl.textContent = new Date(opp.created_at).toLocaleDateString();
 
-        if (nameEl) nameEl.textContent = opportunity.name;
-        if (statusEl) statusEl.textContent = this.formatStatus(opportunity.status);
-        if (priorityEl) priorityEl.textContent = this.formatPriority(opportunity.priority);
-        if (valueEl) valueEl.textContent = `$${opportunity.value.toLocaleString()}`;
-        if (createdEl) createdEl.textContent = new Date(opportunity.created_at).toLocaleDateString();
-        if (descriptionEl) descriptionEl.textContent = opportunity.description || 'No description';
+        // Description textarea
+        const descEl = document.getElementById('opportunity-detail-description');
+        if (descEl) descEl.value = opp.description || '';
 
-        // Render tags
-        const tagsContainer = document.getElementById('opportunity-detail-tags');
-        if (tagsContainer) {
-            tagsContainer.innerHTML = '';
-            if (opportunity.tags && opportunity.tags.length > 0) {
-                opportunity.tags.forEach(tag => {
-                    const tagEl = document.createElement('span');
-                    tagEl.className = 'px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded';
-                    tagEl.textContent = tag;
-                    tagsContainer.appendChild(tagEl);
+        // Tags: badge display (view mode)
+        const tagsBadges = document.getElementById('opportunity-detail-tags');
+        if (tagsBadges) {
+            tagsBadges.innerHTML = '';
+            const tags = opp.tags || [];
+            if (tags.length > 0) {
+                tags.forEach(tag => {
+                    const el = document.createElement('span');
+                    el.className = 'px-2 py-1 text-xs bg-blue-100 dark:bg-blue-900 text-blue-800 dark:text-blue-200 rounded';
+                    el.textContent = tag;
+                    tagsBadges.appendChild(el);
                 });
             } else {
-                tagsContainer.innerHTML = '<span class="text-gray-500 dark:text-gray-400">No tags</span>';
+                tagsBadges.innerHTML = '<span class="text-gray-500 dark:text-gray-400">No tags</span>';
             }
         }
 
-        // Load tasks for this opportunity
-        this.loadTasks(opportunity.id);
-
-        debugLog(`Showing opportunity detail: ${opportunity.name}`);
+        // Tags: text input (edit mode) — always keep in sync
+        const tagsInput = document.getElementById('opportunity-detail-tags-input');
+        if (tagsInput) tagsInput.value = (opp.tags || []).join(', ');
     }
 
     closeOpportunityDetail() {
-        const detailView = document.getElementById('opportunity-detail-view');
-        const emptyState = document.getElementById('opportunities-empty-state');
-
-        if (detailView) detailView.classList.add('hidden');
-        if (emptyState) emptyState.classList.remove('hidden');
+        if (this._editMode) this._exitEditMode(false);
+        document.getElementById('opportunity-detail-view')?.classList.add('hidden');
+        document.getElementById('opportunities-empty-state')?.classList.remove('hidden');
     }
 
-    editCurrentOpportunity() {
+    // -----------------------------------------------------------------------
+    // Inline edit — CSS class toggle only, no DOM restructuring
+    // -----------------------------------------------------------------------
+
+    _enterEditMode() {
+        if (!this.currentOpportunity) return;
+        this._editMode = true;
+
+        const card = document.getElementById('opportunity-detail-card');
+        if (!card) return;
+
+        // Toggle CSS: fields become interactive
+        card.classList.add('edit-active');
+
+        // Enable all opp-field controls
+        card.querySelectorAll('[data-opp-field]').forEach(el => {
+            if (el.tagName === 'SELECT') {
+                el.disabled = false;
+            } else {
+                el.removeAttribute('readonly');
+            }
+        });
+
+        // Swap tags badges → tags text input (same position)
+        document.getElementById('opportunity-detail-tags')?.classList.add('hidden');
+        const tagsInput = document.getElementById('opportunity-detail-tags-input');
+        if (tagsInput) {
+            tagsInput.classList.remove('hidden');
+            tagsInput.removeAttribute('readonly');
+        }
+
+        // Swap Edit → Save + Cancel
+        document.getElementById('edit-opportunity-btn')?.classList.add('hidden');
+        document.getElementById('save-opportunity-btn')?.classList.remove('hidden');
+        document.getElementById('cancel-edit-btn')?.classList.remove('hidden');
+    }
+
+    _exitEditMode(repopulate = true) {
+        this._editMode = false;
+
+        const card = document.getElementById('opportunity-detail-card');
+        if (!card) return;
+
+        // Remove edit styling
+        card.classList.remove('edit-active');
+
+        // Disable all opp-field controls
+        card.querySelectorAll('[data-opp-field]').forEach(el => {
+            if (el.tagName === 'SELECT') {
+                el.disabled = true;
+            } else {
+                el.setAttribute('readonly', '');
+            }
+        });
+
+        // Swap tags text input → badges
+        document.getElementById('opportunity-detail-tags')?.classList.remove('hidden');
+        const tagsInput = document.getElementById('opportunity-detail-tags-input');
+        if (tagsInput) {
+            tagsInput.classList.add('hidden');
+            tagsInput.setAttribute('readonly', '');
+        }
+
+        // Swap Save/Cancel → Edit
+        document.getElementById('save-opportunity-btn')?.classList.add('hidden');
+        document.getElementById('cancel-edit-btn')?.classList.add('hidden');
+        document.getElementById('edit-opportunity-btn')?.classList.remove('hidden');
+
+        // Re-populate from the stored currentOpportunity (reverts any unsaved typing)
+        if (repopulate && this.currentOpportunity) {
+            this._populateDetailFields(this.currentOpportunity);
+        }
+    }
+
+    async _saveInlineEdit() {
         if (!this.currentOpportunity) return;
 
-        const modal = document.getElementById('opportunity-modal');
-        const modalTitle = document.getElementById('opportunity-modal-title');
+        const name = document.getElementById('opportunity-detail-name')?.value?.trim();
+        if (!name) return;
 
-        if (modalTitle) modalTitle.textContent = 'Edit Opportunity';
+        const pipelineStage = document.getElementById('opportunity-detail-status')?.value || 'identified';
+        const priority      = document.getElementById('opportunity-detail-priority')?.value || 'medium';
+        const value         = parseFloat(document.getElementById('opportunity-detail-value')?.value) || 0;
+        const tagsRaw       = document.getElementById('opportunity-detail-tags-input')?.value || '';
+        const tags          = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(t => t) : [];
+        const description   = document.getElementById('opportunity-detail-description')?.value || '';
 
-        // Populate form
-        document.getElementById('opportunity-id').value = this.currentOpportunity.id;
-        document.getElementById('opportunity-name').value = this.currentOpportunity.name;
-        document.getElementById('opportunity-description').value = this.currentOpportunity.description || '';
-        document.getElementById('opportunity-status').value = this.currentOpportunity.status;
-        document.getElementById('opportunity-priority').value = this.currentOpportunity.priority;
-        document.getElementById('opportunity-value').value = this.currentOpportunity.value;
-        document.getElementById('opportunity-tags').value = (this.currentOpportunity.tags || []).join(', ');
+        try {
+            const response = await fetch(`/api/opportunities/${this.currentOpportunity.id}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    name, description,
+                    pipeline_stage: pipelineStage,
+                    status: pipelineStage,
+                    priority, value, tags,
+                })
+            });
 
-        if (modal) modal.classList.remove('hidden');
+            if (response.ok) {
+                const data = await response.json();
+                const updated = data.opportunity || data;
+                this.currentOpportunity = updated;
+                this._exitEditMode(false);       // exit first (restores buttons)
+                this._populateDetailFields(updated); // then populate with fresh data
+                await this.loadOpportunities();
+                this._refreshWorkflows();
+            } else {
+                console.error('Failed to update opportunity');
+            }
+        } catch (error) {
+            console.error('Error updating opportunity:', error);
+        }
     }
+
+    // Called by workflowsManager after a drag-drop stage change
+    async reloadCurrentOpportunity(opportunityId) {
+        try {
+            const response = await fetch(`/api/opportunities/${opportunityId}`);
+            if (response.ok) {
+                const data = await response.json();
+                const opp = data.opportunity;
+                const idx = this.opportunities.findIndex(o => o.id === opportunityId);
+                if (idx !== -1) this.opportunities[idx] = opp;
+                else this.opportunities.unshift(opp);
+                this.renderOpportunitiesList();
+                if (this.currentOpportunity?.id === opportunityId && !this._editMode) {
+                    this.currentOpportunity = opp;
+                    this._populateDetailFields(opp);
+                }
+            }
+        } catch (e) {
+            console.error('Error reloading opportunity:', e);
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Delete
+    // -----------------------------------------------------------------------
 
     async deleteCurrentOpportunity() {
         if (!this.currentOpportunity) return;
-
-        if (!confirm(`Are you sure you want to delete "${this.currentOpportunity.name}"?`)) {
-            return;
-        }
+        if (!confirm(`Are you sure you want to delete "${this.currentOpportunity.name}"?`)) return;
 
         try {
             const response = await fetch(`/api/opportunities/${this.currentOpportunity.id}`, {
                 method: 'DELETE'
             });
-
             if (response.ok) {
-                debugLog('Opportunity deleted successfully');
                 this.closeOpportunityDetail();
-                this.loadOpportunities();
-            } else {
-                console.error('Failed to delete opportunity');
+                await this.loadOpportunities();
+                this._refreshWorkflows();
             }
         } catch (error) {
             console.error('Error deleting opportunity:', error);
@@ -384,56 +485,39 @@ class OpportunitiesManager {
     }
 
     async deleteOpportunityFromList(opportunityId, opportunityName) {
-        if (!confirm(`Are you sure you want to delete "${opportunityName}"? This will also delete all associated tasks.`)) {
-            return;
-        }
+        if (!confirm(`Are you sure you want to delete "${opportunityName}"?`)) return;
 
         try {
-            const response = await fetch(`/api/opportunities/${opportunityId}`, {
-                method: 'DELETE'
-            });
-
+            const response = await fetch(`/api/opportunities/${opportunityId}`, { method: 'DELETE' });
             const result = await response.json();
-
             if (result.status === 'success') {
-                debugLog('Opportunity deleted from list successfully');
-                this.loadOpportunities();
-            } else {
-                console.error('Failed to delete opportunity:', result.message);
+                if (this.currentOpportunity?.id === opportunityId) this.closeOpportunityDetail();
+                await this.loadOpportunities();
+                this._refreshWorkflows();
             }
         } catch (error) {
             console.error('Error deleting opportunity:', error);
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Views
+    // -----------------------------------------------------------------------
+
     showCalendarView() {
-        const calendarContainer = document.getElementById('svg-calendar-container');
-        const ganttContainer = document.getElementById('gantt-chart-container');
-
-        if (calendarContainer && ganttContainer) {
-            calendarContainer.classList.remove('hidden');
-            ganttContainer.classList.add('hidden');
-
-            // Load opportunities into calendar if manager exists
-            if (this.calendarManager && this.currentOpportunity) {
-                this.calendarManager.setOpportunities([this.currentOpportunity]);
-                this.calendarManager.render();
-            }
+        document.getElementById('svg-calendar-container')?.classList.remove('hidden');
+        document.getElementById('gantt-chart-container')?.classList.add('hidden');
+        if (this.calendarManager && this.currentOpportunity) {
+            this.calendarManager.setOpportunities([this.currentOpportunity]);
+            this.calendarManager.render();
         }
     }
 
     showTasksView() {
-        const calendarContainer = document.getElementById('svg-calendar-container');
-        const ganttContainer = document.getElementById('gantt-chart-container');
-
-        if (calendarContainer && ganttContainer) {
-            calendarContainer.classList.add('hidden');
-            ganttContainer.classList.remove('hidden');
-
-            // Load tasks into gantt chart if manager exists
-            if (this.ganttManager && this.currentOpportunity) {
-                this.loadTasksForGantt(this.currentOpportunity.id);
-            }
+        document.getElementById('svg-calendar-container')?.classList.add('hidden');
+        document.getElementById('gantt-chart-container')?.classList.remove('hidden');
+        if (this.ganttManager && this.currentOpportunity) {
+            this.loadTasksForGantt(this.currentOpportunity.id);
         }
     }
 
@@ -453,16 +537,14 @@ class OpportunitiesManager {
     }
 
     showListView() {
-        const listContainer = document.getElementById('tasks-list-container');
-        const calendarContainer = document.getElementById('svg-calendar-container');
-        const ganttContainer = document.getElementById('gantt-chart-container');
-
-        if (listContainer && calendarContainer && ganttContainer) {
-            listContainer.classList.remove('hidden');
-            calendarContainer.classList.add('hidden');
-            ganttContainer.classList.add('hidden');
-        }
+        document.getElementById('tasks-list-container')?.classList.remove('hidden');
+        document.getElementById('svg-calendar-container')?.classList.add('hidden');
+        document.getElementById('gantt-chart-container')?.classList.add('hidden');
     }
+
+    // -----------------------------------------------------------------------
+    // Tasks
+    // -----------------------------------------------------------------------
 
     async loadTasks(opportunityId) {
         try {
@@ -479,7 +561,6 @@ class OpportunitiesManager {
     renderTasksList(tasks) {
         const tbody = document.getElementById('tasks-table-body');
         const emptyState = document.getElementById('tasks-empty-state');
-
         if (!tbody) return;
 
         tbody.innerHTML = '';
@@ -512,58 +593,43 @@ class OpportunitiesManager {
     }
 
     showCreateTaskModal() {
-        if (!this.currentOpportunity) {
-            alert('Please select an opportunity first');
-            return;
-        }
-
+        if (!this.currentOpportunity) { alert('Please select an opportunity first'); return; }
         const modal = document.getElementById('task-modal');
-        const form = document.getElementById('task-form');
-
+        const form  = document.getElementById('task-form');
         if (form) form.reset();
-
         document.getElementById('task-id').value = '';
         document.getElementById('task-opportunity-id').value = this.currentOpportunity.id;
         document.getElementById('task-modal-title').textContent = 'Create Task';
-
         if (modal) modal.classList.remove('hidden');
     }
 
     hideTaskModal() {
-        const modal = document.getElementById('task-modal');
-        if (modal) modal.classList.add('hidden');
+        document.getElementById('task-modal')?.classList.add('hidden');
     }
 
     async saveTask() {
-        const taskId = document.getElementById('task-id').value;
+        const taskId       = document.getElementById('task-id').value;
         const opportunityId = document.getElementById('task-opportunity-id').value;
 
         const taskData = {
-            name: document.getElementById('task-name').value,
+            name:        document.getElementById('task-name').value,
             description: document.getElementById('task-description').value,
-            start_date: document.getElementById('task-start-date').value,
-            end_date: document.getElementById('task-end-date').value,
-            status: document.getElementById('task-status').value,
-            progress: parseInt(document.getElementById('task-progress').value) || 0,
+            start_date:  document.getElementById('task-start-date').value,
+            end_date:    document.getElementById('task-end-date').value,
+            status:      document.getElementById('task-status').value,
+            progress:    parseInt(document.getElementById('task-progress').value) || 0,
             assigned_to: document.getElementById('task-assigned-to').value
         };
 
         try {
-            let response;
-            if (taskId) {
-                response = await fetch(`/api/tasks/${taskId}`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(taskData)
-                });
-            } else {
-                response = await fetch(`/api/opportunities/${opportunityId}/tasks`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify(taskData)
-                });
-            }
-
+            const url = taskId
+                ? `/api/tasks/${taskId}`
+                : `/api/opportunities/${opportunityId}/tasks`;
+            const response = await fetch(url, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify(taskData)
+            });
             if (response.ok) {
                 this.hideTaskModal();
                 this.loadTasks(opportunityId);
@@ -579,17 +645,15 @@ class OpportunitiesManager {
             if (response.ok) {
                 const data = await response.json();
                 const task = data.task;
-
-                document.getElementById('task-id').value = task.id;
+                document.getElementById('task-id').value           = task.id;
                 document.getElementById('task-opportunity-id').value = task.opportunity_id;
-                document.getElementById('task-name').value = task.name;
-                document.getElementById('task-description').value = task.description || '';
-                document.getElementById('task-start-date').value = task.start_date;
-                document.getElementById('task-end-date').value = task.end_date;
-                document.getElementById('task-status').value = task.status;
-                document.getElementById('task-progress').value = task.progress;
-                document.getElementById('task-assigned-to').value = task.assigned_to || '';
-
+                document.getElementById('task-name').value         = task.name;
+                document.getElementById('task-description').value  = task.description || '';
+                document.getElementById('task-start-date').value   = task.start_date;
+                document.getElementById('task-end-date').value     = task.end_date;
+                document.getElementById('task-status').value       = task.status;
+                document.getElementById('task-progress').value     = task.progress;
+                document.getElementById('task-assigned-to').value  = task.assigned_to || '';
                 document.getElementById('task-modal-title').textContent = 'Edit Task';
                 document.getElementById('task-modal').classList.remove('hidden');
             }
@@ -600,12 +664,8 @@ class OpportunitiesManager {
 
     async deleteTask(taskId) {
         if (!confirm('Are you sure you want to delete this task?')) return;
-
         try {
-            const response = await fetch(`/api/tasks/${taskId}`, {
-                method: 'DELETE'
-            });
-
+            const response = await fetch(`/api/tasks/${taskId}`, { method: 'DELETE' });
             if (response.ok && this.currentOpportunity) {
                 this.loadTasks(this.currentOpportunity.id);
             }
@@ -614,23 +674,28 @@ class OpportunitiesManager {
         }
     }
 
+    // -----------------------------------------------------------------------
+    // Helpers
+    // -----------------------------------------------------------------------
+
+    _refreshWorkflows() {
+        if (window.workflowsManager) window.workflowsManager.load();
+    }
+
     escapeHtml(text) {
         const div = document.createElement('div');
         div.textContent = text;
         return div.innerHTML;
     }
 
-    formatStatus(status) {
-        const statusMap = {
-            'open': 'Open',
-            'in_progress': 'In Progress',
-            'won': 'Won',
-            'lost': 'Lost'
-        };
-        return statusMap[status] || status;
+    formatStatus(stage) {
+        const opt = PIPELINE_STAGE_OPTIONS.find(o => o.value === stage);
+        if (opt) return opt.label;
+        const legacy = { 'open': 'Open', 'in_progress': 'In Progress', 'won': 'Won', 'lost': 'Lost' };
+        return legacy[stage] || stage;
     }
 
     formatPriority(priority) {
-        return priority.charAt(0).toUpperCase() + priority.slice(1);
+        return priority ? priority.charAt(0).toUpperCase() + priority.slice(1) : 'Medium';
     }
 }

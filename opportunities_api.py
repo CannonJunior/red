@@ -105,24 +105,34 @@ class OpportunitiesManager:
             ON task_history(task_id, edited_at DESC)
         """)
 
+        # Add pipeline_stage column if it doesn't exist yet (migration)
+        try:
+            cursor.execute(
+                "ALTER TABLE opportunities ADD COLUMN pipeline_stage TEXT DEFAULT 'identified'"
+            )
+        except Exception:
+            pass  # Column already exists
+
         conn.commit()
         conn.close()
 
     def create_opportunity(self, name: str, description: str = "",
                           status: str = "open", priority: str = "medium",
                           value: float = 0.0, tags: List[str] = None,
-                          metadata: Dict = None) -> Dict:
+                          metadata: Dict = None,
+                          pipeline_stage: str = "identified") -> Dict:
         """
         Create a new opportunity.
 
         Args:
             name: Opportunity name
             description: Detailed description
-            status: Status (open, in_progress, won, lost)
+            status: Legacy status field (open, in_progress, won, lost)
             priority: Priority level (low, medium, high)
             value: Estimated value
             tags: List of tags
             metadata: Additional metadata
+            pipeline_stage: Workflow pipeline stage (identified, qualifying, etc.)
 
         Returns:
             Created opportunity data
@@ -139,10 +149,11 @@ class OpportunitiesManager:
 
             cursor.execute("""
                 INSERT INTO opportunities
-                (id, name, description, status, priority, value, tags, metadata, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                (id, name, description, status, priority, value, tags, metadata,
+                 pipeline_stage, created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (opportunity_id, name, description, status, priority, value,
-                  tags_json, metadata_json, now, now))
+                  tags_json, metadata_json, pipeline_stage, now, now))
 
             conn.commit()
             conn.close()
@@ -157,6 +168,7 @@ class OpportunitiesManager:
                     'name': name,
                     'description': description,
                     'status': status,
+                    'pipeline_stage': pipeline_stage,
                     'priority': priority,
                     'value': value,
                     'tags': tags or [],
@@ -209,6 +221,7 @@ class OpportunitiesManager:
                     'name': row['name'],
                     'description': row['description'],
                     'status': row['status'],
+                    'pipeline_stage': row['pipeline_stage'] if 'pipeline_stage' in row.keys() else 'identified',
                     'priority': row['priority'],
                     'value': row['value'],
                     'tags': json.loads(row['tags']) if row['tags'] else [],
@@ -266,6 +279,7 @@ class OpportunitiesManager:
                     'name': row['name'],
                     'description': row['description'],
                     'status': row['status'],
+                    'pipeline_stage': row['pipeline_stage'] if 'pipeline_stage' in row.keys() else 'identified',
                     'priority': row['priority'],
                     'value': row['value'],
                     'tags': json.loads(row['tags']) if row['tags'] else [],
@@ -300,7 +314,7 @@ class OpportunitiesManager:
             update_fields = []
             update_values = []
 
-            for field in ['name', 'description', 'status', 'priority', 'value']:
+            for field in ['name', 'description', 'status', 'pipeline_stage', 'priority', 'value']:
                 if field in updates:
                     update_fields.append(f"{field} = ?")
                     update_values.append(updates[field])
@@ -771,7 +785,8 @@ def handle_opportunities_create_request(data: Dict) -> Dict:
         priority=data.get('priority', 'medium'),
         value=data.get('value', 0.0),
         tags=data.get('tags', []),
-        metadata=data.get('metadata', {})
+        metadata=data.get('metadata', {}),
+        pipeline_stage=data.get('pipeline_stage', 'identified')
     )
 
 

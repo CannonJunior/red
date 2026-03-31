@@ -31,6 +31,70 @@
             }
         })();
     </script>
+    <style>
+        /* ── Opportunity inline-edit field system ─────────────────────────── */
+        /* View mode: controls are invisible — look like plain text            */
+        .opp-field {
+            background: transparent;
+            border: 1px solid transparent;
+            border-radius: 0.375rem;
+            padding: 0.125rem 0;
+            outline: none !important;
+            box-shadow: none !important;
+            resize: none;
+            cursor: default;
+            pointer-events: none;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 100%;
+            font-family: inherit;
+            font-size: inherit;
+            line-height: inherit;
+            color: inherit;
+            display: block;
+        }
+        /* Select arrow hidden in view mode */
+        .opp-field option { color: initial; }
+
+        /* Edit mode: toggle .edit-active on #opportunity-detail-card */
+        #opportunity-detail-card.edit-active .opp-field {
+            background: #ffffff;
+            border-color: #d1d5db;
+            padding: 0.375rem 0.625rem;
+            cursor: text;
+            pointer-events: auto;
+            -webkit-appearance: auto;
+            appearance: auto;
+            resize: vertical;
+        }
+        #opportunity-detail-card.edit-active select.opp-field {
+            cursor: pointer;
+        }
+        /* Dark mode edit */
+        .dark #opportunity-detail-card.edit-active .opp-field {
+            background: #374151;
+            border-color: #4b5563;
+            color: #f9fafb;
+        }
+        /* Name field inherits heading size */
+        #opportunity-detail-name.opp-field {
+            font-size: 1.125rem;
+            font-weight: 600;
+            line-height: 1.75rem;
+        }
+        #opportunity-detail-card.edit-active #opportunity-detail-name.opp-field {
+            padding: 0.25rem 0.625rem;
+        }
+        /* Textarea auto-expands in edit mode */
+        #opportunity-detail-card.edit-active textarea.opp-field {
+            min-height: 4.5rem;
+        }
+        /* Focus ring in edit mode only */
+        #opportunity-detail-card.edit-active .opp-field:focus {
+            border-color: #3b82f6;
+            box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
+        }
+    </style>
 </head>
 <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-200">
     <!-- Splash Screen -->
@@ -1596,22 +1660,44 @@
                                     <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Opportunities</h3>
                                     <p class="text-gray-600 dark:text-gray-400">Track and manage business opportunities with knowledge graph integration</p>
                                 </div>
-                                <button id="add-opportunity-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
-                                    <span class="flex items-center">
-                                        <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
-                                        </svg>
-                                        New Opportunity
-                                    </span>
-                                </button>
+                                <div class="flex items-center gap-2 flex-wrap">
+                                    <!-- CSV import (hidden file input + trigger button) -->
+                                    <input type="file" id="import-csv-file-input" accept=".csv" class="hidden">
+                                    <button id="import-csv-btn" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm">
+                                        Import CSV
+                                    </button>
+                                    <button id="export-csv-btn" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm">
+                                        Export CSV
+                                    </button>
+                                    <button id="export-json-btn" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm">
+                                        Export JSON
+                                    </button>
+                                    <button id="delete-all-opportunities-btn" class="px-3 py-2 bg-red-100 dark:bg-red-900/30 text-red-700 dark:text-red-400 rounded-lg hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors text-sm">
+                                        Delete All
+                                    </button>
+                                    <button id="add-opportunity-btn" class="px-4 py-2 bg-blue-600 text-white rounded-lg hover:bg-blue-700 transition-colors">
+                                        <span class="flex items-center">
+                                            <svg class="w-5 h-5 mr-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"></path>
+                                            </svg>
+                                            New Opportunity
+                                        </span>
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Opportunity Details View -->
                             <div id="opportunity-detail-view" class="hidden">
-                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
-                                    <div class="flex items-center justify-between mb-4">
-                                        <h4 class="text-lg font-semibold text-gray-900 dark:text-white" id="opportunity-detail-name">Opportunity Name</h4>
-                                        <div class="flex items-center space-x-2">
+                                <div id="opportunity-detail-card" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                                    <!-- Header: name (inline input) + action buttons -->
+                                    <div class="flex items-center justify-between mb-4 gap-4">
+                                        <input type="text" id="opportunity-detail-name"
+                                               data-opp-field="name"
+                                               class="opp-field text-gray-900 dark:text-white flex-1 min-w-0"
+                                               placeholder="Opportunity name" readonly>
+                                        <div class="flex items-center space-x-2 flex-shrink-0">
+                                            <button id="save-opportunity-btn" class="hidden px-3 py-1 text-sm bg-green-600 text-white rounded-md hover:bg-green-700">Save</button>
+                                            <button id="cancel-edit-btn" class="hidden px-3 py-1 text-sm bg-gray-500 text-white rounded-md hover:bg-gray-600">Cancel</button>
                                             <button id="edit-opportunity-btn" class="px-3 py-1 text-sm bg-blue-600 text-white rounded-md hover:bg-blue-700">Edit</button>
                                             <button id="delete-opportunity-btn" class="px-3 py-1 text-sm bg-red-600 text-white rounded-md hover:bg-red-700">Delete</button>
                                             <button id="close-opportunity-detail-btn" class="p-1 text-gray-500 hover:text-gray-700 dark:hover:text-gray-300">
@@ -1621,33 +1707,70 @@
                                             </button>
                                         </div>
                                     </div>
+                                    <!-- 2-col metadata grid -->
                                     <div class="grid grid-cols-2 gap-4 mb-4">
                                         <div>
                                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Status</label>
-                                            <p id="opportunity-detail-status" class="text-gray-900 dark:text-white">Open</p>
+                                            <select id="opportunity-detail-status"
+                                                    data-opp-field="pipeline_stage"
+                                                    class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                    disabled>
+                                                <option value="identified">01 — Qualification (Identified)</option>
+                                                <option value="qualifying">01 — Qualification (Qualifying)</option>
+                                                <option value="long_lead">02 — Long Lead</option>
+                                                <option value="bid_decision">03 — Bid Decision</option>
+                                                <option value="active">04 — In Progress</option>
+                                                <option value="submitted">05 — Submitted / Review</option>
+                                                <option value="negotiating">06 — In Negotiation</option>
+                                                <option value="awarded">07 — Closed Won</option>
+                                                <option value="lost">08 — Closed Lost</option>
+                                                <option value="no_bid">09 — Closed No Bid</option>
+                                                <option value="cancelled">20 — Closed Other</option>
+                                                <option value="contract_vehicle_won">98 — Awarded Contract Vehicle</option>
+                                                <option value="contract_vehicle_complete">99 — Completed Contract Vehicle</option>
+                                            </select>
                                         </div>
                                         <div>
                                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Priority</label>
-                                            <p id="opportunity-detail-priority" class="text-gray-900 dark:text-white">Medium</p>
+                                            <select id="opportunity-detail-priority"
+                                                    data-opp-field="priority"
+                                                    class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                    disabled>
+                                                <option value="low">Low</option>
+                                                <option value="medium">Medium</option>
+                                                <option value="high">High</option>
+                                            </select>
                                         </div>
                                         <div>
-                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Value</label>
-                                            <p id="opportunity-detail-value" class="text-gray-900 dark:text-white">$0</p>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Value ($)</label>
+                                            <input type="number" id="opportunity-detail-value"
+                                                   data-opp-field="value"
+                                                   class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                   min="0" step="0.01" readonly>
                                         </div>
                                         <div>
                                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Created</label>
-                                            <p id="opportunity-detail-created" class="text-gray-900 dark:text-white">-</p>
+                                            <p id="opportunity-detail-created" class="text-gray-900 dark:text-white mt-1">-</p>
                                         </div>
                                     </div>
+                                    <!-- Description -->
                                     <div class="mb-4">
                                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Description</label>
-                                        <p id="opportunity-detail-description" class="text-gray-900 dark:text-white mt-1">No description</p>
+                                        <textarea id="opportunity-detail-description"
+                                                  data-opp-field="description"
+                                                  class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                  rows="3" readonly></textarea>
                                     </div>
+                                    <!-- Tags: badge display (view) + text input (edit) at same position -->
                                     <div>
                                         <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Tags</label>
-                                        <div id="opportunity-detail-tags" class="flex flex-wrap gap-2 mt-1">
-                                            <!-- Tags will be populated here -->
+                                        <div id="opportunity-detail-tags" class="flex flex-wrap gap-2 mt-1 min-h-[1.75rem]">
+                                            <!-- tag badges rendered here in view mode -->
                                         </div>
+                                        <input type="text" id="opportunity-detail-tags-input"
+                                               data-opp-field="tags"
+                                               class="opp-field hidden mt-1 text-gray-900 dark:text-white"
+                                               placeholder="e.g. enterprise, IT, urgent" readonly>
                                     </div>
                                 </div>
 
@@ -2087,10 +2210,19 @@
                                         <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Status</label>
                                         <select id="opportunity-status"
                                             class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                            <option value="open">Open</option>
-                                            <option value="in_progress">In Progress</option>
-                                            <option value="won">Won</option>
-                                            <option value="lost">Lost</option>
+                                            <option value="identified">01 — Qualification (Identified)</option>
+                                            <option value="qualifying">01 — Qualification (Qualifying)</option>
+                                            <option value="long_lead">02 — Long Lead</option>
+                                            <option value="bid_decision">03 — Bid Decision</option>
+                                            <option value="active">04 — In Progress</option>
+                                            <option value="submitted">05 — Submitted / Review</option>
+                                            <option value="negotiating">06 — In Negotiation</option>
+                                            <option value="awarded">07 — Closed Won</option>
+                                            <option value="lost">08 — Closed Lost</option>
+                                            <option value="no_bid">09 — Closed No Bid</option>
+                                            <option value="cancelled">20 — Closed Other</option>
+                                            <option value="contract_vehicle_won">98 — Awarded Contract Vehicle</option>
+                                            <option value="contract_vehicle_complete">99 — Completed Contract Vehicle</option>
                                         </select>
                                     </div>
                                     <div>
@@ -2224,6 +2356,7 @@
     <script src="js/knowledge-manager.js"></script>
     <script src="js/visualization-manager.js"></script>
     <script src="js/opportunities-manager.js"></script>
+    <script src="js/opportunities-import-export.js"></script>
     <script src="js/navigation.js"></script>
     <script src="js/integration-manager.js"></script>
     <!-- Orchestrator (must load after all modules) -->

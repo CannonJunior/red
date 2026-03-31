@@ -20,6 +20,17 @@ try:
 except ImportError:
     OPPORTUNITIES_AVAILABLE = False
 
+try:
+    from opportunities_import_export import (
+        handle_opportunities_delete_all_request,
+        handle_opportunities_parse_csv_request,
+        handle_opportunities_import_confirm_request,
+        handle_opportunities_export_request,
+    )
+    IMPORT_EXPORT_AVAILABLE = True
+except ImportError:
+    IMPORT_EXPORT_AVAILABLE = False
+
 
 def handle_opportunities_list_api(handler):
     """Handle GET /api/opportunities - List all opportunities."""
@@ -225,3 +236,92 @@ def handle_task_history_api(handler, task_id):
     except Exception as e:
         print(f"❌ Task history API error: {e}")
         handler.send_json_response({'error': f'Task history failed: {str(e)}'}, 500)
+
+
+# ---------------------------------------------------------------------------
+# Import / Export / Delete-all handlers
+# ---------------------------------------------------------------------------
+
+def handle_opportunities_delete_all_api(handler):
+    """Handle DELETE /api/opportunities - Delete all opportunities."""
+    if not IMPORT_EXPORT_AVAILABLE:
+        handler.send_json_response({'error': 'Import/export module not available'}, 503)
+        return
+    try:
+        result = handle_opportunities_delete_all_request()
+        if result.get('status') == 'success':
+            debug_log(f"Deleted all opportunities: {result.get('deleted_count', 0)}", "🗑️")
+            handler.send_json_response(result)
+        else:
+            handler.send_json_response(result, 500)
+    except Exception as e:
+        print(f"❌ Delete-all opportunities error: {e}")
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+def handle_opportunities_import_parse_api(handler):
+    """Handle POST /api/opportunities/import/parse - Parse CSV headers & preview."""
+    if not IMPORT_EXPORT_AVAILABLE:
+        handler.send_json_response({'error': 'Import/export module not available'}, 503)
+        return
+    try:
+        body = handler.get_request_body()
+        if body is None or 'csv_content' not in body:
+            handler.send_json_response({'error': 'Missing csv_content field'}, 400)
+            return
+        result = handle_opportunities_parse_csv_request(body['csv_content'])
+        handler.send_json_response(result)
+    except Exception as e:
+        print(f"❌ CSV parse error: {e}")
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+def handle_opportunities_import_confirm_api(handler):
+    """Handle POST /api/opportunities/import/confirm - Finalize CSV import."""
+    if not IMPORT_EXPORT_AVAILABLE:
+        handler.send_json_response({'error': 'Import/export module not available'}, 503)
+        return
+    try:
+        body = handler.get_request_body()
+        if body is None or 'csv_content' not in body or 'field_map' not in body:
+            handler.send_json_response({'error': 'Missing csv_content or field_map'}, 400)
+            return
+        result = handle_opportunities_import_confirm_request(
+            body['csv_content'], body['field_map']
+        )
+        debug_log(f"CSV import: {result.get('imported', 0)} imported, "
+                  f"{result.get('skipped', 0)} skipped", "📥")
+        handler.send_json_response(result)
+    except Exception as e:
+        print(f"❌ CSV import error: {e}")
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+def handle_opportunities_export_api(handler):
+    """Handle GET /api/opportunities/export?format=csv|json - Download export."""
+    if not IMPORT_EXPORT_AVAILABLE:
+        handler.send_json_response({'error': 'Import/export module not available'}, 503)
+        return
+    try:
+        from urllib.parse import urlparse, parse_qs
+        parsed = urlparse(handler.path)
+        params = parse_qs(parsed.query)
+        fmt = params.get('format', ['csv'])[0]
+
+        result = handle_opportunities_export_request(fmt)
+        if result.get('status') != 'success':
+            handler.send_json_response(result, 500)
+            return
+
+        content = result['content']
+        handler.send_response(200)
+        handler.send_header('Content-Type', result['content_type'])
+        handler.send_header('Content-Disposition',
+                            f'attachment; filename="{result["filename"]}"')
+        handler.send_header('Content-Length', str(len(content)))
+        handler.end_headers()
+        handler.wfile.write(content)
+        debug_log(f"Exported opportunities as {fmt}: {len(content)} bytes", "📤")
+    except Exception as e:
+        print(f"❌ Opportunities export error: {e}")
+        handler.send_json_response({'error': str(e)}, 500)

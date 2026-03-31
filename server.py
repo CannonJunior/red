@@ -129,7 +129,11 @@ from server.routes.opportunities import (
     handle_task_get_api as handle_task_get_route,
     handle_task_update_api as handle_task_update_route,
     handle_task_delete_api as handle_task_delete_route,
-    handle_task_history_api as handle_task_history_route
+    handle_task_history_api as handle_task_history_route,
+    handle_opportunities_delete_all_api as handle_opportunities_delete_all_route,
+    handle_opportunities_import_parse_api as handle_opportunities_import_parse_route,
+    handle_opportunities_import_confirm_api as handle_opportunities_import_confirm_route,
+    handle_opportunities_export_api as handle_opportunities_export_route,
 )
 try:
     from server.routes.proposals import (
@@ -402,6 +406,9 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                     self.handle_career_assessment_get_api()
                     return
                 # Opportunities API endpoints
+                elif self.path.startswith('/api/opportunities/export'):
+                    self.handle_opportunities_export_api()
+                    return
                 elif self.path == '/api/opportunities':
                     self.handle_opportunities_list_api()
                     return
@@ -593,6 +600,10 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
                 self.handle_todos_update_api()
             # Opportunities API endpoints
+            elif self.path == '/api/opportunities/import/parse':
+                self.handle_opportunities_import_parse_api()
+            elif self.path == '/api/opportunities/import/confirm':
+                self.handle_opportunities_import_confirm_api()
             elif self.path == '/api/opportunities':
                 self.handle_opportunities_create_api()
             elif self.path.startswith('/api/opportunities/') and '/tasks' in self.path:
@@ -664,6 +675,8 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
                 # Extract task ID from path
                 task_id = self.path.split('/')[-1]
                 self.handle_task_delete_api(task_id)
+            elif self.path == '/api/opportunities':
+                self.handle_opportunities_delete_all_api()
             elif self.path.startswith('/api/opportunities/'):
                 # Extract opportunity ID from path
                 opportunity_id = self.path.split('/')[-1]
@@ -1536,6 +1549,22 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_opportunities_delete_api(self, opportunity_id):
         """Handle DELETE /api/opportunities/{id} - Delete opportunity."""
         handle_opportunities_delete_route(self, opportunity_id)
+
+    def handle_opportunities_delete_all_api(self):
+        """Handle DELETE /api/opportunities - Delete all opportunities."""
+        handle_opportunities_delete_all_route(self)
+
+    def handle_opportunities_import_parse_api(self):
+        """Handle POST /api/opportunities/import/parse - Parse CSV headers."""
+        handle_opportunities_import_parse_route(self)
+
+    def handle_opportunities_import_confirm_api(self):
+        """Handle POST /api/opportunities/import/confirm - Finalize import."""
+        handle_opportunities_import_confirm_route(self)
+
+    def handle_opportunities_export_api(self):
+        """Handle GET /api/opportunities/export - Export as CSV or JSON."""
+        handle_opportunities_export_route(self)
 
     # ========== Source Tree API Handler ==========
 

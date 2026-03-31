@@ -3,6 +3,7 @@
  *
  * Displays all proposals as cards in vertical swim lanes, one per
  * Unanet CRM stage code. Horizontally scrollable.
+ * Supports drag-and-drop to move opportunities between stages.
  */
 
 const KANBAN_STAGES = [
@@ -24,10 +25,15 @@ const KANBAN_STAGES = [
 const STAGE_MAP = {};
 KANBAN_STAGES.forEach(s => s.localStages.forEach(ls => { STAGE_MAP[ls] = s.slug; }));
 
+// Map slug → first localStage value (used when dropping to determine the new stage)
+const SLUG_TO_STAGE = {};
+KANBAN_STAGES.forEach(s => { SLUG_TO_STAGE[s.slug] = s.localStages[0]; });
+
 class WorkflowsManager {
     constructor() {
         this.baseUrl = '';
         this.opportunities = [];
+        this._dragId = null; // id of card being dragged
     }
 
     async load() {
@@ -63,10 +69,32 @@ class WorkflowsManager {
                     <span class="text-xs font-semibold text-white truncate">${stage.code}</span>
                     <span class="kanban-count ml-2 text-xs bg-white/30 text-white font-bold px-1.5 py-0.5 rounded-full flex-shrink-0" id="kcount-${stage.slug}">0</span>
                 </div>
-                <div class="kanban-col-body flex-1 overflow-y-auto p-2 space-y-2 min-h-[4rem]" id="kcol-${stage.slug}">
+                <div class="kanban-col-body flex-1 overflow-y-auto p-2 space-y-2 min-h-[4rem]"
+                     id="kcol-${stage.slug}"
+                     data-slug="${stage.slug}">
                 </div>
             </div>
         `).join('');
+
+        // Attach drop listeners to all column bodies
+        board.querySelectorAll('.kanban-col-body').forEach(col => {
+            col.addEventListener('dragover', (e) => {
+                e.preventDefault();
+                col.classList.add('ring-2', 'ring-blue-400', 'dark:ring-blue-500');
+            });
+            col.addEventListener('dragleave', () => {
+                col.classList.remove('ring-2', 'ring-blue-400', 'dark:ring-blue-500');
+            });
+            col.addEventListener('drop', (e) => {
+                e.preventDefault();
+                col.classList.remove('ring-2', 'ring-blue-400', 'dark:ring-blue-500');
+                const id = e.dataTransfer.getData('text/plain') || this._dragId;
+                if (id) {
+                    const newStage = SLUG_TO_STAGE[col.dataset.slug];
+                    if (newStage) this._moveCard(id, newStage);
+                }
+            });
+        });
     }
 
     _populateBoard() {
@@ -82,7 +110,7 @@ class WorkflowsManager {
         KANBAN_STAGES.forEach(s => { colCounts[s.slug] = 0; });
 
         this.opportunities.forEach(opp => {
-            const stage = opp.pipeline_stage || 'identified';
+            const stage = opp.pipeline_stage || opp.status || 'identified';
             const slug = STAGE_MAP[stage] || '01-qual';
             const col = document.getElementById(`kcol-${slug}`);
             if (!col) return;
@@ -98,21 +126,23 @@ class WorkflowsManager {
             const n = colCounts[s.slug] || 0;
             if (countEl) countEl.textContent = n;
             if (col && n === 0) {
-                col.innerHTML = '<div class="text-xs text-gray-400 dark:text-gray-500 text-center py-4">No proposals</div>';
+                col.innerHTML = '<div class="text-xs text-gray-400 dark:text-gray-500 text-center py-4 select-none">No proposals</div>';
             }
         });
     }
 
     _buildCard(opp) {
         const card = document.createElement('div');
-        card.className = 'kanban-card bg-white dark:bg-gray-700 rounded-lg p-3 shadow-sm border border-gray-100 dark:border-gray-600 cursor-pointer hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500 transition-all';
+        card.className = 'kanban-card bg-white dark:bg-gray-700 rounded-lg p-3 shadow-sm border border-gray-100 dark:border-gray-600 cursor-grab hover:shadow-md hover:border-blue-300 dark:hover:border-blue-500 transition-all select-none';
+        card.draggable = true;
         card.dataset.id = opp.id || opp.proposal_id || '';
 
-        const title = opp.title || opp.opportunity_name || 'Untitled';
+        const cardId = opp.id || opp.proposal_id || '';
+        const title = opp.title || opp.name || opp.opportunity_name || 'Untitled';
         const agency = opp.agency || '';
         const value = opp.estimated_value != null ? opp.estimated_value : (opp.value != null ? opp.value : null);
         const dueDate = opp.proposal_due_date || opp.due_date || null;
-        const stageVal = opp.pipeline_stage || '';
+        const stageVal = opp.pipeline_stage || opp.status || '';
         const stageMeta = KANBAN_STAGES.find(s => s.localStages.includes(stageVal));
         const stageBadgeClass = stageMeta ? stageMeta.colorClass : 'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300';
 
@@ -155,15 +185,64 @@ class WorkflowsManager {
             </div>
         `;
 
+        // Drag events
+        card.addEventListener('dragstart', (e) => {
+            this._dragId = cardId;
+            e.dataTransfer.setData('text/plain', cardId);
+            e.dataTransfer.effectAllowed = 'move';
+            card.classList.add('opacity-50');
+        });
+        card.addEventListener('dragend', () => {
+            this._dragId = null;
+            card.classList.remove('opacity-50');
+        });
+
+        // Click: navigate to opportunity detail
         card.addEventListener('click', () => {
-            if (window.app?.opportunitiesManager) {
-                // Navigate to opportunity detail if available
-                window.app.navigateTo('opportunities');
-                window.app.opportunitiesManager.loadOpportunities();
+            if (window.app?.opportunitiesManager && cardId) {
+                const opp = this.opportunities.find(o => (o.id || o.proposal_id) === cardId);
+                if (opp) {
+                    window.app.navigateTo('opportunities');
+                    window.app.opportunitiesManager.showOpportunityDetail(opp);
+                } else {
+                    window.app.navigateTo('opportunities');
+                    window.app.opportunitiesManager.loadOpportunities();
+                }
             }
         });
 
         return card;
+    }
+
+    async _moveCard(opportunityId, newPipelineStage) {
+        try {
+            const response = await fetch(`${this.baseUrl}/api/opportunities/${opportunityId}`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    pipeline_stage: newPipelineStage,
+                    status: newPipelineStage,
+                }),
+            });
+
+            if (response.ok) {
+                // Update local state immediately for snappy UX
+                const opp = this.opportunities.find(o => (o.id || o.proposal_id) === opportunityId);
+                if (opp) opp.pipeline_stage = newPipelineStage;
+
+                // Re-render kanban
+                this._populateBoard();
+
+                // Sync opportunities manager so the detail view + list stay current
+                if (window.app?.opportunitiesManager) {
+                    window.app.opportunitiesManager.reloadCurrentOpportunity(opportunityId);
+                }
+            } else {
+                console.error('Workflows: failed to move card', opportunityId, newPipelineStage);
+            }
+        } catch (e) {
+            console.error('Workflows: error moving card', e);
+        }
     }
 
     _esc(str) {
