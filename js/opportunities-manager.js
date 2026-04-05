@@ -128,6 +128,12 @@ class OpportunitiesManager {
     }
 
     renderOpportunitiesList() {
+        this._renderSidebarList();
+        this._renderMainTable();
+        this._wireMainTableFilters();
+    }
+
+    _renderSidebarList() {
         const opportunitiesList = document.getElementById('opportunities-list');
         if (!opportunitiesList) return;
 
@@ -194,6 +200,145 @@ class OpportunitiesManager {
         });
     }
 
+    _renderMainTable(search = '', stageFilter = '', priorityFilter = '') {
+        const tbody = document.getElementById('opp-main-table-body');
+        if (!tbody) return;
+
+        const q        = search.toLowerCase();
+        const filtered = this.opportunities.filter(opp => {
+            const stage    = opp.pipeline_stage || opp.status || '';
+            const priority = opp.priority || '';
+            if (stageFilter    && stage    !== stageFilter)    return false;
+            if (priorityFilter && priority !== priorityFilter) return false;
+            if (q) {
+                const haystack = [opp.name, opp.agency, opp.description].join(' ').toLowerCase();
+                if (!haystack.includes(q)) return false;
+            }
+            return true;
+        });
+
+        tbody.innerHTML = '';
+
+        if (filtered.length === 0) {
+            const emptyMsg = this.opportunities.length === 0
+                ? 'No opportunities yet. Click <strong>New Opportunity</strong> to get started.'
+                : 'No opportunities match the current filters.';
+            tbody.innerHTML = `<tr><td colspan="6" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500 text-sm">${emptyMsg}</td></tr>`;
+            return;
+        }
+
+        const STAGE_LABELS = {
+            identified: '01 — Qualification', qualifying: '01 — Qualification',
+            long_lead: '02 — Long Lead', bid_decision: '03 — Bid Decision',
+            active: '04 — In Progress', submitted: '05 — Waiting/Review',
+            negotiating: '06 — In Negotiation', awarded: '07 — Closed Won',
+            lost: '08 — Closed Lost', no_bid: '09 — Closed No Bid',
+            cancelled: '20 — Closed Other',
+        };
+        const STAGE_COLORS = {
+            identified: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200',
+            qualifying: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200',
+            long_lead: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200',
+            bid_decision: 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200',
+            active: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200',
+            submitted: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200',
+            negotiating: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200',
+            awarded: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200',
+            lost: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200',
+            no_bid: 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300',
+            cancelled: 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300',
+        };
+        const PRI_COLORS = {
+            high:   'bg-red-100 dark:bg-red-900/40 text-red-700 dark:text-red-300',
+            medium: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300',
+            low:    'bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300',
+        };
+
+        filtered.forEach(opp => {
+            const stage    = opp.pipeline_stage || opp.status || 'identified';
+            const priority = opp.priority || 'medium';
+            const value    = opp.estimated_value ?? opp.value ?? null;
+            const due      = opp.proposal_due_date || opp.due_date || null;
+
+            let valueStr = value != null && value > 0
+                ? (value >= 1e6 ? `$${(value / 1e6).toFixed(1)}M`
+                    : value >= 1000 ? `$${(value / 1000).toFixed(0)}K`
+                    : `$${value}`)
+                : '—';
+
+            let dueStr = '—';
+            let dueCls = 'text-gray-500 dark:text-gray-400';
+            if (due) {
+                try {
+                    const d        = new Date(due);
+                    const diffDays = Math.ceil((d - new Date()) / 86400000);
+                    dueStr = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+                    if (diffDays < 0)        dueCls = 'text-red-600 dark:text-red-400 font-medium';
+                    else if (diffDays <= 7)  dueCls = 'text-orange-500 dark:text-orange-400 font-medium';
+                } catch (_) {}
+            }
+
+            const stageLabel = STAGE_LABELS[stage] || stage;
+            const stageCls   = STAGE_COLORS[stage]  || STAGE_COLORS.identified;
+            const priLabel   = priority.charAt(0).toUpperCase() + priority.slice(1);
+            const priCls     = PRI_COLORS[priority]  || PRI_COLORS.medium;
+
+            const tr = document.createElement('tr');
+            tr.className = 'hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer transition-colors';
+            tr.innerHTML = `
+                <td class="px-4 py-3">
+                    <div class="font-medium text-gray-900 dark:text-white leading-snug">${this.escapeHtml(opp.name || 'Untitled')}</div>
+                    ${opp.agency ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${this.escapeHtml(opp.agency)}</div>` : ''}
+                </td>
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${stageCls}">${this.escapeHtml(stageLabel)}</span>
+                </td>
+                <td class="px-4 py-3">
+                    <span class="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium ${priCls}">${this.escapeHtml(priLabel)}</span>
+                </td>
+                <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-medium">${valueStr}</td>
+                <td class="px-4 py-3 text-sm ${dueCls}">${dueStr}</td>
+                <td class="px-4 py-3 text-right">
+                    <button class="opp-row-delete p-1.5 text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors rounded" title="Delete" data-id="${this.escapeHtml(String(opp.id || ''))}">
+                        <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
+                                  d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                        </svg>
+                    </button>
+                </td>
+            `;
+
+            tr.addEventListener('click', (e) => {
+                if (e.target.closest('.opp-row-delete')) return;
+                this.showOpportunityDetail(opp);
+            });
+            tr.querySelector('.opp-row-delete')?.addEventListener('click', (e) => {
+                e.stopPropagation();
+                this.deleteOpportunityFromList(opp.id, opp.name);
+            });
+
+            tbody.appendChild(tr);
+        });
+    }
+
+    _wireMainTableFilters() {
+        const searchInput    = document.getElementById('opp-search-input');
+        const stageSelect    = document.getElementById('opp-stage-filter');
+        const prioritySelect = document.getElementById('opp-priority-filter');
+        if (!searchInput || searchInput._wired) return;
+        searchInput._wired = true;
+
+        const refresh = () => this._renderMainTable(
+            searchInput.value,
+            stageSelect.value,
+            prioritySelect.value,
+        );
+
+        searchInput.addEventListener('input', refresh);
+        stageSelect.addEventListener('change', refresh);
+        prioritySelect.addEventListener('change', refresh);
+    }
+
     // -----------------------------------------------------------------------
     // Create modal (new opportunities only)
     // -----------------------------------------------------------------------
@@ -258,13 +403,14 @@ class OpportunitiesManager {
         if (this._editMode) this._exitEditMode(false);
 
         const detailView = document.getElementById('opportunity-detail-view');
-        const emptyState = document.getElementById('opportunities-empty-state');
+        const mainList   = document.getElementById('opportunities-main-list');
         if (!detailView) return;
         detailView.classList.remove('hidden');
-        if (emptyState) emptyState.classList.add('hidden');
+        if (mainList) mainList.classList.add('hidden');
 
         this._populateDetailFields(opportunity);
         this.loadTasks(opportunity.id);
+        document.dispatchEvent(new CustomEvent('opportunitySelected', { detail: { id: opportunity.id } }));
     }
 
     /**
@@ -323,7 +469,8 @@ class OpportunitiesManager {
     closeOpportunityDetail() {
         if (this._editMode) this._exitEditMode(false);
         document.getElementById('opportunity-detail-view')?.classList.add('hidden');
-        document.getElementById('opportunities-empty-state')?.classList.remove('hidden');
+        document.getElementById('opportunities-main-list')?.classList.remove('hidden');
+        document.dispatchEvent(new CustomEvent('opportunityDeselected'));
     }
 
     // -----------------------------------------------------------------------

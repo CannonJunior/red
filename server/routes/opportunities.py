@@ -1,6 +1,11 @@
 """Opportunities route handlers for business opportunity tracking."""
 
 from debug_logger import debug_log
+from server.request_models import (
+    OpportunityCreateRequest,
+    OpportunityUpdateRequest,
+    validate_or_error,
+)
 
 try:
     from opportunities_api import (
@@ -14,7 +19,8 @@ try:
         handle_task_get_request,
         handle_tasks_update_request,
         handle_tasks_delete_request,
-        handle_task_history_request
+        handle_task_history_request,
+        handle_pipeline_stats_request,
     )
     OPPORTUNITIES_AVAILABLE = True
 except ImportError:
@@ -30,6 +36,28 @@ try:
     IMPORT_EXPORT_AVAILABLE = True
 except ImportError:
     IMPORT_EXPORT_AVAILABLE = False
+
+try:
+    from proposal_tracking_api import get_tracking_manager as _get_tm
+    _TRACKING_AVAILABLE = True
+except ImportError:
+    _TRACKING_AVAILABLE = False
+
+
+def _trigger_tracking(opportunity_id: str, result: dict) -> None:
+    """Auto-create Proposal or BNB item when an opportunity enters a trigger stage."""
+    if not _TRACKING_AVAILABLE:
+        return
+    opp = result.get('opportunity', {})
+    stage = opp.get('pipeline_stage', '')
+    name = opp.get('name', opportunity_id)
+    try:
+        if stage == 'active':
+            _get_tm().ensure_proposal_item(opportunity_id, name)
+        elif stage == 'bid_decision':
+            _get_tm().ensure_bnb_item(opportunity_id, name)
+    except Exception as e:
+        print(f"⚠️  Tracking trigger failed for {opportunity_id}: {e}")
 
 
 def handle_opportunities_list_api(handler):
@@ -51,12 +79,18 @@ def handle_opportunities_list_api(handler):
 def handle_opportunities_create_api(handler):
     """Handle POST /api/opportunities - Create new opportunity."""
     try:
-        # Read request body
-        request_data = handler.get_request_body()
-        if request_data is None:
+        raw = handler.get_request_body()
+        if raw is None:
             handler.send_json_response({'error': 'Invalid JSON'}, 400)
             return
 
+        validated, err = validate_or_error(OpportunityCreateRequest, raw)
+        if err:
+            handler.send_json_response({'error': f'Validation error: {err}'}, 400)
+            return
+
+        # Use the validated dict so defaults + coercions are applied
+        request_data = validated.model_dump() if hasattr(validated, 'model_dump') else validated
         result = handle_opportunities_create_request(request_data)
 
         if result.get('status') == 'success':
@@ -95,16 +129,22 @@ def handle_opportunities_update_api(handler):
         # Extract opportunity ID from path
         opportunity_id = handler.path.split('/')[-1]
 
-        # Read request body
-        request_data = handler.get_request_body()
-        if request_data is None:
+        raw = handler.get_request_body()
+        if raw is None:
             handler.send_json_response({'error': 'Invalid JSON'}, 400)
             return
 
+        validated, err = validate_or_error(OpportunityUpdateRequest, raw)
+        if err:
+            handler.send_json_response({'error': f'Validation error: {err}'}, 400)
+            return
+
+        request_data = validated.model_dump(exclude_none=True) if hasattr(validated, 'model_dump') else validated
         result = handle_opportunities_update_request(opportunity_id, request_data)
 
         if result.get('status') == 'success':
             debug_log(f"Updated opportunity: {opportunity_id}", "✅")
+            _trigger_tracking(opportunity_id, result)
             handler.send_json_response(result)
         else:
             print(f"❌ Failed to update opportunity: {result.get('message', 'Unknown error')}")
@@ -294,6 +334,19 @@ def handle_opportunities_import_confirm_api(handler):
         handler.send_json_response(result)
     except Exception as e:
         print(f"❌ CSV import error: {e}")
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+def handle_pipeline_stats_api(handler):
+    """Handle GET /api/pipeline/stats - Pipeline health metrics."""
+    try:
+        result = handle_pipeline_stats_request()
+        if result.get('status') == 'success':
+            handler.send_json_response(result)
+        else:
+            handler.send_json_response(result, 500)
+    except Exception as e:
+        print(f"❌ Pipeline stats API error: {e}")
         handler.send_json_response({'error': str(e)}, 500)
 
 

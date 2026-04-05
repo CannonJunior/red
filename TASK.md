@@ -1,5 +1,5 @@
 # TASK.md — Robobrain RED Task Tracker
-**Last Updated**: 2026-03-29
+**Last Updated**: 2026-04-01
 
 ---
 
@@ -11,6 +11,7 @@
 | Career Monster — academic position analysis | 2025-12-27 | See career_monster/ |
 | Agent system — MCP server + Ollama runtime | 2026-01-07 | See agent_system/ |
 | PLANNING.md — Proposal Workflow Architecture | 2026-03-28 | See PLANNING.md |
+| Shipley Capture Intelligence — full feature set | 2026-04-01 | capture_api.py, server/routes/capture.py, js/capture.js, js/capture-intel.js; Win Strategy/PTW/Contacts/Competitors/Activities tabs |
 
 ---
 
@@ -85,9 +86,9 @@
 ### P3-1: Unanet CRM integration
 - [x] `proposal/integrations/unanet.py` — REST API client
 - [x] `proposal/integrations/unanet_mapping.json` — Field mapping config (all 12 stage codes)
-- [ ] Bidirectional sync (push local → Unanet, pull Unanet → local)
+- [x] Bidirectional sync (push local → Unanet, pull Unanet → local) — `proposal/integrations/unanet_sync.py`; UnanetSyncManager with push_all/pull_all/sync; 3 conflict strategies; 32 tests (2026-04-04)
 - [x] `.claude/skills/crm-sync/` — Skill definition (covers Unanet + SharePoint)
-- [ ] Tests: `tests/proposal/integrations/test_unanet_client.py`
+- [x] Tests: `tests/proposal/integrations/test_unanet_client.py` — 36 tests passing (2026-03-31)
 
 ### P3-2: SharePoint integration
 - [x] `proposal/integrations/sharepoint.py` — Microsoft Graph API client
@@ -95,7 +96,7 @@
 - [x] Folder structure creation per proposal
 - [x] Document upload and metadata tagging
 - [x] External sharing link generation
-- [ ] Tests: `tests/proposal/integrations/test_sharepoint_client.py`
+- [x] Tests: `tests/proposal/integrations/test_sharepoint_client.py` — 30 tests passing (2026-03-31)
 
 ### P3-3: Confluence integration
 - [x] `proposal/integrations/confluence.py` — Atlassian REST API client
@@ -130,20 +131,21 @@
 ## 🔄 Phase 5: Continuous Improvement Loop
 
 ### P5-1: Pipeline Health Dashboard
-- [ ] Proposal pipeline summary view (win rate, avg pwin, stage distribution)
-- [ ] Integration with existing web UI at localhost:9090
-- [ ] Lessons learned search (RAG over hotwash reports)
+- [x] Proposal pipeline summary view (win rate, stage distribution, total/active/won value, priority breakdown) — `GET /api/pipeline/stats` (2026-03-31)
+- [x] Integration with existing web UI at localhost:9090 — `pipeline-health-area` panel + nav item + `js/pipeline-health.js` (2026-03-31)
+- [x] Tests: `tests/proposal/test_pipeline_stats.py` — 21 tests passing (2026-03-31)
+- [x] Lessons learned search (RAG over hotwash reports) — `proposal/lessons_search.py`; SQLite FTS5 keyword search + Ollama semantic fallback; filters by category/impact/outcome; 28 tests (2026-04-04)
 
 ### P5-2: Skill Self-Improvement
-- [ ] Per-proposal skill effectiveness rating
-- [ ] Lessons learned → skill prompt injection
-- [ ] Win/loss pattern analysis using career-monster patterns
+- [x] Per-proposal skill effectiveness rating — `proposal/skill_effectiveness.py` SkillTracker.rate(); 1-5 score per skill per proposal outcome
+- [x] Lessons learned → skill prompt injection — SkillTracker.inject_lessons() / format_lessons_as_context(); category-aware FTS retrieval
+- [x] Win/loss pattern analysis — SkillTracker.win_loss_analysis(); pWin calibration + value patterns; 33 tests (2026-04-04)
 
 ### P5-3: Technical Debt (from TECH_DEBT.md)
-- [ ] Refactor monolithic server.py (16-20 hrs)
-- [ ] Add database indexes to search_system.db
-- [ ] Add request validation middleware (Pydantic)
-- [ ] Connection pooling for Ollama + SQLite
+- [x] Refactor monolithic server.py — `server/router.py` + `_build_router()` registry; do_GET/POST/DELETE/PUT replaced with 9-line dispatcher; 186 lines removed (2026-03-31)
+- [x] Add database indexes to search_system.db — pipeline_stage, priority, tasks.status, tasks.assigned_to, task_history.opportunity_id (2026-03-31)
+- [x] Add request validation middleware (Pydantic) — `server/request_models.py`; create/update opportunity routes validated (2026-03-31)
+- [x] Connection pooling for SQLite — `server/db_pool.py` thread-local pool + WAL mode; all OpportunitiesManager query methods migrated (2026-03-31)
 
 ---
 

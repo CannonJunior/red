@@ -25,6 +25,9 @@ from debug_logger import debug_log, info_log, error_log, success_log, warning_lo
 # Import static cache
 from static_cache import get_static_cache
 
+# Import URL router
+from server.router import Router
+
 # Import Ollama configuration
 from ollama_config import ollama_config
 
@@ -134,7 +137,32 @@ from server.routes.opportunities import (
     handle_opportunities_import_parse_api as handle_opportunities_import_parse_route,
     handle_opportunities_import_confirm_api as handle_opportunities_import_confirm_route,
     handle_opportunities_export_api as handle_opportunities_export_route,
+    handle_pipeline_stats_api as handle_pipeline_stats_route,
 )
+try:
+    from server.routes.capture import (
+        handle_contacts_list_api as handle_contacts_list_route,
+        handle_contacts_create_api as handle_contacts_create_route,
+        handle_contact_update_api as handle_contact_update_route,
+        handle_contact_delete_api as handle_contact_delete_route,
+        handle_competitors_list_api as handle_competitors_list_route,
+        handle_competitors_create_api as handle_competitors_create_route,
+        handle_competitor_update_api as handle_competitor_update_route,
+        handle_competitor_delete_api as handle_competitor_delete_route,
+        handle_activities_list_api as handle_activities_list_route,
+        handle_activities_create_api as handle_activities_create_route,
+        handle_activity_delete_api as handle_activity_delete_route,
+        handle_win_strategy_get_api as handle_win_strategy_get_route,
+        handle_win_strategy_put_api as handle_win_strategy_put_route,
+        handle_ptw_get_api as handle_ptw_get_route,
+        handle_ptw_put_api as handle_ptw_put_route,
+    )
+    CAPTURE_AVAILABLE = True
+    print("✅ Capture system loaded successfully")
+except ImportError as e:
+    CAPTURE_AVAILABLE = False
+    print(f"⚠️  Capture system not available: {e}")
+
 try:
     from server.routes.proposals import (
         handle_proposals_list_api as handle_proposals_list_route,
@@ -151,6 +179,23 @@ try:
     PROPOSALS_AVAILABLE = True
 except ImportError:
     PROPOSALS_AVAILABLE = False
+
+try:
+    from server.routes.tracking import (
+        handle_proposal_items_list_api as handle_proposal_items_list_route,
+        handle_proposal_items_create_api as handle_proposal_items_create_route,
+        handle_proposal_item_update_api as handle_proposal_item_update_route,
+        handle_proposal_item_delete_api as handle_proposal_item_delete_route,
+        handle_bnb_items_list_api as handle_bnb_items_list_route,
+        handle_bnb_items_create_api as handle_bnb_items_create_route,
+        handle_bnb_item_update_api as handle_bnb_item_update_route,
+        handle_bnb_item_delete_api as handle_bnb_item_delete_route,
+    )
+    TRACKING_AVAILABLE = True
+    print("✅ Tracking lists loaded successfully")
+except ImportError as e:
+    TRACKING_AVAILABLE = False
+    print(f"⚠️  Tracking lists not available: {e}")
 
 from server.routes.source_tree import handle_source_tree_api as handle_source_tree_route
 
@@ -265,189 +310,209 @@ except ImportError as e:
     print(f"⚠️  Prompts system not available: {e}")
 
 
+# ---------------------------------------------------------------------------
+# Route registry — populated after all *_AVAILABLE flags are set.
+# All handler methods referenced here must be zero-argument (beyond self).
+# ---------------------------------------------------------------------------
+
+def _build_router() -> Router:
+    """Build and return the application router."""
+    r = Router()
+
+    # ---- GET ----------------------------------------------------------------
+    # RAG
+    r.add('GET', lambda p: p == '/api/rag/documents' and RAG_AVAILABLE,       'handle_rag_documents_api')
+    r.add('GET', lambda p: p == '/api/rag/analytics' and RAG_AVAILABLE,       'handle_rag_analytics_api')
+    # Search
+    r.add('GET', lambda p: p == '/api/search/folders' and SEARCH_AVAILABLE,   'handle_search_folders_api')
+    r.add('GET', lambda p: p == '/api/search/tags' and SEARCH_AVAILABLE,      'handle_search_tags_api')
+    # Visualizations
+    r.add('GET', lambda p: p == '/api/visualizations/knowledge-graph',        'handle_knowledge_graph_api')
+    r.add('GET', lambda p: p == '/api/visualizations/performance',            'handle_performance_dashboard_api')
+    r.add('GET', lambda p: p == '/api/visualizations/search-results',         'handle_search_results_api')
+    # Agents
+    r.add('GET', lambda p: p == '/api/agents' and AGENT_SYSTEM_AVAILABLE,                    'handle_agents_api')
+    r.add('GET', lambda p: p == '/api/agents/metrics' and AGENT_SYSTEM_AVAILABLE,            'handle_agents_metrics_api')
+    r.add('GET', lambda p: p.startswith('/api/agents/') and AGENT_SYSTEM_AVAILABLE,          'handle_agents_detail_api')
+    # Ollama
+    r.add('GET', lambda p: p == '/api/ollama/status',                         'handle_ollama_status_api')
+    r.add('GET', lambda p: p == '/api/ollama/agents',                         'handle_ollama_agents_api')
+    r.add('GET', lambda p: p == '/api/ollama/skills',                         'handle_ollama_skills_api')
+    r.add('GET', lambda p: p.startswith('/api/ollama/agents/'),               'handle_ollama_agent_detail_api')
+    # MCP
+    r.add('GET', lambda p: p == '/api/mcp/servers' and AGENT_SYSTEM_AVAILABLE,               'handle_mcp_servers_api')
+    r.add('GET', lambda p: p.startswith('/api/mcp/servers/') and AGENT_SYSTEM_AVAILABLE,     'handle_mcp_server_action_api')
+    r.add('GET', lambda p: p == '/api/mcp/metrics' and AGENT_SYSTEM_AVAILABLE,               'handle_mcp_metrics_api')
+    r.add('GET', lambda p: p == '/api/nlp/capabilities' and AGENT_SYSTEM_AVAILABLE,          'handle_nlp_capabilities_api')
+    # Prompts
+    r.add('GET', lambda p: p == '/api/prompts' and PROMPTS_AVAILABLE,                        'handle_prompts_list_api')
+    r.add('GET', lambda p: p.startswith('/api/prompts/') and PROMPTS_AVAILABLE,              'handle_prompts_detail_api')
+    # Shredding
+    r.add('GET', lambda p: p.startswith('/api/shredding/status/'),            'handle_shredding_status_api')
+    r.add('GET', lambda p: p.startswith('/api/shredding/requirements/'),      'handle_shredding_requirements_api')
+    r.add('GET', lambda p: p.startswith('/api/shredding/matrix/'),            'handle_shredding_matrix_api')
+    # Todos (specific before generic)
+    r.add('GET', lambda p: p == '/api/todos/users' and TODOS_AVAILABLE,                       'handle_users_list_api')
+    r.add('GET', lambda p: (p == '/api/todos/lists' or p.startswith('/api/todos/lists?')) and TODOS_AVAILABLE, 'handle_lists_list_api')
+    r.add('GET', lambda p: p == '/api/todos/shared' and TODOS_AVAILABLE,                     'handle_shared_lists_api')
+    r.add('GET', lambda p: p == '/api/todos/today' and TODOS_AVAILABLE,                      'handle_todos_today_api')
+    r.add('GET', lambda p: p == '/api/todos/upcoming' and TODOS_AVAILABLE,                   'handle_todos_upcoming_api')
+    r.add('GET', lambda p: p == '/api/todos/search' and TODOS_AVAILABLE,                     'handle_todos_search_api')
+    r.add('GET', lambda p: p == '/api/todos/tags' and TODOS_AVAILABLE,                       'handle_tags_list_api')
+    r.add('GET', lambda p: (p == '/api/todos' or p.startswith('/api/todos?')) and TODOS_AVAILABLE, 'handle_todos_list_api')
+    r.add('GET', lambda p: p.startswith('/api/todos/lists/') and p.endswith('/shares') and TODOS_AVAILABLE, 'handle_lists_shares_api')
+    r.add('GET', lambda p: p.startswith('/api/todos/users/') and TODOS_AVAILABLE,            'handle_users_detail_api')
+    r.add('GET', lambda p: p.startswith('/api/todos/lists/') and TODOS_AVAILABLE,            'handle_lists_detail_api')
+    r.add('GET', lambda p: p.startswith('/api/todos/tags/') and TODOS_AVAILABLE,             'handle_tags_detail_api')
+    r.add('GET', lambda p: p.startswith('/api/todos/') and p.endswith('/history') and TODOS_AVAILABLE, 'handle_todos_history_api')
+    r.add('GET', lambda p: p.startswith('/api/todos/') and TODOS_AVAILABLE,                  'handle_todos_detail_api')
+    # Career
+    r.add('GET', lambda p: p == '/api/career/list',                           'handle_career_list_get_api')
+    r.add('GET', lambda p: p == '/api/career/positions' or p.startswith('/api/career/positions?'), 'handle_career_positions_list_api')
+    r.add('GET', lambda p: p == '/api/career/stats',                          'handle_career_stats_api')
+    r.add('GET', lambda p: p.startswith('/api/career/assessments/'),          'handle_career_assessment_get_api')
+    # Opportunities (export and pipeline stats before generic prefix)
+    r.add('GET', lambda p: p == '/api/pipeline/stats',                        'handle_pipeline_stats_api')
+    r.add('GET', lambda p: p.startswith('/api/opportunities/export'),         'handle_opportunities_export_api')
+    r.add('GET', lambda p: p == '/api/opportunities',                         'handle_opportunities_list_api')
+    r.add('GET', lambda p: p.startswith('/api/opportunities/') and '/tasks' in p, 'handle_tasks_list_api')
+    r.add('GET', lambda p: p.startswith('/api/tasks/') and p.endswith('/history'), 'handle_task_history_api')
+    r.add('GET', lambda p: p.startswith('/api/tasks/'),                       'handle_task_get_api')
+    # Capture intel sub-resources (must be before generic /api/opportunities/{id} catch-all)
+    r.add('GET', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/contacts'),     'handle_contacts_list_api')
+    r.add('GET', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/competitors'),  'handle_competitors_list_api')
+    r.add('GET', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/activities'),   'handle_activities_list_api')
+    r.add('GET', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/win-strategy'), 'handle_win_strategy_get_api')
+    r.add('GET', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/ptw'),          'handle_ptw_get_api')
+    r.add('GET', lambda p: p.startswith('/api/opportunities/'),               'handle_opportunities_detail_api')
+    # Misc
+    r.add('GET', lambda p: p == '/api/source-tree',                           'handle_source_tree_api')
+    # Proposals
+    r.add('GET', lambda p: p == '/api/proposals' and PROPOSALS_AVAILABLE,                    'handle_proposals_list_api')
+    r.add('GET', lambda p: p.startswith('/api/proposals/') and p.endswith('/schedule') and PROPOSALS_AVAILABLE, 'handle_proposals_schedule_api')
+    r.add('GET', lambda p: p.startswith('/api/proposals/') and p.endswith('/bid-no-bid') and PROPOSALS_AVAILABLE, 'handle_proposals_bid_no_bid_get_api')
+    r.add('GET', lambda p: p.startswith('/api/proposals/') and PROPOSALS_AVAILABLE,          'handle_proposals_detail_api')
+    # Tracking lists
+    r.add('GET',  lambda p: p == '/api/proposal-items' and TRACKING_AVAILABLE,  'handle_proposal_items_list_api')
+    r.add('GET',  lambda p: p == '/api/bnb-items' and TRACKING_AVAILABLE,       'handle_bnb_items_list_api')
+
+    # ---- POST ---------------------------------------------------------------
+    r.add('POST', lambda p: p == '/api/chat',                                 'handle_chat_api')
+    r.add('POST', lambda p: p == '/api/models',                               'handle_models_api')
+    r.add('POST', lambda p: p == '/api/rag/status' and RAG_AVAILABLE,         'handle_rag_status_api')
+    r.add('POST', lambda p: p == '/api/rag/search' and RAG_AVAILABLE,         'handle_rag_search_api')
+    r.add('POST', lambda p: p == '/api/rag/query' and RAG_AVAILABLE,          'handle_rag_query_api')
+    r.add('POST', lambda p: p == '/api/rag/ingest' and RAG_AVAILABLE,         'handle_rag_ingest_api')
+    r.add('POST', lambda p: p == '/api/rag/upload' and RAG_AVAILABLE,         'handle_rag_upload_api')
+    r.add('POST', lambda p: p == '/api/rag/documents' and RAG_AVAILABLE,      'handle_rag_documents_api')
+    r.add('POST', lambda p: p == '/api/cag/status' and CAG_AVAILABLE,         'handle_cag_status_api')
+    r.add('POST', lambda p: p == '/api/cag/load' and CAG_AVAILABLE,           'handle_cag_load_api')
+    r.add('POST', lambda p: p == '/api/cag/clear' and CAG_AVAILABLE,          'handle_cag_clear_api')
+    r.add('POST', lambda p: p == '/api/cag/query' and CAG_AVAILABLE,          'handle_cag_query_api')
+    r.add('POST', lambda p: p == '/api/agents' and AGENT_SYSTEM_AVAILABLE,                   'handle_agents_api')
+    r.add('POST', lambda p: p.startswith('/api/agents/') and AGENT_SYSTEM_AVAILABLE,         'handle_agents_detail_api')
+    r.add('POST', lambda p: p == '/api/ollama/agents',                        'handle_ollama_agents_api')
+    r.add('POST', lambda p: p.startswith('/api/ollama/agents/') and '/invoke' in p, 'handle_ollama_agent_invoke_api')
+    r.add('POST', lambda p: p.startswith('/api/ollama/agents/'),              'handle_ollama_agent_detail_api')
+    r.add('POST', lambda p: p == '/api/mcp/servers' and AGENT_SYSTEM_AVAILABLE,              'handle_mcp_servers_api')
+    r.add('POST', lambda p: p.startswith('/api/mcp/servers/') and AGENT_SYSTEM_AVAILABLE,    'handle_mcp_server_action_api')
+    r.add('POST', lambda p: p == '/api/nlp/parse-task' and AGENT_SYSTEM_AVAILABLE,           'handle_nlp_parse_task_api')
+    r.add('POST', lambda p: p == '/api/search' and SEARCH_AVAILABLE,                         'handle_search_api')
+    r.add('POST', lambda p: p == '/api/search/folders' and SEARCH_AVAILABLE,                 'handle_search_create_folder_api')
+    r.add('POST', lambda p: p == '/api/search/objects' and SEARCH_AVAILABLE,                 'handle_search_add_object_api')
+    r.add('POST', lambda p: p == '/api/career/list',                          'handle_career_list_add_api')
+    r.add('POST', lambda p: p == '/api/career/positions',                     'handle_career_positions_create_api')
+    r.add('POST', lambda p: p == '/api/career/candidates',                    'handle_career_candidates_create_api')
+    r.add('POST', lambda p: p == '/api/career/analyze',                       'handle_career_analyze_api')
+    r.add('POST', lambda p: p == '/api/shredding/shred',                      'handle_shredding_shred_api')
+    r.add('POST', lambda p: p == '/api/prompts' and PROMPTS_AVAILABLE,                       'handle_prompts_create_api')
+    r.add('POST', lambda p: p == '/api/prompts/use' and PROMPTS_AVAILABLE,                   'handle_prompts_use_api')
+    r.add('POST', lambda p: p == '/api/prompts/search' and PROMPTS_AVAILABLE,                'handle_prompts_search_api')
+    r.add('POST', lambda p: p.startswith('/api/prompts/') and PROMPTS_AVAILABLE,             'handle_prompts_update_api')
+    r.add('POST', lambda p: p == '/api/todos/users' and TODOS_AVAILABLE,                     'handle_users_create_api')
+    r.add('POST', lambda p: p == '/api/todos/lists' and TODOS_AVAILABLE,                     'handle_lists_create_api')
+    r.add('POST', lambda p: p == '/api/todos/tags' and TODOS_AVAILABLE,                      'handle_tags_create_api')
+    r.add('POST', lambda p: p == '/api/todos/parse' and TODOS_AVAILABLE,                     'handle_todos_parse_api')
+    r.add('POST', lambda p: p == '/api/todos/search' and TODOS_AVAILABLE,                    'handle_todos_search_api')
+    r.add('POST', lambda p: p == '/api/todos' and TODOS_AVAILABLE,                           'handle_todos_create_api')
+    r.add('POST', lambda p: p.startswith('/api/todos/lists/') and p.endswith('/share') and TODOS_AVAILABLE, 'handle_lists_share_api')
+    r.add('POST', lambda p: p.startswith('/api/todos/') and p.endswith('/complete') and TODOS_AVAILABLE, 'handle_todos_complete_api')
+    r.add('POST', lambda p: p.startswith('/api/todos/') and p.endswith('/archive') and TODOS_AVAILABLE, 'handle_todos_archive_api')
+    r.add('POST', lambda p: p.startswith('/api/todos/') and TODOS_AVAILABLE,                 'handle_todos_update_api')
+    r.add('POST', lambda p: p == '/api/opportunities/import/parse',           'handle_opportunities_import_parse_api')
+    r.add('POST', lambda p: p == '/api/opportunities/import/confirm',         'handle_opportunities_import_confirm_api')
+    r.add('POST', lambda p: p == '/api/opportunities',                        'handle_opportunities_create_api')
+    r.add('POST', lambda p: p.startswith('/api/opportunities/') and '/tasks' in p, 'handle_tasks_create_api')
+    # Capture POST sub-resources (after tasks to avoid false match on '/activities' vs '/tasks')
+    r.add('POST', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/contacts'),    'handle_contacts_create_api')
+    r.add('POST', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/competitors'), 'handle_competitors_create_api')
+    r.add('POST', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/activities'),  'handle_activities_create_api')
+    r.add('POST', lambda p: p.startswith('/api/tasks/'),                      'handle_task_update_api')
+    r.add('POST', lambda p: p.startswith('/api/opportunities/'),              'handle_opportunities_update_api')
+    r.add('POST', lambda p: p == '/api/proposal-items' and TRACKING_AVAILABLE,  'handle_proposal_items_create_api')
+    r.add('POST', lambda p: p == '/api/bnb-items' and TRACKING_AVAILABLE,       'handle_bnb_items_create_api')
+    r.add('POST', lambda p: p == '/api/proposals' and PROPOSALS_AVAILABLE,                   'handle_proposals_create_api')
+    r.add('POST', lambda p: p.startswith('/api/proposals/') and p.endswith('/advance') and PROPOSALS_AVAILABLE, 'handle_proposals_advance_api')
+    r.add('POST', lambda p: p.startswith('/api/proposals/') and p.endswith('/folders') and PROPOSALS_AVAILABLE, 'handle_proposals_folders_api')
+    r.add('POST', lambda p: p.startswith('/api/proposals/') and p.endswith('/bid-no-bid') and PROPOSALS_AVAILABLE, 'handle_proposals_bid_no_bid_post_api')
+
+    # ---- DELETE -------------------------------------------------------------
+    r.add('DELETE', lambda p: p.startswith('/api/rag/documents/') and RAG_AVAILABLE,         'handle_rag_document_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/cag/documents/') and CAG_AVAILABLE,         'handle_cag_document_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/prompts/') and PROMPTS_AVAILABLE,           'handle_prompts_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/career/list/'),              'handle_career_list_remove_api')
+    r.add('DELETE', lambda p: p.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE, 'handle_ollama_agent_detail_api')
+    r.add('DELETE', lambda p: p.startswith('/api/todos/users/') and TODOS_AVAILABLE,         'handle_users_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/todos/lists/') and '/share' in p and TODOS_AVAILABLE, 'handle_lists_unshare_api')
+    r.add('DELETE', lambda p: p.startswith('/api/todos/lists/') and TODOS_AVAILABLE,         'handle_lists_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/todos/tags/') and TODOS_AVAILABLE,          'handle_tags_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/todos/') and TODOS_AVAILABLE,               'handle_todos_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/tasks/'),                    'handle_task_delete_api')
+    # Capture DELETE sub-resources (before generic /api/opportunities/{id} catch-all)
+    r.add('DELETE', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and '/contacts/'    in p, 'handle_contact_delete_api')
+    r.add('DELETE', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and '/competitors/' in p, 'handle_competitor_delete_api')
+    r.add('DELETE', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and '/activities/'  in p, 'handle_activity_delete_api')
+    r.add('DELETE', lambda p: p == '/api/opportunities',                      'handle_opportunities_delete_all_api')
+    r.add('DELETE', lambda p: p.startswith('/api/opportunities/'),            'handle_opportunities_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/proposal-items/') and TRACKING_AVAILABLE, 'handle_proposal_item_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/bnb-items/') and TRACKING_AVAILABLE,      'handle_bnb_item_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/proposals/') and PROPOSALS_AVAILABLE,       'handle_proposals_delete_api')
+
+    # ---- PUT ----------------------------------------------------------------
+    r.add('PUT', lambda p: p.startswith('/api/shredding/requirements/'),      'handle_shredding_requirement_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/prompts/') and PROMPTS_AVAILABLE,              'handle_prompts_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE,  'handle_ollama_agent_detail_api')
+    r.add('PUT', lambda p: p.startswith('/api/todos/users/') and TODOS_AVAILABLE,            'handle_users_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/todos/lists/') and TODOS_AVAILABLE,            'handle_lists_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/todos/tags/') and TODOS_AVAILABLE,             'handle_tags_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/todos/') and TODOS_AVAILABLE,                  'handle_todos_update_api')
+    # Capture PUT sub-resources (before generic opportunities PUT catch-all)
+    r.add('PUT', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and '/contacts/'    in p, 'handle_contact_update_api')
+    r.add('PUT', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and '/competitors/' in p, 'handle_competitor_update_api')
+    r.add('PUT', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/win-strategy'), 'handle_win_strategy_put_api')
+    r.add('PUT', lambda p: CAPTURE_AVAILABLE and p.startswith('/api/opportunities/') and p.endswith('/ptw'),          'handle_ptw_put_api')
+    r.add('PUT', lambda p: p.startswith('/api/opportunities/'),               'handle_opportunities_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/proposal-items/') and TRACKING_AVAILABLE, 'handle_proposal_item_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/bnb-items/') and TRACKING_AVAILABLE,      'handle_bnb_item_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/proposals/') and PROPOSALS_AVAILABLE,          'handle_proposals_update_api')
+
+    return r
+
+
+_router = _build_router()
+
+
 class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
     """Custom handler to serve static files with proper MIME types."""
     
     def do_GET(self):
-        """Handle GET requests."""
+        """Handle GET requests — API dispatch then static file fallback."""
         try:
-            # Handle API routes
             if self.path.startswith('/api/'):
-                # RAG API endpoints
-                if self.path == '/api/rag/documents' and RAG_AVAILABLE:
-                    self.handle_rag_documents_api()
-                    return
-                elif self.path == '/api/rag/analytics' and RAG_AVAILABLE:
-                    self.handle_rag_analytics_api()
-                    return
-                # Search API endpoints
-                elif self.path == '/api/search/folders' and SEARCH_AVAILABLE:
-                    self.handle_search_folders_api()
-                    return
-                elif self.path == '/api/search/tags' and SEARCH_AVAILABLE:
-                    self.handle_search_tags_api()
-                    return
-                # Visualization API endpoints
-                elif self.path == '/api/visualizations/knowledge-graph':
-                    self.handle_knowledge_graph_api()
-                    return
-                elif self.path == '/api/visualizations/performance':
-                    self.handle_performance_dashboard_api()
-                    return
-                elif self.path == '/api/visualizations/search-results':
-                    self.handle_search_results_api()
-                    return
-                # Agent System API endpoints
-                elif self.path == '/api/agents' and AGENT_SYSTEM_AVAILABLE:
-                    self.handle_agents_api()
-                    return
-                elif self.path == '/api/agents/metrics' and AGENT_SYSTEM_AVAILABLE:
-                    self.handle_agents_metrics_api()
-                    return
-                elif self.path.startswith('/api/agents/') and AGENT_SYSTEM_AVAILABLE:
-                    self.handle_agents_detail_api()
-                    return
-                # Ollama Agent System API endpoints
-                elif self.path == '/api/ollama/status':
-                    self.handle_ollama_status_api()
-                    return
-                elif self.path == '/api/ollama/agents':
-                    self.handle_ollama_agents_api()
-                    return
-                elif self.path == '/api/ollama/skills':
-                    self.handle_ollama_skills_api()
-                    return
-                elif self.path.startswith('/api/ollama/agents/'):
-                    self.handle_ollama_agent_detail_api()
-                    return
-                elif self.path == '/api/mcp/servers' and AGENT_SYSTEM_AVAILABLE:
-                    self.handle_mcp_servers_api()
-                    return
-                elif self.path.startswith('/api/mcp/servers/') and AGENT_SYSTEM_AVAILABLE:
-                    self.handle_mcp_server_action_api()
-                    return
-                elif self.path == '/api/mcp/metrics' and AGENT_SYSTEM_AVAILABLE:
-                    self.handle_mcp_metrics_api()
-                    return
-                elif self.path == '/api/nlp/capabilities' and AGENT_SYSTEM_AVAILABLE:
-                    self.handle_nlp_capabilities_api()
-                    return
-                # Prompts API endpoints
-                elif self.path == '/api/prompts' and PROMPTS_AVAILABLE:
-                    self.handle_prompts_list_api()
-                    return
-                elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
-                    self.handle_prompts_detail_api()
-                    return
-                # Shredding API endpoints
-                elif self.path.startswith('/api/shredding/status/'):
-                    self.handle_shredding_status_api()
-                    return
-                elif self.path.startswith('/api/shredding/requirements/'):
-                    self.handle_shredding_requirements_api()
-                    return
-                elif self.path.startswith('/api/shredding/matrix/'):
-                    self.handle_shredding_matrix_api()
-                    return
-                # TODO API endpoints - specific routes first, then generic
-                elif self.path == '/api/todos/users' and TODOS_AVAILABLE:
-                    self.handle_users_list_api()
-                    return
-                elif (self.path == '/api/todos/lists' or self.path.startswith('/api/todos/lists?')) and TODOS_AVAILABLE:
-                    self.handle_lists_list_api()
-                    return
-                elif self.path == '/api/todos/shared' and TODOS_AVAILABLE:
-                    self.handle_shared_lists_api()
-                    return
-                elif self.path == '/api/todos/today' and TODOS_AVAILABLE:
-                    self.handle_todos_today_api()
-                    return
-                elif self.path == '/api/todos/upcoming' and TODOS_AVAILABLE:
-                    self.handle_todos_upcoming_api()
-                    return
-                elif self.path == '/api/todos/search' and TODOS_AVAILABLE:
-                    self.handle_todos_search_api()
-                    return
-                elif self.path == '/api/todos/tags' and TODOS_AVAILABLE:
-                    self.handle_tags_list_api()
-                    return
-                elif (self.path == '/api/todos' or self.path.startswith('/api/todos?')) and TODOS_AVAILABLE:
-                    self.handle_todos_list_api()
-                    return
-                elif self.path.startswith('/api/todos/lists/') and self.path.endswith('/shares') and TODOS_AVAILABLE:
-                    self.handle_lists_shares_api()
-                    return
-                elif self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
-                    self.handle_users_detail_api()
-                    return
-                elif self.path.startswith('/api/todos/lists/') and TODOS_AVAILABLE:
-                    self.handle_lists_detail_api()
-                    return
-                elif self.path.startswith('/api/todos/tags/') and TODOS_AVAILABLE:
-                    self.handle_tags_detail_api()
-                    return
-                elif self.path.startswith('/api/todos/') and self.path.endswith('/history') and TODOS_AVAILABLE:
-                    self.handle_todos_history_api()
-                    return
-                elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
-                    self.handle_todos_detail_api()
-                    return
-                # Career Monster API endpoints
-                elif self.path == '/api/career/list':
-                    self.handle_career_list_get_api()
-                    return
-                elif self.path == '/api/career/positions' or self.path.startswith('/api/career/positions?'):
-                    self.handle_career_positions_list_api()
-                    return
-                elif self.path == '/api/career/stats':
-                    self.handle_career_stats_api()
-                    return
-                elif self.path.startswith('/api/career/assessments/'):
-                    self.handle_career_assessment_get_api()
-                    return
-                # Opportunities API endpoints
-                elif self.path.startswith('/api/opportunities/export'):
-                    self.handle_opportunities_export_api()
-                    return
-                elif self.path == '/api/opportunities':
-                    self.handle_opportunities_list_api()
-                    return
-                elif self.path.startswith('/api/opportunities/') and '/tasks' in self.path:
-                    # Handle /api/opportunities/{id}/tasks
-                    self.handle_tasks_list_api()
-                    return
-                elif self.path.startswith('/api/tasks/') and self.path.endswith('/history'):
-                    # Handle /api/tasks/{id}/history
-                    self.handle_task_history_api()
-                    return
-                elif self.path.startswith('/api/tasks/'):
-                    # Handle /api/tasks/{id}
-                    self.handle_task_get_api()
-                    return
-                elif self.path.startswith('/api/opportunities/'):
-                    self.handle_opportunities_detail_api()
-                    return
-                # Source code tree (Settings > Source Code tab)
-                elif self.path == '/api/source-tree':
-                    self.handle_source_tree_api()
-                    return
-                # Proposals API endpoints (GovCon proposal lifecycle)
-                elif self.path == '/api/proposals' and PROPOSALS_AVAILABLE:
-                    self.handle_proposals_list_api()
-                    return
-                elif self.path.startswith('/api/proposals/') and self.path.endswith('/schedule') and PROPOSALS_AVAILABLE:
-                    self.handle_proposals_schedule_api()
-                    return
-                elif self.path.startswith('/api/proposals/') and self.path.endswith('/bid-no-bid') and PROPOSALS_AVAILABLE:
-                    self.handle_proposals_bid_no_bid_get_api()
-                    return
-                elif self.path.startswith('/api/proposals/') and PROPOSALS_AVAILABLE:
-                    self.handle_proposals_detail_api()
-                    return
-                else:
+                if not _router.dispatch('GET', self.path, self):
                     self.send_error(404, f"API endpoint not found: {self.path}")
-                    return
-            
+                return
+
             # Handle root path
             if self.path == '/':
                 self.path = '/index.html'
@@ -503,221 +568,27 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_error(500, f"Internal server error: {e}")
     
     def do_POST(self):
-        """Handle POST requests for API endpoints."""
+        """Handle POST requests — API dispatch via router."""
         try:
-            # Parse request path
-            if self.path == '/api/chat':
-                self.handle_chat_api()
-            elif self.path == '/api/models':
-                self.handle_models_api()
-            elif self.path == '/api/rag/status' and RAG_AVAILABLE:
-                self.handle_rag_status_api()
-            elif self.path == '/api/rag/search' and RAG_AVAILABLE:
-                self.handle_rag_search_api()
-            elif self.path == '/api/rag/query' and RAG_AVAILABLE:
-                self.handle_rag_query_api()
-            elif self.path == '/api/rag/ingest' and RAG_AVAILABLE:
-                self.handle_rag_ingest_api()
-            elif self.path == '/api/rag/upload' and RAG_AVAILABLE:
-                self.handle_rag_upload_api()
-            elif self.path == '/api/rag/documents' and RAG_AVAILABLE:
-                self.handle_rag_documents_api()
-            # CAG API endpoints
-            elif self.path == '/api/cag/status' and CAG_AVAILABLE:
-                self.handle_cag_status_api()
-            elif self.path == '/api/cag/load' and CAG_AVAILABLE:
-                self.handle_cag_load_api()
-            elif self.path == '/api/cag/clear' and CAG_AVAILABLE:
-                self.handle_cag_clear_api()
-            elif self.path == '/api/cag/query' and CAG_AVAILABLE:
-                self.handle_cag_query_api()
-            # Agent API endpoints
-            elif self.path == '/api/agents' and AGENT_SYSTEM_AVAILABLE:
-                self.handle_agents_api()
-            elif self.path.startswith('/api/agents/') and AGENT_SYSTEM_AVAILABLE:
-                self.handle_agents_detail_api()
-            # Ollama Agent API endpoints
-            elif self.path == '/api/ollama/agents':
-                self.handle_ollama_agents_api()
-            elif self.path.startswith('/api/ollama/agents/') and '/invoke' in self.path:
-                self.handle_ollama_agent_invoke_api()
-            elif self.path.startswith('/api/ollama/agents/'):
-                self.handle_ollama_agent_detail_api()
-            # Search API endpoints
-            elif self.path == '/api/mcp/servers' and AGENT_SYSTEM_AVAILABLE:
-                self.handle_mcp_servers_api()
-            elif self.path.startswith('/api/mcp/servers/') and AGENT_SYSTEM_AVAILABLE:
-                self.handle_mcp_server_action_api()
-            elif self.path == '/api/nlp/parse-task' and AGENT_SYSTEM_AVAILABLE:
-                self.handle_nlp_parse_task_api()
-            # Search API endpoints
-            elif self.path == '/api/search' and SEARCH_AVAILABLE:
-                self.handle_search_api()
-            elif self.path == '/api/search/folders' and SEARCH_AVAILABLE:
-                self.handle_search_create_folder_api()
-            elif self.path == '/api/search/objects' and SEARCH_AVAILABLE:
-                self.handle_search_add_object_api()
-            # Career Monster API endpoints
-            elif self.path == '/api/career/list':
-                self.handle_career_list_add_api()
-            elif self.path == '/api/career/positions':
-                self.handle_career_positions_create_api()
-            elif self.path == '/api/career/candidates':
-                self.handle_career_candidates_create_api()
-            elif self.path == '/api/career/analyze':
-                self.handle_career_analyze_api()
-            # Shredding API endpoints
-            elif self.path == '/api/shredding/shred':
-                self.handle_shredding_shred_api()
-            # Prompts API endpoints
-            elif self.path == '/api/prompts' and PROMPTS_AVAILABLE:
-                self.handle_prompts_create_api()
-            elif self.path == '/api/prompts/use' and PROMPTS_AVAILABLE:
-                self.handle_prompts_use_api()
-            elif self.path == '/api/prompts/search' and PROMPTS_AVAILABLE:
-                self.handle_prompts_search_api()
-            elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
-                self.handle_prompts_update_api()
-            # TODO API endpoints - specific routes first, then generic
-            elif self.path == '/api/todos/users' and TODOS_AVAILABLE:
-                self.handle_users_create_api()
-            elif self.path == '/api/todos/lists' and TODOS_AVAILABLE:
-                self.handle_lists_create_api()
-            elif self.path == '/api/todos/tags' and TODOS_AVAILABLE:
-                self.handle_tags_create_api()
-            elif self.path == '/api/todos/parse' and TODOS_AVAILABLE:
-                self.handle_todos_parse_api()
-            elif self.path == '/api/todos/search' and TODOS_AVAILABLE:
-                self.handle_todos_search_api()
-            elif self.path == '/api/todos' and TODOS_AVAILABLE:
-                self.handle_todos_create_api()
-            elif self.path.startswith('/api/todos/lists/') and self.path.endswith('/share') and TODOS_AVAILABLE:
-                self.handle_lists_share_api()
-            elif self.path.startswith('/api/todos/') and self.path.endswith('/complete') and TODOS_AVAILABLE:
-                self.handle_todos_complete_api()
-            elif self.path.startswith('/api/todos/') and self.path.endswith('/archive') and TODOS_AVAILABLE:
-                self.handle_todos_archive_api()
-            elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
-                self.handle_todos_update_api()
-            # Opportunities API endpoints
-            elif self.path == '/api/opportunities/import/parse':
-                self.handle_opportunities_import_parse_api()
-            elif self.path == '/api/opportunities/import/confirm':
-                self.handle_opportunities_import_confirm_api()
-            elif self.path == '/api/opportunities':
-                self.handle_opportunities_create_api()
-            elif self.path.startswith('/api/opportunities/') and '/tasks' in self.path:
-                # Handle POST /api/opportunities/{id}/tasks - create task
-                self.handle_tasks_create_api()
-            elif self.path.startswith('/api/tasks/'):
-                # Handle POST /api/tasks/{id} - update task
-                self.handle_task_update_api()
-            elif self.path.startswith('/api/opportunities/'):
-                # Could be PATCH/PUT for update
-                self.handle_opportunities_update_api()
-            # Proposals API endpoints (GovCon proposal lifecycle)
-            elif self.path == '/api/proposals' and PROPOSALS_AVAILABLE:
-                self.handle_proposals_create_api()
-            elif self.path.startswith('/api/proposals/') and self.path.endswith('/advance') and PROPOSALS_AVAILABLE:
-                self.handle_proposals_advance_api()
-            elif self.path.startswith('/api/proposals/') and self.path.endswith('/folders') and PROPOSALS_AVAILABLE:
-                self.handle_proposals_folders_api()
-            elif self.path.startswith('/api/proposals/') and self.path.endswith('/bid-no-bid') and PROPOSALS_AVAILABLE:
-                self.handle_proposals_bid_no_bid_post_api()
-            else:
+            if not _router.dispatch('POST', self.path, self):
                 self.send_error(404, f"API endpoint not found: {self.path}")
-
         except Exception as e:
             print(f"❌ Error handling POST {self.path}: {e}")
             self.send_error(500, f"Internal server error: {e}")
     
     def do_DELETE(self):
-        """Handle DELETE requests for API endpoints."""
+        """Handle DELETE requests — API dispatch via router."""
         try:
-            # Parse request path for DELETE operations
-            if self.path.startswith('/api/rag/documents/') and RAG_AVAILABLE:
-                # Extract document ID from path
-                document_id = self.path.split('/')[-1]
-                self.handle_rag_document_delete_api(document_id)
-            elif self.path.startswith('/api/cag/documents/') and CAG_AVAILABLE:
-                # Extract document ID from path
-                document_id = self.path.split('/')[-1]
-                self.handle_cag_document_delete_api(document_id)
-            elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
-                # Extract prompt ID from path
-                prompt_id = self.path.split('/')[-1]
-                self.handle_prompts_delete_api(prompt_id)
-            elif self.path.startswith('/api/career/list/'):
-                # Extract list ID from path
-                list_id = self.path.split('/')[-1]
-                self.handle_career_list_remove_api(list_id)
-            # Ollama agents API endpoints
-            elif self.path.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE:
-                self.handle_ollama_agent_detail_api()
-            # TODO API endpoints - specific routes first, then generic
-            elif self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
-                user_id = self.path.split('/')[-1]
-                self.handle_users_delete_api(user_id)
-            elif self.path.startswith('/api/todos/lists/') and '/share' in self.path and TODOS_AVAILABLE:
-                list_id = self.path.split('/')[-2]
-                self.handle_lists_unshare_api(list_id)
-            elif self.path.startswith('/api/todos/lists/') and TODOS_AVAILABLE:
-                list_id = self.path.split('/')[-1]
-                self.handle_lists_delete_api(list_id)
-            elif self.path.startswith('/api/todos/tags/') and TODOS_AVAILABLE:
-                tag_id = self.path.split('/')[-1]
-                self.handle_tags_delete_api(tag_id)
-            elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
-                # Extract todo ID from path
-                todo_id = self.path.split('/')[-1]
-                self.handle_todos_delete_api(todo_id)
-            elif self.path.startswith('/api/tasks/'):
-                # Extract task ID from path
-                task_id = self.path.split('/')[-1]
-                self.handle_task_delete_api(task_id)
-            elif self.path == '/api/opportunities':
-                self.handle_opportunities_delete_all_api()
-            elif self.path.startswith('/api/opportunities/'):
-                # Extract opportunity ID from path
-                opportunity_id = self.path.split('/')[-1]
-                self.handle_opportunities_delete_api(opportunity_id)
-            elif self.path.startswith('/api/proposals/') and PROPOSALS_AVAILABLE:
-                self.handle_proposals_delete_api()
-            else:
+            if not _router.dispatch('DELETE', self.path, self):
                 self.send_error(404, f"API endpoint not found: {self.path}")
-
         except Exception as e:
             print(f"❌ Error handling DELETE {self.path}: {e}")
             self.send_error(500, f"Internal server error: {e}")
 
     def do_PUT(self):
-        """Handle PUT requests for API endpoints."""
+        """Handle PUT requests — API dispatch via router."""
         try:
-            # Shredding API endpoints
-            if self.path.startswith('/api/shredding/requirements/'):
-                self.handle_shredding_requirement_update_api()
-            # Prompts API endpoints
-            elif self.path.startswith('/api/prompts/') and PROMPTS_AVAILABLE:
-                self.handle_prompts_update_api()
-            # Ollama agents API endpoints
-            elif self.path.startswith('/api/ollama/agents/') and OLLAMA_AGENTS_AVAILABLE:
-                self.handle_ollama_agent_detail_api()
-            # TODO API endpoints - specific routes first, then generic
-            elif self.path.startswith('/api/todos/users/') and TODOS_AVAILABLE:
-                user_id = self.path.split('/')[-1]
-                self.handle_users_update_api(user_id)
-            elif self.path.startswith('/api/todos/lists/') and not '/share' in self.path and TODOS_AVAILABLE:
-                list_id = self.path.split('/')[-1]
-                self.handle_lists_update_api(list_id)
-            elif self.path.startswith('/api/todos/tags/') and TODOS_AVAILABLE:
-                tag_id = self.path.split('/')[-1]
-                self.handle_tags_update_api(tag_id)
-            elif self.path.startswith('/api/todos/') and TODOS_AVAILABLE:
-                # Handle PUT /api/todos/{id} - Update individual todo
-                self.handle_todos_update_api()
-            elif self.path.startswith('/api/proposals/') and PROPOSALS_AVAILABLE:
-                self.handle_proposals_update_api()
-            else:
+            if not _router.dispatch('PUT', self.path, self):
                 self.send_error(404, f"API endpoint not found: {self.path}")
         except Exception as e:
             print(f"❌ Error handling PUT {self.path}: {e}")
@@ -1357,7 +1228,7 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle OPTIONS requests for CORS preflight."""
         self.send_response(200)
         self.send_header('Access-Control-Allow-Origin', '*')
-        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, OPTIONS')
+        self.send_header('Access-Control-Allow-Methods', 'GET, HEAD, POST, PUT, DELETE, OPTIONS')
         self.send_header('Access-Control-Allow-Headers', 'Content-Type')
         self.end_headers()
     
@@ -1390,8 +1261,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_rag_upload_api(self):
         """Handle RAG file upload API requests."""
         handle_rag_upload_route(self)
-    def handle_rag_document_delete_api(self, document_id):
+    def handle_rag_document_delete_api(self):
         """Handle RAG document deletion API requests."""
+        document_id = self.path.split('/')[-1]
         handle_rag_document_delete_route(self, document_id)
     def handle_cag_status_api(self):
         """Handle CAG cache status API requests."""
@@ -1402,8 +1274,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_cag_clear_api(self):
         """Handle CAG cache clear API requests."""
         handle_cag_clear_route(self)
-    def handle_cag_document_delete_api(self, document_id):
+    def handle_cag_document_delete_api(self):
         """Handle CAG document deletion API requests."""
+        document_id = self.path.split('/')[-1]
         handle_cag_document_delete_route(self, document_id)
     def handle_cag_query_api(self):
         """Handle CAG-enhanced query API requests."""
@@ -1471,8 +1344,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_prompts_update_api(self):
         """Handle PUT/POST /api/prompts/{prompt_id} - Update prompt."""
         handle_prompts_update_route(self)
-    def handle_prompts_delete_api(self, prompt_id):
+    def handle_prompts_delete_api(self):
         """Handle DELETE /api/prompts/{prompt_id} - Delete prompt."""
+        prompt_id = self.path.split('/')[-1]
         handle_prompts_delete_route(self, prompt_id)
     def handle_prompts_use_api(self):
         """Handle POST /api/prompts/use - Use a prompt (get content)."""
@@ -1530,6 +1404,10 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     # ========== Opportunities API Handlers ==========
 
+    def handle_pipeline_stats_api(self):
+        """Handle GET /api/pipeline/stats - Pipeline health metrics."""
+        handle_pipeline_stats_route(self)
+
     def handle_opportunities_list_api(self):
         """Handle GET /api/opportunities - List all opportunities."""
         handle_opportunities_list_route(self)
@@ -1546,8 +1424,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle PUT/PATCH /api/opportunities/{id} - Update opportunity."""
         handle_opportunities_update_route(self)
 
-    def handle_opportunities_delete_api(self, opportunity_id):
+    def handle_opportunities_delete_api(self):
         """Handle DELETE /api/opportunities/{id} - Delete opportunity."""
+        opportunity_id = self.path.split('/')[-1]
         handle_opportunities_delete_route(self, opportunity_id)
 
     def handle_opportunities_delete_all_api(self):
@@ -1642,8 +1521,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         task_id = self.path.split('/')[-1]
         handle_task_update_route(self, task_id)
 
-    def handle_task_delete_api(self, task_id):
+    def handle_task_delete_api(self):
         """Handle DELETE /api/tasks/{id} - Delete task."""
+        task_id = self.path.split('/')[-1]
         handle_task_delete_route(self, task_id)
 
     def handle_task_history_api(self):
@@ -1651,6 +1531,102 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         # Extract task ID from path: /api/tasks/{id}/history
         task_id = self.path.split('/')[-2]  # /api/tasks/{id}/history
         handle_task_history_route(self, task_id)
+
+    # ========== Capture API Handlers ==========
+
+    def handle_contacts_list_api(self):
+        """GET /api/opportunities/{id}/contacts"""
+        handle_contacts_list_route(self)
+
+    def handle_contacts_create_api(self):
+        """POST /api/opportunities/{id}/contacts"""
+        handle_contacts_create_route(self)
+
+    def handle_contact_update_api(self):
+        """PUT /api/opportunities/{id}/contacts/{cid}"""
+        handle_contact_update_route(self)
+
+    def handle_contact_delete_api(self):
+        """DELETE /api/opportunities/{id}/contacts/{cid}"""
+        handle_contact_delete_route(self)
+
+    def handle_competitors_list_api(self):
+        """GET /api/opportunities/{id}/competitors"""
+        handle_competitors_list_route(self)
+
+    def handle_competitors_create_api(self):
+        """POST /api/opportunities/{id}/competitors"""
+        handle_competitors_create_route(self)
+
+    def handle_competitor_update_api(self):
+        """PUT /api/opportunities/{id}/competitors/{cid}"""
+        handle_competitor_update_route(self)
+
+    def handle_competitor_delete_api(self):
+        """DELETE /api/opportunities/{id}/competitors/{cid}"""
+        handle_competitor_delete_route(self)
+
+    def handle_activities_list_api(self):
+        """GET /api/opportunities/{id}/activities"""
+        handle_activities_list_route(self)
+
+    def handle_activities_create_api(self):
+        """POST /api/opportunities/{id}/activities"""
+        handle_activities_create_route(self)
+
+    def handle_activity_delete_api(self):
+        """DELETE /api/opportunities/{id}/activities/{aid}"""
+        handle_activity_delete_route(self)
+
+    def handle_win_strategy_get_api(self):
+        """GET /api/opportunities/{id}/win-strategy"""
+        handle_win_strategy_get_route(self)
+
+    def handle_win_strategy_put_api(self):
+        """PUT /api/opportunities/{id}/win-strategy"""
+        handle_win_strategy_put_route(self)
+
+    def handle_ptw_get_api(self):
+        """GET /api/opportunities/{id}/ptw"""
+        handle_ptw_get_route(self)
+
+    def handle_ptw_put_api(self):
+        """PUT /api/opportunities/{id}/ptw"""
+        handle_ptw_put_route(self)
+
+    # ========== Tracking Lists API Handlers ==========
+
+    def handle_proposal_items_list_api(self):
+        """GET /api/proposal-items"""
+        handle_proposal_items_list_route(self)
+
+    def handle_proposal_items_create_api(self):
+        """POST /api/proposal-items"""
+        handle_proposal_items_create_route(self)
+
+    def handle_proposal_item_update_api(self):
+        """PUT /api/proposal-items/{id}"""
+        handle_proposal_item_update_route(self)
+
+    def handle_proposal_item_delete_api(self):
+        """DELETE /api/proposal-items/{id}"""
+        handle_proposal_item_delete_route(self)
+
+    def handle_bnb_items_list_api(self):
+        """GET /api/bnb-items"""
+        handle_bnb_items_list_route(self)
+
+    def handle_bnb_items_create_api(self):
+        """POST /api/bnb-items"""
+        handle_bnb_items_create_route(self)
+
+    def handle_bnb_item_update_api(self):
+        """PUT /api/bnb-items/{id}"""
+        handle_bnb_item_update_route(self)
+
+    def handle_bnb_item_delete_api(self):
+        """DELETE /api/bnb-items/{id}"""
+        handle_bnb_item_delete_route(self)
 
     # TODO API handlers
     def handle_users_list_api(self):
@@ -1697,8 +1673,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         todo_id = self.path.split('/')[-1]
         handle_todos_update_route(self, todo_id)
 
-    def handle_todos_delete_api(self, todo_id):
+    def handle_todos_delete_api(self):
         """Handle DELETE /api/todos/{id} - Delete todo."""
+        todo_id = self.path.split('/')[-1]
         handle_todos_delete_route(self, todo_id)
 
     def handle_todos_complete_api(self):
@@ -1742,20 +1719,24 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
 
     # Phase 2 TODO API handlers
 
-    def handle_users_update_api(self, user_id):
+    def handle_users_update_api(self):
         """Handle PUT /api/todos/users/{id} - Update user."""
+        user_id = self.path.split('/')[-1]
         handle_users_update_route(self, user_id)
 
-    def handle_users_delete_api(self, user_id):
+    def handle_users_delete_api(self):
         """Handle DELETE /api/todos/users/{id} - Delete user."""
+        user_id = self.path.split('/')[-1]
         handle_users_delete_route(self, user_id)
 
-    def handle_lists_update_api(self, list_id):
+    def handle_lists_update_api(self):
         """Handle PUT /api/todos/lists/{id} - Update list."""
+        list_id = self.path.split('/')[-1]
         handle_lists_update_route(self, list_id)
 
-    def handle_lists_delete_api(self, list_id):
+    def handle_lists_delete_api(self):
         """Handle DELETE /api/todos/lists/{id} - Delete list."""
+        list_id = self.path.split('/')[-1]
         handle_lists_delete_route(self, list_id)
 
     def handle_lists_share_api(self):
@@ -1763,8 +1744,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         list_id = self.path.split('/')[-2]
         handle_lists_share_route(self, list_id)
 
-    def handle_lists_unshare_api(self, list_id):
+    def handle_lists_unshare_api(self):
         """Handle DELETE /api/todos/lists/{id}/share - Unshare list."""
+        list_id = self.path.split('/')[-2]  # /api/todos/lists/{id}/share
         handle_lists_unshare_route(self, list_id)
 
     def handle_lists_shares_api(self):
@@ -1781,12 +1763,14 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         tag_id = self.path.split('/')[-1]
         handle_tags_detail_route(self, tag_id)
 
-    def handle_tags_update_api(self, tag_id):
+    def handle_tags_update_api(self):
         """Handle PUT /api/todos/tags/{id} - Update tag."""
+        tag_id = self.path.split('/')[-1]
         handle_tags_update_route(self, tag_id)
 
-    def handle_tags_delete_api(self, tag_id):
+    def handle_tags_delete_api(self):
         """Handle DELETE /api/todos/tags/{id} - Delete tag."""
+        tag_id = self.path.split('/')[-1]
         handle_tags_delete_route(self, tag_id)
 
     # ========== Career Monster API Handlers ==========
@@ -1826,8 +1810,9 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
         """Handle POST /api/career/list - Add to career analysis list."""
         handle_career_list_add_route(self)
 
-    def handle_career_list_remove_api(self, list_id):
+    def handle_career_list_remove_api(self):
         """Handle DELETE /api/career/list/{id} - Remove from list."""
+        list_id = self.path.split('/')[-1]
         handle_career_list_remove_route(self, list_id)
 
 

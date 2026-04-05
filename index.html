@@ -94,6 +94,65 @@
             border-color: #3b82f6;
             box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
         }
+        /* Skills filter pills */
+        .skills-filter-pill {
+            display: inline-flex; align-items: center; gap: 0.35rem;
+            padding: 0.3rem 0.85rem; border-radius: 9999px; font-size: 0.8rem; font-weight: 500;
+            border: 1.5px solid #d1d5db; color: #6b7280; background: transparent;
+            cursor: pointer; transition: background 0.15s, color 0.15s, border-color 0.15s;
+        }
+        .dark .skills-filter-pill { border-color: #4b5563; color: #9ca3af; }
+        .skills-filter-pill:hover { border-color: #3b82f6; color: #2563eb; }
+        .dark .skills-filter-pill:hover { border-color: #60a5fa; color: #60a5fa; }
+        .skills-filter-pill.active {
+            background: #eff6ff; border-color: #3b82f6; color: #2563eb;
+        }
+        .dark .skills-filter-pill.active {
+            background: #1e3a5f; border-color: #60a5fa; color: #93c5fd;
+        }
+        .skills-filter-pill.active::before {
+            content: '✓'; font-size: 0.7rem; font-weight: 700;
+        }
+        /* Capture Intelligence Panel */
+        .capture-tab {
+            color: #6b7280;
+            border-bottom-color: transparent;
+            white-space: nowrap;
+            transition: color 0.15s, border-color 0.15s;
+        }
+        .capture-tab:hover { color: #374151; }
+        .capture-tab.active {
+            color: #2563eb;
+            border-bottom-color: #2563eb;
+        }
+        .dark .capture-tab { color: #9ca3af; }
+        .dark .capture-tab:hover { color: #e5e7eb; }
+        .dark .capture-tab.active { color: #60a5fa; border-bottom-color: #60a5fa; }
+        .gate-badge {
+            display: inline-flex; align-items: center; gap: 0.25rem;
+            padding: 0.2rem 0.6rem; border-radius: 9999px; font-size: 0.7rem; font-weight: 600;
+        }
+        .gate-badge.complete { background: #d1fae5; color: #065f46; }
+        .gate-badge.incomplete { background: #f3f4f6; color: #6b7280; }
+        .dark .gate-badge.complete { background: #064e3b; color: #6ee7b7; }
+        .dark .gate-badge.incomplete { background: #374151; color: #9ca3af; }
+        .capture-pill {
+            display: inline-flex; align-items: center; gap: 0.25rem;
+            padding: 0.2rem 0.5rem; border-radius: 9999px; font-size: 0.75rem; font-weight: 500;
+        }
+        .capture-pill .rm-pill {
+            cursor: pointer; font-size: 0.9rem; line-height: 1; opacity: 0.6;
+        }
+        .capture-pill .rm-pill:hover { opacity: 1; }
+        .pwin-track {
+            position: relative; height: 8px; border-radius: 4px; background: #e5e7eb;
+        }
+        .pwin-fill {
+            height: 100%; border-radius: 4px;
+            background: linear-gradient(90deg, #ef4444, #f59e0b, #10b981);
+            transition: width 0.3s ease;
+        }
+
     </style>
 </head>
 <body class="bg-white dark:bg-gray-900 text-gray-900 dark:text-white transition-colors duration-200">
@@ -323,6 +382,16 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 6h16M4 10h16M4 14h16M4 18h16"></path>
                                 </svg>
                                 Workflows
+                            </span>
+                        </button>
+
+                        <!-- Pipeline Health Dashboard -->
+                        <button class="nav-item w-full text-left px-3 py-2 rounded-md text-sm font-medium text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700" data-page="pipeline-health">
+                            <span class="flex items-center">
+                                <svg class="w-4 h-4 mr-3 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 002 2h2a2 2 0 002-2zm0 0V9a2 2 0 012-2h2a2 2 0 012 2v10m-6 0a2 2 0 002 2h2a2 2 0 002-2m0 0V5a2 2 0 012-2h2a2 2 0 012 2v14a2 2 0 01-2 2h-2a2 2 0 01-2-2z"></path>
+                                </svg>
+                                Pipeline Health
                             </span>
                         </button>
 
@@ -948,11 +1017,20 @@
                         <div class="max-w-4xl mx-auto">
                             <div class="mb-6">
                                 <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-2">Skills Interface</h3>
-                                <p class="text-gray-600 dark:text-gray-400">Enable or disable skills to control which sub-tabs are shown in the sidebar.</p>
+                                <p class="text-gray-600 dark:text-gray-400 mb-4">Enable or disable skills to control which sub-tabs are shown in the sidebar.</p>
+                                <!-- Filter pills -->
+                                <div class="flex flex-wrap gap-2" id="skills-filter-pills">
+                                    <button class="skills-filter-pill active" data-filter="plugin">
+                                        Plugin Skills
+                                    </button>
+                                    <button class="skills-filter-pill active" data-filter="custom">
+                                        Custom Skills
+                                    </button>
+                                </div>
                             </div>
 
                             <!-- Plugin Skills -->
-                            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                            <div id="plugin-skills-section" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
                                 <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-1">Plugin Skills</h4>
                                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Anthropic plugin skills available to agents</p>
                                 <div id="plugin-skills-list" class="space-y-3">
@@ -961,7 +1039,7 @@
                             </div>
 
                             <!-- Custom Skills -->
-                            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
+                            <div id="custom-skills-section" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
                                 <h4 class="text-lg font-medium text-gray-900 dark:text-white mb-1">Custom Skills</h4>
                                 <p class="text-sm text-gray-500 dark:text-gray-400 mb-4">Local project skills with sub-tab interfaces</p>
                                 <div id="custom-skills-list" class="space-y-3">
@@ -1098,17 +1176,105 @@
                             <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Proposal Workflow</h3>
                             <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Pipeline Kanban — drag cards to update stage</p>
                         </div>
-                        <button id="refresh-workflows-btn" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                        <div class="flex items-center gap-2">
+                            <button id="expand-all-workflows-btn" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 9l-7 7-7-7"></path>
+                                </svg>
+                                <span id="expand-all-workflows-label">Expand All</span>
+                            </button>
+                            <button id="refresh-workflows-btn" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+                    </div>
+                    <!-- Kanban board — horizontally scrollable -->
+                    <div class="flex-1 overflow-x-auto overflow-y-hidden">
+                        <div id="kanban-board" class="flex h-full gap-3 p-4 min-w-max items-start">
+                            <!-- Columns built dynamically by workflows.js -->
+                        </div>
+                    </div>
+                </main>
+
+                <!-- Pipeline Health Dashboard (hidden by default) -->
+                <main id="pipeline-health-area" class="flex-1 flex flex-col hidden overflow-y-auto">
+                    <div class="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-700 flex items-center justify-between">
+                        <div>
+                            <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Pipeline Health</h3>
+                            <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">Win rates, stage distribution, and pipeline value</p>
+                        </div>
+                        <button id="refresh-pipeline-health-btn" class="flex items-center gap-2 px-3 py-1.5 text-sm bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-300 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors">
                             <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"></path>
                             </svg>
                             Refresh
                         </button>
                     </div>
-                    <!-- Kanban board — horizontally scrollable -->
-                    <div class="flex-1 overflow-x-auto overflow-y-hidden">
-                        <div id="kanban-board" class="flex h-full gap-3 p-4 min-w-max items-start">
-                            <!-- Columns built dynamically by workflows.js -->
+
+                    <div class="p-6 max-w-5xl mx-auto w-full space-y-8">
+                        <!-- Loading spinner -->
+                        <div id="ph-spinner" class="hidden flex items-center justify-center py-12">
+                            <svg class="animate-spin h-8 w-8 text-blue-500" fill="none" viewBox="0 0 24 24">
+                                <circle class="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" stroke-width="4"></circle>
+                                <path class="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8v8z"></path>
+                            </svg>
+                        </div>
+
+                        <!-- KPI Cards -->
+                        <div class="grid grid-cols-2 md:grid-cols-4 gap-4">
+                            <!-- Total -->
+                            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-1">
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Total Opps</span>
+                                <span id="ph-total" class="text-3xl font-bold text-gray-900 dark:text-white">—</span>
+                                <span class="text-xs text-gray-400 dark:text-gray-500">tracked opportunities</span>
+                            </div>
+                            <!-- Win Rate -->
+                            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-1">
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Win Rate</span>
+                                <span id="ph-win-rate" class="text-3xl font-bold text-green-600 dark:text-green-400">—</span>
+                                <span class="flex gap-2 text-xs text-gray-400 dark:text-gray-500">
+                                    <span id="ph-won-count">0 won</span>
+                                    <span>/</span>
+                                    <span id="ph-lost-count">0 lost</span>
+                                </span>
+                            </div>
+                            <!-- Active Pipeline Value -->
+                            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-1">
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Active Pipeline</span>
+                                <span id="ph-active-value" class="text-3xl font-bold text-blue-600 dark:text-blue-400">—</span>
+                                <span class="text-xs text-gray-400 dark:text-gray-500">open opportunities</span>
+                            </div>
+                            <!-- Won Value -->
+                            <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-5 flex flex-col gap-1">
+                                <span class="text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wide">Won Value</span>
+                                <span id="ph-won-value" class="text-3xl font-bold text-emerald-600 dark:text-emerald-400">—</span>
+                                <span class="text-xs text-gray-400 dark:text-gray-500">closed won</span>
+                            </div>
+                        </div>
+
+                        <!-- Stage Distribution -->
+                        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Stage Distribution</h4>
+                            <div class="mb-3 grid grid-cols-[10rem_1fr_4rem_5rem] gap-3 text-xs text-gray-400 dark:text-gray-500">
+                                <span class="text-right">Stage</span>
+                                <span></span>
+                                <span class="text-right">Count</span>
+                                <span class="text-right">Value</span>
+                            </div>
+                            <div id="ph-stage-bars" class="space-y-1">
+                                <p class="text-sm text-gray-400 dark:text-gray-500 text-center py-4">Loading…</p>
+                            </div>
+                        </div>
+
+                        <!-- Priority Breakdown -->
+                        <div class="bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 p-6">
+                            <h4 class="text-sm font-semibold text-gray-900 dark:text-white mb-4">Priority Breakdown</h4>
+                            <div id="ph-priority-pills" class="flex flex-wrap gap-3">
+                                <span class="text-sm text-gray-400 dark:text-gray-500">Loading…</span>
+                            </div>
                         </div>
                     </div>
                 </main>
@@ -1686,6 +1852,59 @@
                                 </div>
                             </div>
 
+                            <!-- Opportunities List View (shown when no detail is open) -->
+                            <div id="opportunities-main-list">
+                                <!-- Search + filter bar -->
+                                <div class="flex items-center gap-3 mb-4 flex-wrap">
+                                    <input type="text" id="opp-search-input"
+                                           placeholder="Search opportunities…"
+                                           class="flex-1 min-w-[180px] px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-900 dark:text-white placeholder-gray-400 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <select id="opp-stage-filter"
+                                            class="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="">All Stages</option>
+                                        <option value="identified">01 — Qualification</option>
+                                        <option value="long_lead">02 — Long Lead</option>
+                                        <option value="bid_decision">03 — Bid Decision</option>
+                                        <option value="active">04 — In Progress</option>
+                                        <option value="submitted">05 — Waiting/Review</option>
+                                        <option value="negotiating">06 — In Negotiation</option>
+                                        <option value="awarded">07 — Closed Won</option>
+                                        <option value="lost">08 — Closed Lost</option>
+                                        <option value="no_bid">09 — Closed No Bid</option>
+                                    </select>
+                                    <select id="opp-priority-filter"
+                                            class="px-3 py-2 text-sm rounded-lg border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                        <option value="">All Priorities</option>
+                                        <option value="high">High</option>
+                                        <option value="medium">Medium</option>
+                                        <option value="low">Low</option>
+                                    </select>
+                                </div>
+
+                                <!-- Table -->
+                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                    <table class="w-full text-sm">
+                                        <thead class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
+                                            <tr>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Opportunity</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Stage</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Priority</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Value</th>
+                                                <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Due Date</th>
+                                                <th class="px-4 py-3 w-10"></th>
+                                            </tr>
+                                        </thead>
+                                        <tbody id="opp-main-table-body" class="divide-y divide-gray-100 dark:divide-gray-700">
+                                            <tr id="opp-main-empty-row">
+                                                <td colspan="6" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
+                                                    No opportunities yet. Click <strong>New Opportunity</strong> to get started.
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+
                             <!-- Opportunity Details View -->
                             <div id="opportunity-detail-view" class="hidden">
                                 <div id="opportunity-detail-card" class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6 mb-6">
@@ -1774,6 +1993,20 @@
                                     </div>
                                 </div>
 
+                                <!-- Capture Intelligence Panel -->
+                                <div id="capture-panel" class="hidden mb-6">
+                                    <div class="bg-white dark:bg-gray-800 rounded-t-lg border border-gray-200 dark:border-gray-700 border-b-0">
+                                        <div class="flex overflow-x-auto">
+                                            <button class="capture-tab active px-4 py-3 text-sm font-medium border-b-2" data-tab="win-strategy">Win Strategy</button>
+                                            <button class="capture-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="contacts">Customer Intel</button>
+                                            <button class="capture-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="competitors">Competitors</button>
+                                            <button class="capture-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="activities">Engagement Log</button>
+                                            <button class="capture-tab px-4 py-3 text-sm font-medium border-b-2 border-transparent" data-tab="ptw">PTW</button>
+                                        </div>
+                                    </div>
+                                    <div id="capture-tab-content" class="bg-white dark:bg-gray-800 rounded-b-lg border border-gray-200 dark:border-gray-700 p-6 min-h-[200px]"></div>
+                                </div>
+
                                 <!-- Tasks Section -->
                                 <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-6">
                                     <div class="flex items-center justify-between mb-4">
@@ -1833,17 +2066,104 @@
                                 </div>
                             </div>
 
-                            <!-- Empty State -->
-                            <div id="opportunities-empty-state" class="text-center py-12">
-                                <svg class="w-16 h-16 mx-auto mb-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z"></path>
-                                </svg>
-                                <p class="text-lg text-gray-600 dark:text-gray-400 mb-2">No opportunity selected</p>
-                                <p class="text-sm text-gray-500 dark:text-gray-500">Select an opportunity from the sidebar or create a new one</p>
+                        </div>
+                    </div>
+                </main>
+                <!-- Lists Interface Area -->
+                <main id="lists-interface-area" class="flex-1 flex flex-col hidden">
+                    <div class="flex-1 overflow-y-auto p-6">
+                        <div class="max-w-4xl mx-auto">
+                            <div class="mb-6 flex items-center justify-between">
+                                <div>
+                                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-1">Lists</h3>
+                                    <p class="text-gray-600 dark:text-gray-400 text-sm">Manage data collections — control visibility, export data, and add custom lists.</p>
+                                </div>
+                                <button id="add-list-btn" class="flex items-center gap-2 px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white text-sm font-medium rounded-lg transition-colors">
+                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M12 4v16m8-8H4"/>
+                                    </svg>
+                                    Add List
+                                </button>
+                            </div>
+
+                            <!-- Items panel (shown when View is clicked) -->
+                            <div id="lists-items-panel" class="hidden mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                                    <h4 id="lists-items-panel-title" class="text-sm font-semibold text-gray-800 dark:text-white"></h4>
+                                    <button onclick="window.trackingLists?.closePanel()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">&times;</button>
+                                </div>
+                                <div class="overflow-x-auto">
+                                    <table class="w-full text-sm">
+                                        <thead id="tracking-items-header"></thead>
+                                        <tbody id="tracking-items-tbody">
+                                            <tr><td class="px-4 py-6 text-center text-sm text-gray-400">Select a list to view items.</td></tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                                <div id="tracking-add-form-container" class="px-4 pb-4"></div>
+                            </div>
+
+                            <!-- Lists table -->
+                            <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
+                                <table class="w-full text-sm">
+                                    <thead>
+                                        <tr class="border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
+                                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">List</th>
+                                            <th class="text-left px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Type</th>
+                                            <th class="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Items</th>
+                                            <th class="text-center px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Visible</th>
+                                            <th class="text-right px-5 py-3 text-xs font-semibold text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody id="lists-table-body">
+                                        <tr>
+                                            <td colspan="5" class="px-5 py-8 text-center text-sm text-gray-400 dark:text-gray-500">Loading lists…</td>
+                                        </tr>
+                                    </tbody>
+                                </table>
                             </div>
                         </div>
                     </div>
                 </main>
+
+                <!-- Add List Modal -->
+                <div id="add-list-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4">
+                    <div class="bg-white dark:bg-gray-800 rounded-xl shadow-xl w-full max-w-md">
+                        <div class="flex items-center justify-between px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                            <h4 class="text-base font-semibold text-gray-900 dark:text-white">Add List</h4>
+                            <button id="close-add-list-modal" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
+                                <svg class="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
+                                </svg>
+                            </button>
+                        </div>
+                        <form id="add-list-form" class="px-6 py-4 space-y-4">
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Name <span class="text-red-500">*</span></label>
+                                <input type="text" id="new-list-name" required placeholder="e.g. Partners"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                                <input type="text" id="new-list-description" placeholder="Short description"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500"/>
+                            </div>
+                            <div>
+                                <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Type</label>
+                                <select id="new-list-type"
+                                    class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg text-sm dark:bg-gray-700 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                    <option value="custom">Custom</option>
+                                    <option value="builtin">Built-in</option>
+                                </select>
+                            </div>
+                            <div class="flex justify-end gap-3 pt-2">
+                                <button type="button" id="cancel-add-list-btn" class="px-4 py-2 text-sm text-gray-700 dark:text-gray-300 hover:bg-gray-100 dark:hover:bg-gray-700 rounded-lg">Cancel</button>
+                                <button type="submit" class="px-4 py-2 text-sm bg-blue-600 hover:bg-blue-700 text-white rounded-lg font-medium">Add List</button>
+                            </div>
+                        </form>
+                    </div>
+                </div>
+
                 <!-- TODO Lists Area (Phase 5) -->
                 <main id="todos-area" class="flex-1 flex flex-col hidden">
                     <div class="flex-1 overflow-y-auto p-6">
@@ -2372,5 +2692,11 @@
     <script src="color_manager.js"></script>
     <script src="settings_manager.js"></script>
     <script src="workflows.js"></script>
+    <script src="js/workflow-drawer.js"></script>
+    <script src="js/pipeline-health.js"></script>
+    <script src="js/capture.js"></script>
+    <script src="js/capture-intel.js"></script>
+    <script src="js/lists-manager.js"></script>
+    <script src="js/tracking-lists.js"></script>
 </body>
 </html>

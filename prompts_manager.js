@@ -87,9 +87,15 @@ class PromptsManager {
         emptyState?.classList.add('hidden');
 
         tableBody.innerHTML = prompts.map(prompt => `
-            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700">
+            <tr class="hover:bg-gray-50 dark:hover:bg-gray-700 cursor-pointer prompt-row"
+                data-prompt-id="${prompt.id}" title="Click to expand">
                 <td class="px-6 py-4">
-                    <div class="text-sm font-medium text-gray-900 dark:text-white">${this.escapeHtml(prompt.name)}</div>
+                    <div class="flex items-center gap-2">
+                        <svg class="prompt-chevron w-4 h-4 text-gray-400 shrink-0 transition-transform duration-200" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5l7 7-7 7"/>
+                        </svg>
+                        <span class="text-sm font-medium text-gray-900 dark:text-white">${this.escapeHtml(prompt.name)}</span>
+                    </div>
                 </td>
                 <td class="px-6 py-4">
                     <div class="text-sm text-gray-600 dark:text-gray-400">${this.escapeHtml(prompt.description)}</div>
@@ -107,15 +113,39 @@ class PromptsManager {
                     ${prompt.usage_count || 0}
                 </td>
                 <td class="px-6 py-4 text-right text-sm space-x-2">
-                    <button onclick="promptsManager.editPrompt('${prompt.id}')" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
+                    <button onclick="event.stopPropagation(); promptsManager.editPrompt('${prompt.id}')" class="text-blue-600 hover:text-blue-800 dark:text-blue-400 dark:hover:text-blue-300">
                         Edit
                     </button>
-                    <button onclick="promptsManager.deletePrompt('${prompt.id}')" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
+                    <button onclick="event.stopPropagation(); promptsManager.deletePrompt('${prompt.id}')" class="text-red-600 hover:text-red-800 dark:text-red-400 dark:hover:text-red-300">
                         Delete
                     </button>
                 </td>
             </tr>
+            <tr class="prompt-expand-row hidden" data-expand-for="${prompt.id}">
+                <td colspan="6" class="px-6 pb-4 pt-0">
+                    <pre class="text-sm text-gray-800 dark:text-gray-200 bg-gray-50 dark:bg-gray-900 border border-gray-200 dark:border-gray-700 rounded-lg p-4 whitespace-pre-wrap font-mono overflow-auto max-h-64">${this.escapeHtml(prompt.content)}</pre>
+                </td>
+            </tr>
         `).join('');
+
+        // Row click → toggle expand row
+        tableBody.querySelectorAll('.prompt-row').forEach(row => {
+            row.addEventListener('click', () => {
+                this.togglePromptExpand(row.dataset.promptId);
+            });
+        });
+    }
+
+    togglePromptExpand(promptId) {
+        const expandRow = document.querySelector(`.prompt-expand-row[data-expand-for="${promptId}"]`);
+        const mainRow = document.querySelector(`.prompt-row[data-prompt-id="${promptId}"]`);
+        if (!expandRow || !mainRow) return;
+
+        const isExpanded = !expandRow.classList.contains('hidden');
+        expandRow.classList.toggle('hidden', isExpanded);
+
+        const chevron = mainRow.querySelector('.prompt-chevron');
+        chevron?.classList.toggle('rotate-90', !isExpanded);
     }
 
     updateStats() {

@@ -11,6 +11,12 @@ from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 
+try:
+    from server.db_pool import get_db as _get_db
+    _USE_POOL = True
+except ImportError:
+    _USE_POOL = False
+
 
 class OpportunitiesManager:
     """Manage opportunities with SQLite storage and knowledge graph integration."""
@@ -19,6 +25,34 @@ class OpportunitiesManager:
         """Initialize opportunities manager."""
         self.db_path = db_path
         self._init_database()
+
+    def _connect(self):
+        """
+        Return a context manager for a database connection.
+
+        Uses the thread-local pool when available, falls back to a plain
+        sqlite3.connect otherwise.
+
+        Returns:
+            Context manager yielding sqlite3.Connection.
+        """
+        if _USE_POOL:
+            return _get_db(self.db_path)
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _plain():
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            try:
+                yield conn
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+
+        return _plain()
 
     def _init_database(self):
         """Initialize opportunities and tasks tables in database."""
@@ -105,13 +139,38 @@ class OpportunitiesManager:
             ON task_history(task_id, edited_at DESC)
         """)
 
+        # Additional performance indexes (not pipeline_stage — column added below)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_opportunities_priority
+            ON opportunities(priority)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_tasks_status
+            ON tasks(status)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_tasks_assigned
+            ON tasks(assigned_to)
+        """)
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_task_history_opportunity
+            ON task_history(opportunity_id)
+        """)
+
         # Add pipeline_stage column if it doesn't exist yet (migration)
+        # Reason: ALTER TABLE must precede index creation on the column
         try:
             cursor.execute(
                 "ALTER TABLE opportunities ADD COLUMN pipeline_stage TEXT DEFAULT 'identified'"
             )
         except Exception:
             pass  # Column already exists
+
+        # Index pipeline_stage after the column is guaranteed to exist
+        cursor.execute("""
+            CREATE INDEX IF NOT EXISTS idx_opportunities_pipeline_stage
+            ON opportunities(pipeline_stage)
+        """)
 
         conn.commit()
         conn.close()
@@ -144,8 +203,8 @@ class OpportunitiesManager:
             tags_json = json.dumps(tags or [])
             metadata_json = json.dumps(metadata or {})
 
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             cursor.execute("""
                 INSERT INTO opportunities
@@ -156,7 +215,6 @@ class OpportunitiesManager:
                   tags_json, metadata_json, pipeline_stage, now, now))
 
             conn.commit()
-            conn.close()
 
             # Add to knowledge graph
             self._add_to_knowledge_graph(opportunity_id, name, description, tags or [])
@@ -195,9 +253,8 @@ class OpportunitiesManager:
             List of opportunities
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             if status:
                 cursor.execute("""
@@ -212,7 +269,6 @@ class OpportunitiesManager:
                 """)
 
             rows = cursor.fetchall()
-            conn.close()
 
             opportunities = []
             for row in rows:
@@ -255,16 +311,14 @@ class OpportunitiesManager:
             Opportunity data
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             cursor.execute("""
                 SELECT * FROM opportunities WHERE id = ?
             """, (opportunity_id,))
 
             row = cursor.fetchone()
-            conn.close()
 
             if not row:
                 return {
@@ -307,8 +361,8 @@ class OpportunitiesManager:
             Updated opportunity data
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             # Build update query
             update_fields = []
@@ -342,7 +396,6 @@ class OpportunitiesManager:
             """, update_values)
 
             conn.commit()
-            conn.close()
 
             # Update knowledge graph if name or description changed
             if 'name' in updates or 'description' in updates or 'tags' in updates:
@@ -367,13 +420,12 @@ class OpportunitiesManager:
             Success status
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             cursor.execute("DELETE FROM opportunities WHERE id = ?", (opportunity_id,))
 
             conn.commit()
-            conn.close()
 
             # Remove from knowledge graph
             self._remove_from_knowledge_graph(opportunity_id)
@@ -388,6 +440,93 @@ class OpportunitiesManager:
                 'status': 'error',
                 'message': f'Failed to delete opportunity: {str(e)}'
             }
+
+    def get_pipeline_stats(self) -> Dict:
+        """
+        Compute pipeline health statistics.
+
+        Calculates win rate, stage distribution, priority breakdown,
+        and total/active/won pipeline value from current DB state.
+
+        Returns:
+            Dict with status, stats sub-dict containing all metrics.
+        """
+        # Canonical closed-won and closed-lost pipeline stage values
+        _WON_STAGES  = {'awarded', 'contract_vehicle_won', 'contract_vehicle_complete'}
+        _LOST_STAGES = {'lost', 'no_bid', 'cancelled'}
+        _OPEN_STAGES = {
+            'identified', 'qualifying', 'long_lead', 'bid_decision',
+            'active', 'submitted', 'negotiating',
+        }
+
+        try:
+            with self._connect() as conn:
+                cursor = conn.cursor()
+
+            cursor.execute(
+                "SELECT pipeline_stage, priority, value FROM opportunities"
+            )
+            rows = cursor.fetchall()
+
+            total = len(rows)
+            by_stage: Dict[str, Dict] = {}
+            by_priority: Dict[str, int] = {}
+            total_value = 0.0
+            active_value = 0.0
+            won_value = 0.0
+            won_count = 0
+            lost_count = 0
+
+            for row in rows:
+                stage    = row['pipeline_stage'] or 'identified'
+                priority = row['priority'] or 'medium'
+                value    = float(row['value'] or 0)
+
+                # Stage bucket
+                if stage not in by_stage:
+                    by_stage[stage] = {'count': 0, 'value': 0.0}
+                by_stage[stage]['count'] += 1
+                by_stage[stage]['value'] += value
+
+                # Priority bucket
+                by_priority[priority] = by_priority.get(priority, 0) + 1
+
+                total_value += value
+                if stage in _WON_STAGES:
+                    won_value += value
+                    won_count += 1
+                elif stage in _OPEN_STAGES:
+                    active_value += value
+
+                if stage in _WON_STAGES:
+                    won_count  # already counted above
+                elif stage in _LOST_STAGES:
+                    lost_count += 1
+
+            decided = won_count + lost_count
+            win_rate = round(won_count / decided, 4) if decided > 0 else None
+
+            return {
+                'status': 'success',
+                'stats': {
+                    'total':         total,
+                    'won_count':     won_count,
+                    'lost_count':    lost_count,
+                    'active_count':  sum(
+                        v['count'] for s, v in by_stage.items()
+                        if s in _OPEN_STAGES
+                    ),
+                    'win_rate':      win_rate,
+                    'total_value':   round(total_value, 2),
+                    'active_value':  round(active_value, 2),
+                    'won_value':     round(won_value, 2),
+                    'by_stage':      by_stage,
+                    'by_priority':   by_priority,
+                },
+            }
+
+        except Exception as e:
+            return {'status': 'error', 'message': f'Failed to compute pipeline stats: {e}'}
 
     def _add_to_knowledge_graph(self, opportunity_id: str, name: str,
                                 description: str, tags: List[str]):
@@ -472,8 +611,8 @@ Type: Business Opportunity
             task_id = str(uuid.uuid4())
             now = datetime.now().isoformat()
 
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             cursor.execute("""
                 INSERT INTO tasks
@@ -484,7 +623,6 @@ Type: Business Opportunity
                   status, progress, assigned_to, now, now))
 
             conn.commit()
-            conn.close()
 
             return {
                 'status': 'success',
@@ -520,9 +658,8 @@ Type: Business Opportunity
             List of tasks
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             cursor.execute("""
                 SELECT * FROM tasks
@@ -531,7 +668,6 @@ Type: Business Opportunity
             """, (opportunity_id,))
 
             rows = cursor.fetchall()
-            conn.close()
 
             tasks = []
             for row in rows:
@@ -576,17 +712,15 @@ Type: Business Opportunity
             Updated task data
         """
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             # Get current task state for history
             cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
             current_task = cursor.fetchone()
 
             if not current_task:
-                conn.close()
-                return {'status': 'error', 'message': 'Task not found'}
+                    return {'status': 'error', 'message': 'Task not found'}
 
             # Save current state to history
             history_id = str(uuid.uuid4())
@@ -625,8 +759,7 @@ Type: Business Opportunity
                     update_values.append(updates[field])
 
             if not update_fields:
-                conn.close()
-                return {'status': 'error', 'message': 'No fields to update'}
+                    return {'status': 'error', 'message': 'No fields to update'}
 
             update_fields.append("updated_at = ?")
             update_values.append(now)
@@ -640,7 +773,6 @@ Type: Business Opportunity
             """, update_values)
 
             conn.commit()
-            conn.close()
 
             return self.get_task(task_id)
 
@@ -653,13 +785,11 @@ Type: Business Opportunity
     def get_task(self, task_id: str) -> Dict:
         """Get a specific task by ID."""
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
             row = cursor.fetchone()
-            conn.close()
 
             if not row:
                 return {'status': 'error', 'message': 'Task not found'}
@@ -690,9 +820,8 @@ Type: Business Opportunity
     def get_task_history(self, task_id: str) -> Dict:
         """Get edit history for a task."""
         try:
-            conn = sqlite3.connect(self.db_path)
-            conn.row_factory = sqlite3.Row
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             cursor.execute("""
                 SELECT * FROM task_history
@@ -701,7 +830,6 @@ Type: Business Opportunity
             """, (task_id,))
 
             rows = cursor.fetchall()
-            conn.close()
 
             history_items = []
             for row in rows:
@@ -735,13 +863,12 @@ Type: Business Opportunity
     def delete_task(self, task_id: str) -> Dict:
         """Delete a task."""
         try:
-            conn = sqlite3.connect(self.db_path)
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
             cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
 
             conn.commit()
-            conn.close()
 
             return {
                 'status': 'success',
@@ -852,3 +979,15 @@ def handle_task_history_request(task_id: str) -> Dict:
     """Handle get task history request."""
     manager = get_opportunities_manager()
     return manager.get_task_history(task_id)
+
+
+def handle_pipeline_stats_request() -> Dict:
+    """
+    Compute pipeline health statistics from the opportunities table.
+
+    Returns:
+        Dict with keys: total, by_stage, by_priority, win_rate,
+        total_value, active_value, won_value.
+    """
+    manager = get_opportunities_manager()
+    return manager.get_pipeline_stats()

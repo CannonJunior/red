@@ -26,7 +26,12 @@ class Navigation {
                         this.navigateTo('skills-interface');
                         this.setActiveNavItem(item);
                     }
-                    // Knowledge and Lists: expand only, no area navigation
+                    // Lists also navigates to the lists interface
+                    if (page === 'lists') {
+                        this.navigateTo('lists-interface');
+                        this.setActiveNavItem(item);
+                    }
+                    // Knowledge: expand only, no area navigation
                     return;
                 }
 
@@ -125,6 +130,26 @@ class Navigation {
                 this._renderSkillsManagementList('custom-skills-list', builtinSkills, savedState, STORAGE_KEY);
                 this.refreshSkillsSubmenu(builtinSkills, savedState);
             });
+    }
+
+    _setupSkillsFilterPills() {
+        const pills = document.querySelectorAll('#skills-filter-pills .skills-filter-pill');
+        // Guard: only bind once per page load
+        if (document.getElementById('skills-filter-pills')?.dataset.bound) return;
+        if (document.getElementById('skills-filter-pills')) {
+            document.getElementById('skills-filter-pills').dataset.bound = '1';
+        }
+
+        pills.forEach(pill => {
+            pill.addEventListener('click', () => {
+                pill.classList.toggle('active');
+                const filter = pill.dataset.filter;
+                const section = document.getElementById(`${filter}-skills-section`);
+                if (section) {
+                    section.classList.toggle('hidden', !pill.classList.contains('active'));
+                }
+            });
+        });
     }
 
     _renderSkillsManagementList(containerId, skills, savedState, storageKey) {
@@ -377,10 +402,12 @@ class Navigation {
         document.getElementById('skills-interface-area')?.classList.add('hidden');
         document.getElementById('ollama-agent-create-area')?.classList.add('hidden');
         document.getElementById('workflows-area')?.classList.add('hidden');
+        document.getElementById('pipeline-health-area')?.classList.add('hidden');
+        document.getElementById('lists-interface-area')?.classList.add('hidden');
 
         // Hide expandable submenu panels ONLY when navigating away from Lists-related pages
-        // Don't hide them when navigating TO opportunities or todos pages
-        if (page !== 'opportunities' && page !== 'todos') {
+        // Don't hide them when navigating TO opportunities, todos, or the lists interface
+        if (page !== 'opportunities' && page !== 'todos' && page !== 'lists-interface') {
             document.getElementById('opportunities-list')?.classList.add('hidden');
             document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
             document.getElementById('lists-submenu')?.classList.add('hidden');
@@ -460,6 +487,21 @@ class Navigation {
                     });
                 }
                 break;
+            case 'pipeline-health':
+                document.getElementById('pipeline-health-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Pipeline Health';
+                this.currentPage = 'pipeline-health';
+                if (window.pipelineHealthManager) {
+                    window.pipelineHealthManager.load();
+                }
+                const phRefreshBtn = document.getElementById('refresh-pipeline-health-btn');
+                if (phRefreshBtn && !phRefreshBtn._wired) {
+                    phRefreshBtn._wired = true;
+                    phRefreshBtn.addEventListener('click', () => {
+                        if (window.pipelineHealthManager) window.pipelineHealthManager.load();
+                    });
+                }
+                break;
             case 'mcp':
                 document.getElementById('mcp-area')?.classList.remove('hidden');
                 pageTitle.textContent = 'MCP';
@@ -480,11 +522,18 @@ class Navigation {
                     window.app.opportunitiesManager.loadOpportunities();
                 }
                 break;
+            case 'lists-interface':
+                document.getElementById('lists-interface-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Lists';
+                this.currentPage = 'lists-interface';
+                if (window.listsManager) window.listsManager.load();
+                break;
             case 'skills-interface':
                 document.getElementById('skills-interface-area')?.classList.remove('hidden');
                 pageTitle.textContent = 'Skills Interface';
                 this.currentPage = 'skills-interface';
                 this.loadSkillsManagementPage();
+                this._setupSkillsFilterPills();
                 break;
             case 'ollama-agent-create':
                 document.getElementById('ollama-agent-create-area')?.classList.remove('hidden');
