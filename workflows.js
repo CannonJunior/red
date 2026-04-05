@@ -1,8 +1,8 @@
 /**
  * Workflows — Proposal Pipeline Kanban Board
  *
- * Displays all proposals as cards in vertical swim lanes, one per
- * Unanet CRM stage code. Horizontally scrollable.
+ * Displays all opportunities as cards in vertical swim lanes, one per
+ * stage code. Horizontally scrollable.
  * Supports:
  *   - Drag-and-drop to move opportunities between stages
  *   - Per-card expand/collapse to reveal task pills
@@ -10,27 +10,29 @@
  */
 
 const KANBAN_STAGES = [
-    { code: '01-Qualification',     slug: '01-qual',       localStages: ['identified', 'qualifying'],          colorClass: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200',   headerClass: 'bg-blue-500' },
-    { code: '02-Long Lead',         slug: '02-lead',       localStages: ['long_lead'],                         colorClass: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200', headerClass: 'bg-indigo-500' },
-    { code: '03-Bid Decision',      slug: '03-bid',        localStages: ['bid_decision'],                      colorClass: 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200', headerClass: 'bg-purple-500' },
-    { code: '04-In Progress',       slug: '04-progress',   localStages: ['active'],                            colorClass: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200', headerClass: 'bg-yellow-500' },
-    { code: '05-Waiting/Review',    slug: '05-review',     localStages: ['submitted'],                         colorClass: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200', headerClass: 'bg-orange-500' },
-    { code: '06-In Negotiation',    slug: '06-nego',       localStages: ['negotiating'],                       colorClass: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200',  headerClass: 'bg-amber-500' },
-    { code: '07-Closed Won',        slug: '07-won',        localStages: ['awarded'],                           colorClass: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200',  headerClass: 'bg-green-600' },
-    { code: '08-Closed Lost',       slug: '08-lost',       localStages: ['lost'],                              colorClass: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200',     headerClass: 'bg-red-500' },
-    { code: '09-Closed No Bid',     slug: '09-nobid',      localStages: ['no_bid'],                            colorClass: 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300',     headerClass: 'bg-gray-500' },
-    { code: '20-Closed Other',      slug: '20-other',      localStages: ['cancelled'],                         colorClass: 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300', headerClass: 'bg-slate-500' },
-    { code: '98-Awarded Contract',  slug: '98-vehicle',    localStages: ['contract_vehicle_won'],              colorClass: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200', headerClass: 'bg-emerald-600' },
-    { code: '99-Completed Contract',slug: '99-complete',   localStages: ['contract_vehicle_complete'],         colorClass: 'bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-200', headerClass: 'bg-teal-600' },
+    { code: '01-Qualification',      slug: '01-qual',      localStages: ['identified', 'qualifying'],       colorClass: 'bg-blue-100 dark:bg-blue-900/40 text-blue-800 dark:text-blue-200',         headerClass: 'bg-blue-500' },
+    { code: '02-Long Lead',          slug: '02-lead',      localStages: ['long_lead'],                      colorClass: 'bg-indigo-100 dark:bg-indigo-900/40 text-indigo-800 dark:text-indigo-200', headerClass: 'bg-indigo-500' },
+    { code: '03-Bid Decision',       slug: '03-bid',       localStages: ['bid_decision'],                   colorClass: 'bg-purple-100 dark:bg-purple-900/40 text-purple-800 dark:text-purple-200', headerClass: 'bg-purple-500' },
+    { code: '04-In Progress',        slug: '04-progress',  localStages: ['active'],                         colorClass: 'bg-yellow-100 dark:bg-yellow-900/40 text-yellow-800 dark:text-yellow-200', headerClass: 'bg-yellow-500' },
+    { code: '05-Waiting/Review',     slug: '05-review',    localStages: ['submitted'],                      colorClass: 'bg-orange-100 dark:bg-orange-900/40 text-orange-800 dark:text-orange-200', headerClass: 'bg-orange-500' },
+    { code: '06-In Negotiation',     slug: '06-nego',      localStages: ['negotiating'],                    colorClass: 'bg-amber-100 dark:bg-amber-900/40 text-amber-800 dark:text-amber-200',    headerClass: 'bg-amber-500' },
+    { code: '07-Closed Won',         slug: '07-won',       localStages: ['awarded'],                        colorClass: 'bg-green-100 dark:bg-green-900/40 text-green-800 dark:text-green-200',    headerClass: 'bg-green-600' },
+    { code: '08-Closed Lost',        slug: '08-lost',      localStages: ['lost'],                           colorClass: 'bg-red-100 dark:bg-red-900/40 text-red-800 dark:text-red-200',            headerClass: 'bg-red-500' },
+    { code: '09-Closed No Bid',      slug: '09-nobid',     localStages: ['no_bid'],                         colorClass: 'bg-gray-200 dark:bg-gray-700 text-gray-700 dark:text-gray-300',           headerClass: 'bg-gray-500' },
+    { code: '20-Closed Other',       slug: '20-other',     localStages: ['cancelled'],                      colorClass: 'bg-slate-200 dark:bg-slate-700 text-slate-700 dark:text-slate-300',       headerClass: 'bg-slate-500' },
+    { code: '98-Awarded Contract',   slug: '98-vehicle',   localStages: ['contract_vehicle_won'],           colorClass: 'bg-emerald-100 dark:bg-emerald-900/40 text-emerald-800 dark:text-emerald-200', headerClass: 'bg-emerald-600' },
+    { code: '99-Completed Contract', slug: '99-complete',  localStages: ['contract_vehicle_complete'],      colorClass: 'bg-teal-100 dark:bg-teal-900/40 text-teal-800 dark:text-teal-200',         headerClass: 'bg-teal-600' },
 ];
 
+// pipeline_stage value → column slug
 const STAGE_MAP = {};
 KANBAN_STAGES.forEach(s => s.localStages.forEach(ls => { STAGE_MAP[ls] = s.slug; }));
 
+// column slug → canonical pipeline_stage value (first entry in localStages)
 const SLUG_TO_STAGE = {};
 KANBAN_STAGES.forEach(s => { SLUG_TO_STAGE[s.slug] = s.localStages[0]; });
 
-// Task status → pill color
+// Task status → pill color classes
 const TASK_STATUS_COLORS = {
     'pending':     'bg-gray-200 dark:bg-gray-600 text-gray-700 dark:text-gray-200',
     'in_progress': 'bg-blue-100 dark:bg-blue-900/50 text-blue-700 dark:text-blue-300',
@@ -41,13 +43,11 @@ const TASK_STATUS_COLORS = {
 
 class WorkflowsManager {
     constructor() {
-        this.baseUrl     = '';
+        this.baseUrl       = '';
         this.opportunities = [];
-        this._dragId      = null;
-        this._isDragging  = false;
-        this._allExpanded = false;
-        // Cache: opportunityId → task array (fetched lazily)
-        this._taskCache  = {};
+        this._isDragging   = false;
+        this._allExpanded  = false;
+        this._taskCache    = {};   // opportunityId → task array
     }
 
     async load() {
@@ -68,20 +68,18 @@ class WorkflowsManager {
             const data = await res.json();
             this.opportunities = data.opportunities || data.items || data || [];
         } catch (e) {
-            console.error('Workflows: failed to load opportunities', e);
+            console.error('[Workflows] failed to load opportunities', e);
             this.opportunities = [];
         }
 
-        // Clear task cache on full reload so stale tasks aren't shown
-        this._taskCache = {};
+        this._taskCache   = {};
         this._allExpanded = false;
         this._syncExpandLabel();
-
         this._populateBoard();
     }
 
     // -----------------------------------------------------------------------
-    // Board construction
+    // Board construction (called once when the board container is empty)
     // -----------------------------------------------------------------------
 
     _buildBoard(board) {
@@ -98,33 +96,29 @@ class WorkflowsManager {
             </div>
         `).join('');
 
+        // Attach drop-zone listeners to each column body.
+        // dragover must call preventDefault() to register the column as a valid drop target.
+        // drop reads the opportunity id from dataTransfer and calls _moveCard.
         board.querySelectorAll('.kanban-col-body').forEach(col => {
             col.addEventListener('dragover', (e) => {
                 e.preventDefault();
                 e.dataTransfer.dropEffect = 'move';
-                col.classList.add('ring-2', 'ring-blue-400', 'dark:ring-blue-500', 'bg-blue-50/40', 'dark:bg-blue-900/10');
-                let ph = col.querySelector('.drag-placeholder');
-                if (!ph) {
-                    ph = document.createElement('div');
-                    ph.className = 'drag-placeholder h-14 rounded-lg border-2 border-dashed border-blue-300 dark:border-blue-600 bg-blue-50 dark:bg-blue-900/20 pointer-events-none';
-                }
-                const after = this._dragAfterElement(col, e.clientY);
-                if (after) col.insertBefore(ph, after);
-                else col.appendChild(ph);
+                col.classList.add('ring-2', 'ring-blue-400');
             });
+
             col.addEventListener('dragleave', (e) => {
+                // Only remove highlight when the pointer truly leaves the column
                 if (col.contains(e.relatedTarget)) return;
-                col.classList.remove('ring-2', 'ring-blue-400', 'dark:ring-blue-500', 'bg-blue-50/40', 'dark:bg-blue-900/10');
-                col.querySelector('.drag-placeholder')?.remove();
+                col.classList.remove('ring-2', 'ring-blue-400');
             });
+
             col.addEventListener('drop', (e) => {
                 e.preventDefault();
-                col.classList.remove('ring-2', 'ring-blue-400', 'dark:ring-blue-500', 'bg-blue-50/40', 'dark:bg-blue-900/10');
-                col.querySelector('.drag-placeholder')?.remove();
-                const id = e.dataTransfer.getData('text/plain') || this._dragId;
-                if (id) {
-                    const newStage = SLUG_TO_STAGE[col.dataset.slug];
-                    if (newStage) this._moveCard(id, newStage);
+                col.classList.remove('ring-2', 'ring-blue-400');
+                const oppId    = e.dataTransfer.getData('text/plain');
+                const newStage = SLUG_TO_STAGE[col.dataset.slug];
+                if (oppId && newStage) {
+                    this._moveCard(oppId, newStage);
                 }
             });
         });
@@ -144,8 +138,8 @@ class WorkflowsManager {
     }
 
     _syncExpandLabel() {
-        const label = document.getElementById('expand-all-workflows-label');
-        const btn   = document.getElementById('expand-all-workflows-btn');
+        const label   = document.getElementById('expand-all-workflows-label');
+        const btn     = document.getElementById('expand-all-workflows-btn');
         if (!label || !btn) return;
         label.textContent = this._allExpanded ? 'Collapse All' : 'Expand All';
         const chevron = btn.querySelector('svg');
@@ -168,7 +162,7 @@ class WorkflowsManager {
         KANBAN_STAGES.forEach(s => { colCounts[s.slug] = 0; });
 
         this.opportunities.forEach(opp => {
-            const stage = opp.pipeline_stage || opp.status || 'identified';
+            const stage = opp.pipeline_stage || 'identified';
             const slug  = STAGE_MAP[stage] || '01-qual';
             const col   = document.getElementById(`kcol-${slug}`);
             if (!col) return;
@@ -192,7 +186,7 @@ class WorkflowsManager {
     // -----------------------------------------------------------------------
 
     _buildCard(opp) {
-        const cardId  = opp.id || opp.proposal_id || '';
+        const cardId  = String(opp.id || opp.proposal_id || '');
         const title   = opp.title || opp.name || opp.opportunity_name || 'Untitled';
         const agency  = opp.agency || '';
         const value   = opp.estimated_value != null ? opp.estimated_value : (opp.value != null ? opp.value : null);
@@ -217,12 +211,12 @@ class WorkflowsManager {
         let dueDateStr = '';
         if (dueDate) {
             try {
-                const d = new Date(dueDate);
+                const d        = new Date(dueDate);
                 const diffDays = Math.ceil((d - new Date()) / 86400000);
                 const formatted = d.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
-                const cls = diffDays < 0 ? 'text-red-500 dark:text-red-400'
-                    : diffDays <= 7     ? 'text-orange-500 dark:text-orange-400'
-                                        : 'text-gray-400 dark:text-gray-500';
+                const cls = diffDays < 0   ? 'text-red-500 dark:text-red-400'
+                          : diffDays <= 7  ? 'text-orange-500 dark:text-orange-400'
+                                           : 'text-gray-400 dark:text-gray-500';
                 dueDateStr = `<span class="text-xs ${cls} flex items-center gap-1 flex-shrink-0">
                     <svg class="w-3 h-3" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
@@ -233,18 +227,15 @@ class WorkflowsManager {
             } catch (_) {}
         }
 
-        // ── card header (always visible) ──
+        // ── card header ──
         const header = document.createElement('div');
         header.className = 'p-3';
 
-        // Top row: drag handle + title + expand chevron
         const topRow = document.createElement('div');
         topRow.className = 'flex items-start justify-between gap-2 mb-1';
 
-        // Drag handle (grip dots) — makes the affordance visible
         const dragHandle = document.createElement('div');
         dragHandle.className = 'drag-handle flex-shrink-0 cursor-grab text-gray-300 dark:text-gray-600 hover:text-gray-500 dark:hover:text-gray-400 mt-0.5';
-        dragHandle.title = 'Drag to move stage';
         dragHandle.innerHTML = `<svg class="w-3 h-3" fill="currentColor" viewBox="0 0 10 16">
             <circle cx="3" cy="2" r="1.2"/><circle cx="7" cy="2" r="1.2"/>
             <circle cx="3" cy="7" r="1.2"/><circle cx="7" cy="7" r="1.2"/>
@@ -252,10 +243,9 @@ class WorkflowsManager {
         </svg>`;
 
         const titleEl = document.createElement('div');
-        titleEl.className = 'text-sm font-medium text-gray-900 dark:text-white leading-snug line-clamp-2 flex-1';
+        titleEl.className = 'text-sm font-medium text-gray-900 dark:text-white leading-snug line-clamp-2 flex-1 cursor-pointer';
         titleEl.textContent = title;
 
-        // Chevron button
         const chevronBtn = document.createElement('button');
         chevronBtn.className = 'flex-shrink-0 p-0.5 rounded text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 transition-colors cursor-pointer mt-0.5';
         chevronBtn.title = 'Expand tasks';
@@ -268,7 +258,6 @@ class WorkflowsManager {
         topRow.appendChild(chevronBtn);
         header.appendChild(topRow);
 
-        // Agency + meta row
         if (agency) {
             const agencyEl = document.createElement('div');
             agencyEl.className = 'text-xs text-gray-500 dark:text-gray-400 mb-1.5 truncate';
@@ -286,7 +275,6 @@ class WorkflowsManager {
             header.appendChild(metaRow);
         }
 
-        // ── tasks panel (collapsed by default) ──
         const tasksPanel = document.createElement('div');
         tasksPanel.className = 'kanban-tasks-panel hidden border-t border-gray-100 dark:border-gray-600 px-3 pt-2 pb-3';
         tasksPanel.innerHTML = '<div class="text-xs text-gray-400 dark:text-gray-500 italic">Loading tasks…</div>';
@@ -294,30 +282,29 @@ class WorkflowsManager {
         card.appendChild(header);
         card.appendChild(tasksPanel);
 
-        // ── drag events on card (dragstart must be on the draggable element itself) ──
+        // ── drag-and-drop ──
+        // dragstart fires on the element with draggable=true (card), not its children.
         card.addEventListener('dragstart', (e) => {
-            this._dragId     = cardId;
-            this._isDragging = true;
             e.dataTransfer.setData('text/plain', cardId);
             e.dataTransfer.effectAllowed = 'move';
-            card.classList.add('opacity-50');
+            this._isDragging = true;
+            // Brief delay so the browser captures the snapshot before opacity changes
+            requestAnimationFrame(() => card.classList.add('opacity-50'));
         });
+
         card.addEventListener('dragend', () => {
-            this._dragId = null;
             card.classList.remove('opacity-50');
-            // Defer reset so drop-triggered click handlers see the flag
             setTimeout(() => { this._isDragging = false; }, 0);
         });
 
-        // ── chevron: toggle expand ──
+        // ── expand / collapse ──
         chevronBtn.addEventListener('click', (e) => {
-            e.stopPropagation(); // don't fire the card navigate click
-            const expanded = tasksPanel.classList.contains('hidden');
-            this._setCardExpanded(card, cardId, expanded);
+            e.stopPropagation();
+            const expand = tasksPanel.classList.contains('hidden');
+            this._setCardExpanded(card, cardId, expand);
         });
 
-        // ── card body click: navigate to detail ──
-        titleEl.style.cursor = 'pointer';
+        // ── navigate to detail (guard against clicks during drag) ──
         titleEl.addEventListener('click', (e) => {
             e.stopPropagation();
             if (this._isDragging) return;
@@ -325,8 +312,8 @@ class WorkflowsManager {
         });
         header.addEventListener('click', (e) => {
             if (this._isDragging) return;
-            if (e.target === chevronBtn || chevronBtn.contains(e.target)) return;
-            if (e.target === dragHandle || dragHandle.contains(e.target)) return;
+            if (chevronBtn.contains(e.target)) return;
+            if (dragHandle.contains(e.target)) return;
             this._navigateToDetail(cardId);
         });
 
@@ -338,12 +325,9 @@ class WorkflowsManager {
     // -----------------------------------------------------------------------
 
     async _setCardExpanded(card, opportunityId, expand) {
-        const panel     = card.querySelector('.kanban-tasks-panel');
-        const chevronSvg = card.querySelector('.kanban-tasks-panel ~ * svg, button svg');
-        // Find the chevron inside the card header
-        const btn = card.querySelector('button');
-        const svg = btn ? btn.querySelector('svg') : null;
-
+        const panel = card.querySelector('.kanban-tasks-panel');
+        const btn   = card.querySelector('button');
+        const svg   = btn ? btn.querySelector('svg') : null;
         if (!panel) return;
 
         if (expand) {
@@ -359,18 +343,15 @@ class WorkflowsManager {
     }
 
     async _loadTasksIntoPanel(panel, opportunityId) {
-        // Use cache if available
         if (this._taskCache[opportunityId]) {
             this._renderTaskPills(panel, this._taskCache[opportunityId]);
             return;
         }
-
         panel.innerHTML = '<div class="text-xs text-gray-400 dark:text-gray-500 italic">Loading tasks…</div>';
-
         try {
             const res = await fetch(`${this.baseUrl}/api/opportunities/${opportunityId}/tasks`);
             if (res.ok) {
-                const data = await res.json();
+                const data  = await res.json();
                 const tasks = data.tasks || [];
                 this._taskCache[opportunityId] = tasks;
                 this._renderTaskPills(panel, tasks);
@@ -387,30 +368,26 @@ class WorkflowsManager {
             panel.innerHTML = '<div class="text-xs text-gray-400 dark:text-gray-500 italic">No tasks.</div>';
             return;
         }
-
         panel.innerHTML = '';
         const wrap = document.createElement('div');
         wrap.className = 'flex flex-wrap gap-1.5';
-
         tasks.forEach(task => {
-            const pill = document.createElement('span');
+            const pill     = document.createElement('span');
             const colorCls = TASK_STATUS_COLORS[task.status] || TASK_STATUS_COLORS['pending'];
             pill.className = `inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-medium ${colorCls}`;
-            pill.title = `${task.status}${task.progress ? ' · ' + task.progress + '%' : ''}`;
+            pill.title     = `${task.status}${task.progress ? ' · ' + task.progress + '%' : ''}`;
 
-            // Status dot
             const dot = document.createElement('span');
             dot.className = 'w-1.5 h-1.5 rounded-full flex-shrink-0 ' + this._statusDotColor(task.status);
 
-            const label = document.createElement('span');
-            label.className = 'truncate max-w-[9rem]';
-            label.textContent = task.name;
+            const lbl = document.createElement('span');
+            lbl.className   = 'truncate max-w-[9rem]';
+            lbl.textContent = task.name;
 
             pill.appendChild(dot);
-            pill.appendChild(label);
+            pill.appendChild(lbl);
             wrap.appendChild(pill);
         });
-
         panel.appendChild(wrap);
     }
 
@@ -426,58 +403,33 @@ class WorkflowsManager {
     }
 
     // -----------------------------------------------------------------------
-    // Opportunity detail drawer — see js/workflow-drawer.js for implementation
-    // The mixin in workflow-drawer.js overrides _navigateToDetail and adds
-    // _openDrawer, _closeDrawer, _populateDrawer, _loadDrawerTasks,
-    // _renderDrawerTasks, _stageLabel, and _formatDue.
+    // Opportunity detail drawer — implemented in js/workflow-drawer.js (mixin)
     // -----------------------------------------------------------------------
-
-    // Placeholder: overridden by workflow-drawer.js mixin at runtime.
     _navigateToDetail(cardId) { void cardId; }
 
     // -----------------------------------------------------------------------
-    // Drag-and-drop helpers
-    // -----------------------------------------------------------------------
-
-    /** Return the card element the dragged card should be inserted before, or null to append. */
-    _dragAfterElement(col, mouseY) {
-        const cards = [...col.querySelectorAll('.kanban-card:not(.opacity-50)')];
-        return cards.reduce((closest, card) => {
-            const { top, height } = card.getBoundingClientRect();
-            const offset = mouseY - top - height / 2;
-            return offset < 0 && offset > closest.offset
-                ? { offset, el: card }
-                : closest;
-        }, { offset: Number.NEGATIVE_INFINITY, el: null }).el;
-    }
-
-    // -----------------------------------------------------------------------
-    // Drag-and-drop stage move
+    // Stage move — PUT /api/opportunities/{id} with pipeline_stage only
     // -----------------------------------------------------------------------
 
     async _moveCard(opportunityId, newPipelineStage) {
         try {
-            const response = await fetch(`${this.baseUrl}/api/opportunities/${opportunityId}`, {
-                method: 'POST',
+            const res = await fetch(`${this.baseUrl}/api/opportunities/${opportunityId}`, {
+                method: 'PUT',
                 headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({
-                    pipeline_stage: newPipelineStage,
-                    status: newPipelineStage,
-                }),
+                body: JSON.stringify({ pipeline_stage: newPipelineStage }),
             });
 
-            if (response.ok) {
-                const opp = this.opportunities.find(o => (o.id || o.proposal_id) === opportunityId);
+            if (res.ok) {
+                // Update in-memory record so _populateBoard reflects the new stage immediately
+                const opp = this.opportunities.find(o => String(o.id) === String(opportunityId));
                 if (opp) opp.pipeline_stage = newPipelineStage;
                 this._populateBoard();
-                if (window.app?.opportunitiesManager) {
-                    window.app.opportunitiesManager.reloadCurrentOpportunity(opportunityId);
-                }
             } else {
-                console.error('Workflows: failed to move card', opportunityId, newPipelineStage);
+                const body = await res.json().catch(() => ({}));
+                console.error('[Workflows] move failed:', res.status, body);
             }
         } catch (e) {
-            console.error('Workflows: error moving card', e);
+            console.error('[Workflows] move error:', e);
         }
     }
 

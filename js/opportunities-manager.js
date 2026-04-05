@@ -1,8 +1,7 @@
 // Opportunities Manager
 // Pipeline stage definitions — must match KANBAN_STAGES in workflows.js
 const PIPELINE_STAGE_OPTIONS = [
-    { value: 'identified',               label: '01 — Qualification (Identified)' },
-    { value: 'qualifying',               label: '01 — Qualification (Qualifying)' },
+    { value: 'identified',               label: '01 — Qualification' },
     { value: 'long_lead',                label: '02 — Long Lead' },
     { value: 'bid_decision',             label: '03 — Bid Decision' },
     { value: 'active',                   label: '04 — In Progress' },
@@ -376,7 +375,6 @@ class OpportunitiesManager {
                 body: JSON.stringify({
                     name, description,
                     pipeline_stage: pipelineStage,
-                    status: pipelineStage,
                     priority, value, tags,
                 })
             });
@@ -567,7 +565,6 @@ class OpportunitiesManager {
                 body: JSON.stringify({
                     name, description,
                     pipeline_stage: pipelineStage,
-                    status: pipelineStage,
                     priority, value, tags,
                 })
             });

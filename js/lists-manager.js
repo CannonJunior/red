@@ -46,6 +46,14 @@ class ListsManager {
                 countKey: 'items',
                 viewable: true,
             },
+            {
+                id: 'todos',
+                name: 'TODO Lists',
+                description: 'Task and checklist collections',
+                type: 'builtin',
+                apiEndpoint: '/api/todos',
+                countKey: 'lists',
+            },
         ];
 
         this._visibilityKey = 'lists_visibility';
@@ -81,6 +89,44 @@ class ListsManager {
         const v = this._visibility();
         v[id] = visible;
         localStorage.setItem(this._visibilityKey, JSON.stringify(v));
+        this._applySidebarVisibility(id, visible);
+    }
+
+    /**
+     * Sidebar element selectors keyed by list id.
+     * Each entry is an array of CSS selectors whose elements are shown/hidden.
+     */
+    _sidebarSelectors() {
+        return {
+            'opportunities':  ['.sub-nav-item[data-list="opportunities"]', '#opportunities-list'],
+            'career-analysis': ['.sub-nav-item[data-list="career-analysis"]'],
+            'todos':           ['.sub-nav-item[data-list="todos"]',         '#todo-lists-dropdown'],
+        };
+    }
+
+    _applySidebarVisibility(id, visible) {
+        const map = this._sidebarSelectors();
+        const selectors = map[id];
+        if (!selectors) return;
+        selectors.forEach(sel => {
+            document.querySelectorAll(sel).forEach(el => {
+                el.style.display = visible ? '' : 'none';
+            });
+        });
+    }
+
+    /** Apply stored visibility to all known sidebar items on load. */
+    _syncSidebarVisibility() {
+        const vis = this._visibility();
+        const map = this._sidebarSelectors();
+        Object.entries(map).forEach(([id, selectors]) => {
+            const visible = vis[id] !== false; // default visible
+            selectors.forEach(sel => {
+                document.querySelectorAll(sel).forEach(el => {
+                    el.style.display = visible ? '' : 'none';
+                });
+            });
+        });
     }
 
     /** Fetch item count for a list. Returns null on failure. */
@@ -186,6 +232,7 @@ class ListsManager {
         }).join('');
 
         this._bindTableEvents(lists);
+        this._syncSidebarVisibility();
 
         // Async-load counts after rows are in DOM
         lists.forEach(async list => {
