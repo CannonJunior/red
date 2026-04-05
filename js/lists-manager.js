@@ -47,6 +47,24 @@ class ListsManager {
                 viewable: true,
             },
             {
+                id: 'hotwash',
+                name: 'Hotwash',
+                description: 'Post-action reviews — auto-created when opportunity reaches 06/07/08/09 stages',
+                type: 'builtin',
+                apiEndpoint: '/api/hotwash-items',
+                countKey: 'items',
+                viewable: true,
+            },
+            {
+                id: 'tasks',
+                name: 'Tasks',
+                description: 'All tasks across all opportunities — auto-created from pipeline events',
+                type: 'builtin',
+                apiEndpoint: '/api/all-tasks',
+                countKey: 'tasks',
+                viewable: true,
+            },
+            {
                 id: 'todos',
                 name: 'TODO Lists',
                 description: 'Task and checklist collections',
@@ -100,6 +118,10 @@ class ListsManager {
         return {
             'opportunities':  ['.sub-nav-item[data-list="opportunities"]', '#opportunities-list'],
             'career-analysis': ['.sub-nav-item[data-list="career-analysis"]'],
+            'proposals':       ['.sub-nav-item[data-list="proposals"]'],
+            'bnb':             ['.sub-nav-item[data-list="bnb"]'],
+            'hotwash':         ['.sub-nav-item[data-list="hotwash"]'],
+            'tasks':           ['.sub-nav-item[data-list="tasks"]'],
             'todos':           ['.sub-nav-item[data-list="todos"]',         '#todo-lists-dropdown'],
         };
     }

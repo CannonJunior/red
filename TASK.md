@@ -12,6 +12,7 @@
 | Agent system — MCP server + Ollama runtime | 2026-01-07 | See agent_system/ |
 | PLANNING.md — Proposal Workflow Architecture | 2026-03-28 | See PLANNING.md |
 | Shipley Capture Intelligence — full feature set | 2026-04-01 | capture_api.py, server/routes/capture.py, js/capture.js, js/capture-intel.js; Win Strategy/PTW/Contacts/Competitors/Activities tabs |
+| Auto-task creation + Pipeline Tasks settings + All-Tasks list | 2026-04-04 | config/tracking_task_templates.json; server/routes/settings_api.py; /api/settings/tracking-tasks GET/PUT; /api/all-tasks GET; js/tasks-list.js; js/pipeline-tasks-settings.js; Tasks sidebar item in Lists |
 
 ---
 

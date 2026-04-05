@@ -1,11 +1,17 @@
 """Opportunities route handlers for business opportunity tracking."""
 
+import json
+from datetime import datetime, timedelta
+from pathlib import Path
+
 from debug_logger import debug_log
 from server.request_models import (
     OpportunityCreateRequest,
     OpportunityUpdateRequest,
     validate_or_error,
 )
+
+_TEMPLATES_PATH = Path(__file__).parent.parent.parent / 'config' / 'tracking_task_templates.json'
 
 try:
     from opportunities_api import (
@@ -44,8 +50,60 @@ except ImportError:
     _TRACKING_AVAILABLE = False
 
 
+_HOTWASH_STAGES = {'negotiating', 'awarded', 'lost', 'no_bid'}
+
+
+def _get_task_template(trigger: str) -> dict | None:
+    """
+    Load the task template for a given trigger type from config.
+
+    Args:
+        trigger (str): One of 'proposal', 'bnb', 'hotwash'.
+
+    Returns:
+        dict: Template dict if enabled, else None.
+    """
+    try:
+        data = json.loads(_TEMPLATES_PATH.read_text()) if _TEMPLATES_PATH.exists() else {}
+        templates = data.get('templates', [])
+        return next(
+            (t for t in templates if t.get('trigger') == trigger and t.get('enabled', True)),
+            None,
+        )
+    except Exception:
+        return None
+
+
+def _create_tracking_task(opportunity_id: str, trigger: str) -> None:
+    """
+    Create an auto-task for an opportunity based on a tracking event template.
+
+    Args:
+        opportunity_id (str): The opportunity to attach the task to.
+        trigger (str): Template trigger key ('proposal', 'bnb', 'hotwash').
+    """
+    if not OPPORTUNITIES_AVAILABLE:
+        return
+    template = _get_task_template(trigger)
+    if not template:
+        return
+    try:
+        today = datetime.now()
+        data = {
+            'name': template['task_name'],
+            'description': template.get('task_description', ''),
+            'start_date': today.strftime('%Y-%m-%d'),
+            'end_date': (today + timedelta(days=14)).strftime('%Y-%m-%d'),
+        }
+        result = handle_tasks_create_request(opportunity_id, data)
+        if result.get('status') == 'success':
+            print(f"✅ Auto-task created: '{template['task_name']}' for {opportunity_id}")
+    except Exception as e:
+        print(f"⚠️  Failed to create tracking task for {opportunity_id}: {e}")
+
+
 def _trigger_tracking(opportunity_id: str, result: dict) -> None:
-    """Auto-create Proposal or BNB item when an opportunity enters a trigger stage."""
+    """Auto-create Proposal, BNB, or Hotwash item on stage change."""
     if not _TRACKING_AVAILABLE:
         return
     opp = result.get('opportunity', {})
@@ -53,9 +111,17 @@ def _trigger_tracking(opportunity_id: str, result: dict) -> None:
     name = opp.get('name', opportunity_id)
     try:
         if stage == 'active':
-            _get_tm().ensure_proposal_item(opportunity_id, name)
+            tracking_result = _get_tm().ensure_proposal_item(opportunity_id, name)
+            if tracking_result.get('status') == 'success':
+                _create_tracking_task(opportunity_id, 'proposal')
         elif stage == 'bid_decision':
-            _get_tm().ensure_bnb_item(opportunity_id, name)
+            tracking_result = _get_tm().ensure_bnb_item(opportunity_id, name)
+            if tracking_result.get('status') == 'success':
+                _create_tracking_task(opportunity_id, 'bnb')
+        elif stage in _HOTWASH_STAGES:
+            tracking_result = _get_tm().ensure_hotwash_item(opportunity_id, name, trigger_stage=stage)
+            if tracking_result.get('status') == 'success':
+                _create_tracking_task(opportunity_id, 'hotwash')
     except Exception as e:
         print(f"⚠️  Tracking trigger failed for {opportunity_id}: {e}")
 

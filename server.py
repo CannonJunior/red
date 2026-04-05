@@ -190,12 +190,22 @@ try:
         handle_bnb_items_create_api as handle_bnb_items_create_route,
         handle_bnb_item_update_api as handle_bnb_item_update_route,
         handle_bnb_item_delete_api as handle_bnb_item_delete_route,
+        handle_hotwash_items_list_api as handle_hotwash_items_list_route,
+        handle_hotwash_items_create_api as handle_hotwash_items_create_route,
+        handle_hotwash_item_update_api as handle_hotwash_item_update_route,
+        handle_hotwash_item_delete_api as handle_hotwash_item_delete_route,
+        handle_all_tasks_list_api as handle_all_tasks_list_route,
     )
     TRACKING_AVAILABLE = True
     print("✅ Tracking lists loaded successfully")
 except ImportError as e:
     TRACKING_AVAILABLE = False
     print(f"⚠️  Tracking lists not available: {e}")
+
+from server.routes.settings_api import (
+    handle_tracking_tasks_settings_get as handle_tracking_tasks_get_route,
+    handle_tracking_tasks_settings_put as handle_tracking_tasks_put_route,
+)
 
 from server.routes.source_tree import handle_source_tree_api as handle_source_tree_route
 
@@ -395,6 +405,9 @@ def _build_router() -> Router:
     # Tracking lists
     r.add('GET',  lambda p: p == '/api/proposal-items' and TRACKING_AVAILABLE,  'handle_proposal_items_list_api')
     r.add('GET',  lambda p: p == '/api/bnb-items' and TRACKING_AVAILABLE,       'handle_bnb_items_list_api')
+    r.add('GET',  lambda p: p == '/api/hotwash-items' and TRACKING_AVAILABLE,   'handle_hotwash_items_list_api')
+    r.add('GET',  lambda p: p == '/api/all-tasks' and TRACKING_AVAILABLE,      'handle_all_tasks_list_api')
+    r.add('GET',  lambda p: p == '/api/settings/tracking-tasks',               'handle_tracking_tasks_settings_get')
 
     # ---- POST ---------------------------------------------------------------
     r.add('POST', lambda p: p == '/api/chat',                                 'handle_chat_api')
@@ -451,6 +464,7 @@ def _build_router() -> Router:
     r.add('POST', lambda p: p.startswith('/api/opportunities/'),              'handle_opportunities_update_api')
     r.add('POST', lambda p: p == '/api/proposal-items' and TRACKING_AVAILABLE,  'handle_proposal_items_create_api')
     r.add('POST', lambda p: p == '/api/bnb-items' and TRACKING_AVAILABLE,       'handle_bnb_items_create_api')
+    r.add('POST', lambda p: p == '/api/hotwash-items' and TRACKING_AVAILABLE,   'handle_hotwash_items_create_api')
     r.add('POST', lambda p: p == '/api/proposals' and PROPOSALS_AVAILABLE,                   'handle_proposals_create_api')
     r.add('POST', lambda p: p.startswith('/api/proposals/') and p.endswith('/advance') and PROPOSALS_AVAILABLE, 'handle_proposals_advance_api')
     r.add('POST', lambda p: p.startswith('/api/proposals/') and p.endswith('/folders') and PROPOSALS_AVAILABLE, 'handle_proposals_folders_api')
@@ -476,6 +490,7 @@ def _build_router() -> Router:
     r.add('DELETE', lambda p: p.startswith('/api/opportunities/'),            'handle_opportunities_delete_api')
     r.add('DELETE', lambda p: p.startswith('/api/proposal-items/') and TRACKING_AVAILABLE, 'handle_proposal_item_delete_api')
     r.add('DELETE', lambda p: p.startswith('/api/bnb-items/') and TRACKING_AVAILABLE,      'handle_bnb_item_delete_api')
+    r.add('DELETE', lambda p: p.startswith('/api/hotwash-items/') and TRACKING_AVAILABLE,  'handle_hotwash_item_delete_api')
     r.add('DELETE', lambda p: p.startswith('/api/proposals/') and PROPOSALS_AVAILABLE,       'handle_proposals_delete_api')
 
     # ---- PUT ----------------------------------------------------------------
@@ -494,6 +509,8 @@ def _build_router() -> Router:
     r.add('PUT', lambda p: p.startswith('/api/opportunities/'),               'handle_opportunities_update_api')
     r.add('PUT', lambda p: p.startswith('/api/proposal-items/') and TRACKING_AVAILABLE, 'handle_proposal_item_update_api')
     r.add('PUT', lambda p: p.startswith('/api/bnb-items/') and TRACKING_AVAILABLE,      'handle_bnb_item_update_api')
+    r.add('PUT', lambda p: p.startswith('/api/hotwash-items/') and TRACKING_AVAILABLE,  'handle_hotwash_item_update_api')
+    r.add('PUT', lambda p: p == '/api/settings/tracking-tasks',                'handle_tracking_tasks_settings_put')
     r.add('PUT', lambda p: p.startswith('/api/proposals/') and PROPOSALS_AVAILABLE,          'handle_proposals_update_api')
 
     return r
@@ -1627,6 +1644,34 @@ The filled PowerPoint presentation has been saved to `{result['output_file']}`.
     def handle_bnb_item_delete_api(self):
         """DELETE /api/bnb-items/{id}"""
         handle_bnb_item_delete_route(self)
+
+    def handle_hotwash_items_list_api(self):
+        """GET /api/hotwash-items"""
+        handle_hotwash_items_list_route(self)
+
+    def handle_hotwash_items_create_api(self):
+        """POST /api/hotwash-items"""
+        handle_hotwash_items_create_route(self)
+
+    def handle_hotwash_item_update_api(self):
+        """PUT /api/hotwash-items/{id}"""
+        handle_hotwash_item_update_route(self)
+
+    def handle_hotwash_item_delete_api(self):
+        """DELETE /api/hotwash-items/{id}"""
+        handle_hotwash_item_delete_route(self)
+
+    def handle_all_tasks_list_api(self):
+        """GET /api/all-tasks"""
+        handle_all_tasks_list_route(self)
+
+    def handle_tracking_tasks_settings_get(self):
+        """GET /api/settings/tracking-tasks"""
+        handle_tracking_tasks_get_route(self)
+
+    def handle_tracking_tasks_settings_put(self):
+        """PUT /api/settings/tracking-tasks"""
+        handle_tracking_tasks_put_route(self)
 
     # TODO API handlers
     def handle_users_list_api(self):

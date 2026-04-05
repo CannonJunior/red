@@ -71,6 +71,12 @@ class Navigation {
                     return;
                 }
 
+                if (listType === 'proposals' || listType === 'bnb' || listType === 'hotwash' || listType === 'tasks') {
+                    const names = { proposals: 'Proposals', bnb: 'Bid No-Bid', hotwash: 'Hotwash', tasks: 'Tasks' };
+                    this._showTrackingPanel(listType, names[listType]);
+                    return;
+                }
+
                 if (item.classList.contains('expandable-nav-item')) {
                     this.toggleExpandableNavItem(item, listType);
                     if (listType === 'todos') {
@@ -105,6 +111,21 @@ class Navigation {
         const pageTitle = document.getElementById('page-title');
         if (pageTitle) {
             pageTitle.textContent = 'Career-Monster';
+        }
+    }
+
+    _showTrackingPanel(listId, listName) {
+        // Show the lists area but hide the registry table and header —
+        // only the tracking items panel should be visible.
+        this.navigateTo('lists-interface');
+        document.getElementById('lists-registry-header')?.classList.add('hidden');
+        document.getElementById('lists-registry-section')?.classList.add('hidden');
+        const pageTitle = document.getElementById('page-title');
+        if (pageTitle) pageTitle.textContent = listName;
+        if (listId === 'tasks') {
+            if (window.tasksList) window.tasksList.openPanel(listId, listName);
+        } else {
+            if (window.trackingLists) window.trackingLists.openPanel(listId, listName);
         }
     }
 
@@ -524,6 +545,8 @@ class Navigation {
                 break;
             case 'lists-interface':
                 document.getElementById('lists-interface-area')?.classList.remove('hidden');
+                document.getElementById('lists-registry-header')?.classList.remove('hidden');
+                document.getElementById('lists-registry-section')?.classList.remove('hidden');
                 pageTitle.textContent = 'Lists';
                 this.currentPage = 'lists-interface';
                 if (window.listsManager) window.listsManager.load();

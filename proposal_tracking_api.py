@@ -1,10 +1,11 @@
-"""Proposal and Bid-No-Bid list tracking data layer.
+"""Proposal, Bid-No-Bid, and Hotwash list tracking data layer.
 
 Tables (in search_system.db alongside capture tables):
   proposal_items  — one row per opportunity that enters 04-In Progress
   bnb_items       — one row per opportunity that enters 03-Bid Decision
+  hotwash_items   — one row per opportunity that enters 06/07/08/09 stages
 
-Both tables are auto-populated by the opportunity stage-change trigger
+All tables are auto-populated by the opportunity stage-change trigger
 in server/routes/opportunities.py, and are also directly writable via
 the tracking HTTP API.
 """
@@ -54,7 +55,7 @@ class TrackingManager:
         return _plain()
 
     def _init_database(self):
-        """Create proposal_items and bnb_items tables if they don't exist."""
+        """Create proposal_items, bnb_items, and hotwash_items tables if they don't exist."""
         conn = sqlite3.connect(self.db_path)
         c = conn.cursor()
         c.executescript("""
@@ -89,6 +90,23 @@ class TrackingManager:
             );
             CREATE INDEX IF NOT EXISTS idx_bnb_items_opp
                 ON bnb_items(opportunity_id);
+
+            CREATE TABLE IF NOT EXISTS hotwash_items (
+                id TEXT PRIMARY KEY,
+                opportunity_id TEXT NOT NULL UNIQUE,
+                opportunity_name TEXT NOT NULL,
+                trigger_stage TEXT,
+                conducted_date TEXT,
+                participants TEXT,
+                outcome_summary TEXT,
+                lessons_learned TEXT,
+                action_items TEXT,
+                notes TEXT,
+                created_at TEXT NOT NULL,
+                updated_at TEXT NOT NULL
+            );
+            CREATE INDEX IF NOT EXISTS idx_hotwash_items_opp
+                ON hotwash_items(opportunity_id);
         """)
         conn.commit()
         conn.close()
@@ -309,6 +327,122 @@ class TrackingManager:
             'rationale': r['rationale'] or '',
             'score': r['score'],
             'decision_date': r['decision_date'] or '',
+            'created_at': r['created_at'],
+            'updated_at': r['updated_at'],
+        }
+
+
+    # -------------------------------------------------------------------------
+    # Hotwash Items
+    # -------------------------------------------------------------------------
+
+    def list_hotwash_items(self) -> Dict:
+        """Return all hotwash items ordered by created_at desc."""
+        try:
+            with self._connect() as conn:
+                rows = conn.cursor().execute(
+                    "SELECT * FROM hotwash_items ORDER BY created_at DESC"
+                ).fetchall()
+            return {'status': 'success', 'items': [self._hwd(r) for r in rows]}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+
+    def create_hotwash_item(self, data: Dict) -> Dict:
+        """Create a hotwash item (manual or auto-triggered)."""
+        try:
+            hid, now = str(uuid.uuid4()), datetime.now().isoformat()
+            opp_id = data.get('opportunity_id', '')
+            with self._connect() as conn:
+                conn.cursor().execute(
+                    """INSERT INTO hotwash_items
+                       (id, opportunity_id, opportunity_name, trigger_stage,
+                        conducted_date, participants, outcome_summary,
+                        lessons_learned, action_items, notes,
+                        created_at, updated_at)
+                       VALUES (?,?,?,?,?,?,?,?,?,?,?,?)""",
+                    (hid, opp_id, data.get('opportunity_name', ''),
+                     data.get('trigger_stage', ''),
+                     data.get('conducted_date', ''),
+                     data.get('participants', ''),
+                     data.get('outcome_summary', ''),
+                     data.get('lessons_learned', ''),
+                     data.get('action_items', ''),
+                     data.get('notes', ''),
+                     now, now))
+                conn.commit()
+                row = conn.cursor().execute(
+                    "SELECT * FROM hotwash_items WHERE id=?", (hid,)
+                ).fetchone()
+            return {'status': 'success', 'item': self._hwd(row)}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+
+    def update_hotwash_item(self, item_id: str, data: Dict) -> Dict:
+        """Update fields on a hotwash item."""
+        try:
+            now = datetime.now().isoformat()
+            sets, vals = [], []
+            for f in ['opportunity_name', 'trigger_stage', 'conducted_date',
+                      'participants', 'outcome_summary', 'lessons_learned',
+                      'action_items', 'notes']:
+                if f in data:
+                    sets.append(f"{f}=?")
+                    vals.append(data[f])
+            sets.append("updated_at=?")
+            vals.extend([now, item_id])
+            with self._connect() as conn:
+                conn.cursor().execute(
+                    f"UPDATE hotwash_items SET {','.join(sets)} WHERE id=?", vals)
+                conn.commit()
+                row = conn.cursor().execute(
+                    "SELECT * FROM hotwash_items WHERE id=?", (item_id,)
+                ).fetchone()
+            return {'status': 'success', 'item': self._hwd(row) if row else None}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+
+    def delete_hotwash_item(self, item_id: str) -> Dict:
+        """Delete a hotwash item."""
+        try:
+            with self._connect() as conn:
+                conn.cursor().execute(
+                    "DELETE FROM hotwash_items WHERE id=?", (item_id,))
+                conn.commit()
+            return {'status': 'success'}
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+
+    def ensure_hotwash_item(self, opportunity_id: str, opportunity_name: str,
+                             trigger_stage: str = '') -> Dict:
+        """Create a hotwash item for this opportunity if one doesn't exist yet."""
+        try:
+            with self._connect() as conn:
+                exists = conn.cursor().execute(
+                    "SELECT id FROM hotwash_items WHERE opportunity_id=?",
+                    (opportunity_id,)).fetchone()
+            if exists:
+                return {'status': 'exists'}
+            return self.create_hotwash_item({
+                'opportunity_id': opportunity_id,
+                'opportunity_name': opportunity_name,
+                'trigger_stage': trigger_stage,
+            })
+        except Exception as e:
+            return {'status': 'error', 'message': str(e)}
+
+    def _hwd(self, r) -> Dict:
+        """Serialize a hotwash_items row."""
+        return {
+            'id': r['id'],
+            'opportunity_id': r['opportunity_id'],
+            'opportunity_name': r['opportunity_name'] or '',
+            'trigger_stage': r['trigger_stage'] or '',
+            'conducted_date': r['conducted_date'] or '',
+            'participants': r['participants'] or '',
+            'outcome_summary': r['outcome_summary'] or '',
+            'lessons_learned': r['lessons_learned'] or '',
+            'action_items': r['action_items'] or '',
+            'notes': r['notes'] or '',
             'created_at': r['created_at'],
             'updated_at': r['updated_at'],
         }

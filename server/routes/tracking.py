@@ -9,6 +9,7 @@ Routes:
   POST   /api/bnb-items                   create a BNB item manually
   PUT    /api/bnb-items/{id}              update a BNB item
   DELETE /api/bnb-items/{id}             delete a BNB item
+  GET    /api/all-tasks                   list all tasks across all opportunities
 """
 
 try:
@@ -119,5 +120,85 @@ def handle_bnb_item_delete_api(handler):
     try:
         handler.send_json_response(
             get_tracking_manager().delete_bnb_item(_item_id(handler.path)))
+    except Exception as e:
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+# ---- Hotwash Items -----------------------------------------------------------
+
+def handle_hotwash_items_list_api(handler):
+    """GET /api/hotwash-items"""
+    if not TRACKING_AVAILABLE:
+        return _unavailable(handler)
+    try:
+        handler.send_json_response(get_tracking_manager().list_hotwash_items())
+    except Exception as e:
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+def handle_hotwash_items_create_api(handler):
+    """POST /api/hotwash-items"""
+    if not TRACKING_AVAILABLE:
+        return _unavailable(handler)
+    try:
+        data = handler.get_request_body() or {}
+        result = get_tracking_manager().create_hotwash_item(data)
+        status = 201 if result.get('status') == 'success' else 400
+        handler.send_json_response(result, status)
+    except Exception as e:
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+def handle_hotwash_item_update_api(handler):
+    """PUT /api/hotwash-items/{id}"""
+    if not TRACKING_AVAILABLE:
+        return _unavailable(handler)
+    try:
+        data = handler.get_request_body() or {}
+        result = get_tracking_manager().update_hotwash_item(_item_id(handler.path), data)
+        handler.send_json_response(result)
+    except Exception as e:
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+def handle_hotwash_item_delete_api(handler):
+    """DELETE /api/hotwash-items/{id}"""
+    if not TRACKING_AVAILABLE:
+        return _unavailable(handler)
+    try:
+        handler.send_json_response(
+            get_tracking_manager().delete_hotwash_item(_item_id(handler.path)))
+    except Exception as e:
+        handler.send_json_response({'error': str(e)}, 500)
+
+
+# ---- All Tasks (cross-opportunity) -------------------------------------------
+
+def handle_all_tasks_list_api(handler):
+    """
+    GET /api/all-tasks — list all tasks across all opportunities.
+
+    Queries search_system.db directly to avoid extending the 993-line
+    opportunities_api.py beyond maintainable size.
+
+    Args:
+        handler: HTTP request handler instance.
+    """
+    import sqlite3
+    try:
+        conn = sqlite3.connect('search_system.db')
+        conn.row_factory = sqlite3.Row
+        cursor = conn.execute("""
+            SELECT t.id, t.opportunity_id, t.name, t.description,
+                   t.start_date, t.end_date, t.status, t.progress,
+                   t.assigned_to, t.created_at, t.updated_at,
+                   o.name AS opportunity_name
+            FROM tasks t
+            LEFT JOIN opportunities o ON t.opportunity_id = o.id
+            ORDER BY t.created_at DESC
+        """)
+        tasks = [dict(row) for row in cursor.fetchall()]
+        conn.close()
+        handler.send_json_response({'status': 'success', 'tasks': tasks, 'count': len(tasks)})
     except Exception as e:
         handler.send_json_response({'error': str(e)}, 500)
