@@ -21,13 +21,13 @@ Usage:
     self.send_error(404, f"Not found: {self.path}")
 """
 
-from typing import Callable, List, NamedTuple
+from typing import Callable, List, NamedTuple, Union
 
 
 class _Route(NamedTuple):
     method: str
     match: Callable[[str], bool]
-    action: str  # name of zero-arg method on the handler instance
+    action: Union[str, Callable]  # method name OR callable(handler)
 
 
 class Router:
@@ -36,14 +36,15 @@ class Router:
     def __init__(self) -> None:
         self._routes: List[_Route] = []
 
-    def add(self, method: str, match: Callable[[str], bool], action: str) -> None:
+    def add(self, method: str, match: Callable[[str], bool], action: Union[str, Callable]) -> None:
         """
         Register a route.
 
         Args:
             method: HTTP verb ('GET', 'POST', 'DELETE', 'PUT').
             match: Callable that returns True when the path matches.
-            action: Zero-argument method name on the handler instance.
+            action: Zero-argument method name on the handler instance,
+                    OR a callable(handler) that handles the request directly.
         """
         self._routes.append(_Route(method.upper(), match, action))
 
@@ -64,6 +65,9 @@ class Router:
         bare = path.split('?')[0]
         for route in self._routes:
             if route.method == method and route.match(bare):
-                getattr(handler, route.action)()
+                if callable(route.action) and not isinstance(route.action, str):
+                    route.action(handler)
+                else:
+                    getattr(handler, route.action)()
                 return True
         return False

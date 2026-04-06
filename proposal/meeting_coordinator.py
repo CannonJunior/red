@@ -20,6 +20,8 @@ from datetime import date, datetime, timedelta
 from pathlib import Path
 from typing import Dict, List, Optional
 
+from ollama_config import ollama_config
+
 logger = logging.getLogger(__name__)
 
 
@@ -492,7 +494,7 @@ def summarize_notes(raw_notes: str, meeting_type: str = "") -> str:
     """
     import requests as _requests
 
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    base_url = ollama_config.base_url.rstrip("/")
     model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
     meeting_label = MEETING_TYPES.get(meeting_type, "proposal meeting")
 

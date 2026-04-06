@@ -22,6 +22,7 @@ import uuid
 from .section_parser import SectionParser
 from .requirement_extractor import RequirementExtractor, Requirement
 from .requirement_classifier import RequirementClassifier, RequirementClassification
+from ollama_config import ollama_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -38,7 +39,7 @@ class RFPShredder:
     def __init__(
         self,
         db_path: str = "opportunities.db",
-        ollama_url: str = "http://localhost:11434",
+        ollama_url: Optional[str] = None,
         ollama_model: str = "qwen2.5:3b"
     ):
         """
@@ -46,14 +47,14 @@ class RFPShredder:
 
         Args:
             db_path: Path to SQLite database
-            ollama_url: URL of Ollama server
+            ollama_url: URL of Ollama server (defaults to ollama_config.base_url)
             ollama_model: Model to use for classification
         """
         self.db_path = db_path
         self.section_parser = SectionParser()
         self.req_extractor = RequirementExtractor()
         self.classifier = RequirementClassifier(
-            ollama_url=ollama_url,
+            ollama_url=ollama_url or ollama_config.base_url,
             model=ollama_model
         )
 

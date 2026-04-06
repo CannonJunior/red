@@ -12,6 +12,8 @@ Routes:
   GET    /api/all-tasks                   list all tasks across all opportunities
 """
 
+from server.utils.error_handler import error_handler
+
 try:
     from proposal_tracking_api import get_tracking_manager
     TRACKING_AVAILABLE = True
@@ -30,150 +32,127 @@ def _unavailable(handler):
 
 # ---- Proposal Items ----------------------------------------------------------
 
+@error_handler
 def handle_proposal_items_list_api(handler):
     """GET /api/proposal-items"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        handler.send_json_response(get_tracking_manager().list_proposal_items())
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    handler.send_json_response(get_tracking_manager().list_proposal_items())
 
 
+@error_handler
 def handle_proposal_items_create_api(handler):
     """POST /api/proposal-items"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        data = handler.get_request_body() or {}
-        result = get_tracking_manager().create_proposal_item(data)
-        status = 201 if result.get('status') == 'success' else 400
-        handler.send_json_response(result, status)
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    data = handler.get_request_body() or {}
+    result = get_tracking_manager().create_proposal_item(data)
+    status = 201 if result.get('status') == 'success' else 400
+    handler.send_json_response(result, status)
 
 
+@error_handler
 def handle_proposal_item_update_api(handler):
     """PUT /api/proposal-items/{id}"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        data = handler.get_request_body() or {}
-        result = get_tracking_manager().update_proposal_item(_item_id(handler.path), data)
-        handler.send_json_response(result)
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    data = handler.get_request_body() or {}
+    result = get_tracking_manager().update_proposal_item(_item_id(handler.path), data)
+    handler.send_json_response(result)
 
 
+@error_handler
 def handle_proposal_item_delete_api(handler):
     """DELETE /api/proposal-items/{id}"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        handler.send_json_response(
-            get_tracking_manager().delete_proposal_item(_item_id(handler.path)))
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    handler.send_json_response(
+        get_tracking_manager().delete_proposal_item(_item_id(handler.path)))
 
 
 # ---- BNB Items ---------------------------------------------------------------
 
+@error_handler
 def handle_bnb_items_list_api(handler):
     """GET /api/bnb-items"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        handler.send_json_response(get_tracking_manager().list_bnb_items())
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    handler.send_json_response(get_tracking_manager().list_bnb_items())
 
 
+@error_handler
 def handle_bnb_items_create_api(handler):
     """POST /api/bnb-items"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        data = handler.get_request_body() or {}
-        result = get_tracking_manager().create_bnb_item(data)
-        status = 201 if result.get('status') == 'success' else 400
-        handler.send_json_response(result, status)
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    data = handler.get_request_body() or {}
+    result = get_tracking_manager().create_bnb_item(data)
+    status = 201 if result.get('status') == 'success' else 400
+    handler.send_json_response(result, status)
 
 
+@error_handler
 def handle_bnb_item_update_api(handler):
     """PUT /api/bnb-items/{id}"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        data = handler.get_request_body() or {}
-        result = get_tracking_manager().update_bnb_item(_item_id(handler.path), data)
-        handler.send_json_response(result)
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    data = handler.get_request_body() or {}
+    result = get_tracking_manager().update_bnb_item(_item_id(handler.path), data)
+    handler.send_json_response(result)
 
 
+@error_handler
 def handle_bnb_item_delete_api(handler):
     """DELETE /api/bnb-items/{id}"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        handler.send_json_response(
-            get_tracking_manager().delete_bnb_item(_item_id(handler.path)))
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    handler.send_json_response(
+        get_tracking_manager().delete_bnb_item(_item_id(handler.path)))
 
 
 # ---- Hotwash Items -----------------------------------------------------------
 
+@error_handler
 def handle_hotwash_items_list_api(handler):
     """GET /api/hotwash-items"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        handler.send_json_response(get_tracking_manager().list_hotwash_items())
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    handler.send_json_response(get_tracking_manager().list_hotwash_items())
 
 
+@error_handler
 def handle_hotwash_items_create_api(handler):
     """POST /api/hotwash-items"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        data = handler.get_request_body() or {}
-        result = get_tracking_manager().create_hotwash_item(data)
-        status = 201 if result.get('status') == 'success' else 400
-        handler.send_json_response(result, status)
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    data = handler.get_request_body() or {}
+    result = get_tracking_manager().create_hotwash_item(data)
+    status = 201 if result.get('status') == 'success' else 400
+    handler.send_json_response(result, status)
 
 
+@error_handler
 def handle_hotwash_item_update_api(handler):
     """PUT /api/hotwash-items/{id}"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        data = handler.get_request_body() or {}
-        result = get_tracking_manager().update_hotwash_item(_item_id(handler.path), data)
-        handler.send_json_response(result)
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    data = handler.get_request_body() or {}
+    result = get_tracking_manager().update_hotwash_item(_item_id(handler.path), data)
+    handler.send_json_response(result)
 
 
+@error_handler
 def handle_hotwash_item_delete_api(handler):
     """DELETE /api/hotwash-items/{id}"""
     if not TRACKING_AVAILABLE:
         return _unavailable(handler)
-    try:
-        handler.send_json_response(
-            get_tracking_manager().delete_hotwash_item(_item_id(handler.path)))
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    handler.send_json_response(
+        get_tracking_manager().delete_hotwash_item(_item_id(handler.path)))
 
 
 # ---- All Tasks (cross-opportunity) -------------------------------------------
 
+@error_handler
 def handle_all_tasks_list_api(handler):
     """
     GET /api/all-tasks — list all tasks across all opportunities.
@@ -184,10 +163,9 @@ def handle_all_tasks_list_api(handler):
     Args:
         handler: HTTP request handler instance.
     """
-    import sqlite3
-    try:
-        conn = sqlite3.connect('search_system.db')
-        conn.row_factory = sqlite3.Row
+    from config.database import DEFAULT_DB
+    from server.db_pool import get_db
+    with get_db(DEFAULT_DB) as conn:
         cursor = conn.execute("""
             SELECT t.id, t.opportunity_id, t.name, t.description,
                    t.start_date, t.end_date, t.status, t.progress,
@@ -198,7 +176,4 @@ def handle_all_tasks_list_api(handler):
             ORDER BY t.created_at DESC
         """)
         tasks = [dict(row) for row in cursor.fetchall()]
-        conn.close()
-        handler.send_json_response({'status': 'success', 'tasks': tasks, 'count': len(tasks)})
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    handler.send_json_response({'status': 'success', 'tasks': tasks, 'count': len(tasks)})

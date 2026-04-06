@@ -48,6 +48,8 @@ def _open_connection(db_path: str) -> sqlite3.Connection:
     conn.execute("PRAGMA foreign_keys=ON")
     # Slightly larger cache for read-heavy workloads (~8 MB)
     conn.execute("PRAGMA cache_size=-8000")
+    # Wait up to 5 s instead of immediately raising OperationalError on lock
+    conn.execute("PRAGMA busy_timeout=5000")
 
     return conn
 

@@ -2,6 +2,7 @@
 
 import json
 from pathlib import Path
+from server.utils.error_handler import error_handler
 
 _TEMPLATES_PATH = Path(__file__).parent.parent.parent / 'config' / 'tracking_task_templates.json'
 
@@ -55,6 +56,7 @@ def _save_templates(data: dict) -> None:
     _TEMPLATES_PATH.write_text(json.dumps(data, indent=2))
 
 
+@error_handler
 def handle_tracking_tasks_settings_get(handler):
     """
     GET /api/settings/tracking-tasks — return current task templates.
@@ -62,12 +64,10 @@ def handle_tracking_tasks_settings_get(handler):
     Args:
         handler: HTTP request handler instance.
     """
-    try:
-        handler.send_json_response(_load_templates())
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    handler.send_json_response(_load_templates())
 
 
+@error_handler
 def handle_tracking_tasks_settings_put(handler):
     """
     PUT /api/settings/tracking-tasks — update task templates.
@@ -75,12 +75,9 @@ def handle_tracking_tasks_settings_put(handler):
     Args:
         handler: HTTP request handler instance.
     """
-    try:
-        data = handler.get_request_body()
-        if data is None or 'templates' not in data:
-            handler.send_json_response({'error': 'Missing templates field'}, 400)
-            return
-        _save_templates(data)
-        handler.send_json_response({'status': 'success', 'templates': data['templates']})
-    except Exception as e:
-        handler.send_json_response({'error': str(e)}, 500)
+    data = handler.get_request_body()
+    if data is None or 'templates' not in data:
+        handler.send_json_response({'error': 'Missing templates field'}, 400)
+        return
+    _save_templates(data)
+    handler.send_json_response({'status': 'success', 'templates': data['templates']})

@@ -14,6 +14,8 @@ import hashlib
 from dataclasses import dataclass, asdict
 from enum import Enum
 
+from config.database import DEFAULT_DB
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -119,7 +121,7 @@ class SearchFilter:
 class SearchDatabase:
     """SQLite-based database for the search system."""
     
-    def __init__(self, db_path: str = "./search_system.db"):
+    def __init__(self, db_path: str = DEFAULT_DB):
         self.db_path = db_path
         self.init_database()
     
@@ -215,7 +217,7 @@ class SearchDatabase:
 class UniversalSearchSystem:
     """Main search system class with all functionality."""
     
-    def __init__(self, db_path: str = "./search_system.db"):
+    def __init__(self, db_path: str = DEFAULT_DB):
         self.db = SearchDatabase(db_path)
     
     # Object Management

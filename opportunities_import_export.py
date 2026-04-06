@@ -13,6 +13,8 @@ from datetime import datetime
 from typing import Dict, List
 import uuid
 
+from config.database import DEFAULT_DB
+
 
 # ---------------------------------------------------------------------------
 # Field definitions (used in field-mapping UI)
@@ -28,7 +30,7 @@ OPPORTUNITY_FIELDS = [
     {'key': 'status',         'label': 'Status (legacy)', 'required': False},
 ]
 
-DB_PATH = "search_system.db"
+DB_PATH = DEFAULT_DB
 
 
 # ---------------------------------------------------------------------------

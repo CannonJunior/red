@@ -2151,7 +2151,7 @@
                             <div id="lists-items-panel" class="hidden mb-6 bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 overflow-hidden">
                                 <div class="flex items-center justify-between px-5 py-3 border-b border-gray-200 dark:border-gray-700 bg-gray-50 dark:bg-gray-900/50">
                                     <h4 id="lists-items-panel-title" class="text-sm font-semibold text-gray-800 dark:text-white"></h4>
-                                    <button onclick="window.trackingLists?.closePanel()" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">&times;</button>
+                                    <button onclick="window.trackingLists?.closePanel(); window.tasksList?.closePanel();" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200 text-xl leading-none">&times;</button>
                                 </div>
                                 <div class="overflow-x-auto">
                                     <table class="w-full text-sm">
@@ -2730,6 +2730,7 @@
     </div>
 
     <!-- Module files (must load before app.js) -->
+    <script src="js/api-client.js"></script>
     <script src="js/debug.js"></script>
     <script src="js/theme-manager.js"></script>
     <script src="js/chat-interface.js"></script>

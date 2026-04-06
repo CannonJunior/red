@@ -32,6 +32,7 @@ from typing import Any, Dict, List, Optional
 
 import requests
 
+from ollama_config import ollama_config
 from proposal.database import DEFAULT_DB_PATH, get_conn
 from proposal.hotwash import IMPACT_LEVELS, LESSON_CATEGORIES
 
@@ -182,7 +183,7 @@ class LessonsSearchIndex:
         """
         self._db_path = db_path or DEFAULT_DB_PATH
         self._ollama_url = (
-            ollama_base_url or os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")
+            ollama_base_url or ollama_config.base_url
         ).rstrip("/")
         self._embed_model = embed_model or os.getenv("OLLAMA_EMBED_MODEL", "nomic-embed-text")
         self._ensure_schema()

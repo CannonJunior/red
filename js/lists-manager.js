@@ -316,11 +316,15 @@ class ListsManager {
             });
         });
 
-        // View items panel (proposals, bnb)
+        // View items panel (proposals, bnb, hotwash, tasks)
         document.querySelectorAll('.list-view-btn').forEach(btn => {
             btn.addEventListener('click', () => {
-                if (window.trackingLists) {
-                    window.trackingLists.openPanel(btn.dataset.listId, btn.dataset.listName);
+                const id = btn.dataset.listId;
+                const name = btn.dataset.listName;
+                if (id === 'tasks') {
+                    if (window.tasksList) window.tasksList.openPanel(id, name);
+                } else {
+                    if (window.trackingLists) window.trackingLists.openPanel(id, name);
                 }
             });
         });

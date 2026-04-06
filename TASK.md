@@ -147,6 +147,12 @@
 - [x] Add database indexes to search_system.db — pipeline_stage, priority, tasks.status, tasks.assigned_to, task_history.opportunity_id (2026-03-31)
 - [x] Add request validation middleware (Pydantic) — `server/request_models.py`; create/update opportunity routes validated (2026-03-31)
 - [x] Connection pooling for SQLite — `server/db_pool.py` thread-local pool + WAL mode; all OpportunitiesManager query methods migrated (2026-03-31)
+- [x] Centralise DB path — `config/database.py` DEFAULT_DB from SEARCH_DB_PATH env var; 7 files updated (2026-04-05)
+- [x] Pool adoption in prompts_api.py and tracking.py — `_connect()` context manager pattern; bare sqlite3.connect removed (2026-04-05)
+- [x] Split server/routes/todos.py (878 lines) — todos_users.py / todos_lists.py / todos_items.py / todos_tags.py + stub re-exporter (2026-04-05)
+- [x] Split server.py (1874 → 72 lines) — `server/request_handler.py` (lean handler, no delegation methods); `server/routes_builder.py` (callable actions); `server/router.py` upgraded to support Callable actions (2026-04-05)
+- [x] Centralize Ollama URL — `ollama_config.py` singleton used in 12 files; removed all raw `os.getenv("OLLAMA_BASE_URL", "http://localhost:11434")` and hardcoded strings; `ollama_config.base_url` property is now the single source of truth (2026-04-05)
+- [x] JS API client layer — `js/api-client.js` global `api` object with `get/post/put/delete` wrappers; standard JSON headers + error handling; loaded first in index.html (2026-04-05)
 
 ---
 

@@ -7,10 +7,19 @@ for the RAG system with Model Context Protocol (MCP) integration.
 
 import json
 import sqlite3
+from contextlib import contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, List, Optional
 import uuid
+
+from config.database import DEFAULT_DB
+
+try:
+    from server.db_pool import get_db as _get_db
+    _USE_POOL = True
+except ImportError:
+    _USE_POOL = False
 
 
 class PromptsManager:
@@ -20,7 +29,7 @@ class PromptsManager:
     Zero-cost local SQLite database storage for 5-user scale.
     """
 
-    def __init__(self, db_path: str = "search_system.db"):
+    def __init__(self, db_path: str = DEFAULT_DB):
         """
         Initialize the prompts manager.
 
@@ -68,11 +77,23 @@ class PromptsManager:
         conn.commit()
         conn.close()
 
-    def _get_connection(self) -> sqlite3.Connection:
-        """Get database connection with row factory."""
-        conn = sqlite3.connect(self.db_path)
-        conn.row_factory = sqlite3.Row
-        return conn
+    def _connect(self):
+        """Get a context-managed database connection, using pool when available."""
+        if _USE_POOL:
+            return _get_db(self.db_path)
+
+        @contextmanager
+        def _plain():
+            conn = sqlite3.connect(self.db_path)
+            conn.row_factory = sqlite3.Row
+            try:
+                yield conn
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+        return _plain()
 
     def create_prompt(self, name: str, content: str, description: str = "",
                      tags: List[str] = None, mcp_enabled: bool = True) -> Dict:
@@ -103,18 +124,17 @@ class PromptsManager:
 
             tags_json = json.dumps(tags or [])
 
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
-            cursor.execute("""
-                INSERT INTO prompts
-                (id, name, content, description, tags, mcp_enabled, usage_count, last_used, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (prompt_id, name, content, description or f'Custom prompt: {name}',
-                  tags_json, 1 if mcp_enabled else 0, 0, None, now, now))
+                cursor.execute("""
+                    INSERT INTO prompts
+                    (id, name, content, description, tags, mcp_enabled, usage_count, last_used, created_at, updated_at)
+                    VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                """, (prompt_id, name, content, description or f'Custom prompt: {name}',
+                      tags_json, 1 if mcp_enabled else 0, 0, None, now, now))
 
-            conn.commit()
-            conn.close()
+                conn.commit()
 
             print(f"✅ Created prompt: {name} ({prompt_id})")
 
@@ -158,21 +178,20 @@ class PromptsManager:
             dict: Prompt data or error.
         """
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
-            if prompt_id:
-                cursor.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,))
-            elif name:
-                cursor.execute("SELECT * FROM prompts WHERE LOWER(name) = LOWER(?)", (name,))
-            else:
-                return {
-                    'status': 'error',
-                    'message': 'Either prompt_id or name is required'
-                }
+                if prompt_id:
+                    cursor.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,))
+                elif name:
+                    cursor.execute("SELECT * FROM prompts WHERE LOWER(name) = LOWER(?)", (name,))
+                else:
+                    return {
+                        'status': 'error',
+                        'message': 'Either prompt_id or name is required'
+                    }
 
-            row = cursor.fetchone()
-            conn.close()
+                row = cursor.fetchone()
 
             if not row:
                 identifier = prompt_id or name
@@ -215,20 +234,19 @@ class PromptsManager:
             dict: List of prompts.
         """
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
-            query = "SELECT * FROM prompts"
-            params = []
+                query = "SELECT * FROM prompts"
+                params = []
 
-            if mcp_only:
-                query += " WHERE mcp_enabled = 1"
+                if mcp_only:
+                    query += " WHERE mcp_enabled = 1"
 
-            query += " ORDER BY usage_count DESC, name ASC"
+                query += " ORDER BY usage_count DESC, name ASC"
 
-            cursor.execute(query, params)
-            rows = cursor.fetchall()
-            conn.close()
+                cursor.execute(query, params)
+                rows = cursor.fetchall()
 
             prompts_list = []
             for row in rows:
@@ -285,80 +303,75 @@ class PromptsManager:
             dict: Updated prompt data or error.
         """
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
-            # Check if prompt exists
-            cursor.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,))
-            row = cursor.fetchone()
+                # Check if prompt exists
+                cursor.execute("SELECT * FROM prompts WHERE id = ?", (prompt_id,))
+                row = cursor.fetchone()
 
-            if not row:
-                conn.close()
-                return {
-                    'status': 'error',
-                    'message': f'Prompt with ID "{prompt_id}" not found'
-                }
-
-            # Validate name if provided
-            if name is not None:
-                if not name or not name.replace('_', '').isalnum():
-                    conn.close()
+                if not row:
                     return {
                         'status': 'error',
-                        'message': 'Prompt name must be alphanumeric (underscores allowed, no spaces)'
+                        'message': f'Prompt with ID "{prompt_id}" not found'
                     }
 
-                # Check for name conflicts (excluding current prompt)
-                cursor.execute("SELECT id FROM prompts WHERE LOWER(name) = LOWER(?) AND id != ?", (name, prompt_id))
-                conflict = cursor.fetchone()
-                if conflict:
-                    conn.close()
-                    return {
-                        'status': 'error',
-                        'message': f'Prompt with name "{name}" already exists'
-                    }
+                # Validate name if provided
+                if name is not None:
+                    if not name or not name.replace('_', '').isalnum():
+                        return {
+                            'status': 'error',
+                            'message': 'Prompt name must be alphanumeric (underscores allowed, no spaces)'
+                        }
 
-            # Build update query
-            update_fields = []
-            update_values = []
+                    # Check for name conflicts (excluding current prompt)
+                    cursor.execute("SELECT id FROM prompts WHERE LOWER(name) = LOWER(?) AND id != ?", (name, prompt_id))
+                    conflict = cursor.fetchone()
+                    if conflict:
+                        return {
+                            'status': 'error',
+                            'message': f'Prompt with name "{name}" already exists'
+                        }
 
-            if name is not None:
-                update_fields.append("name = ?")
-                update_values.append(name)
+                # Build update query
+                update_fields = []
+                update_values = []
 
-            if content is not None:
-                update_fields.append("content = ?")
-                update_values.append(content)
+                if name is not None:
+                    update_fields.append("name = ?")
+                    update_values.append(name)
 
-            if description is not None:
-                update_fields.append("description = ?")
-                update_values.append(description)
+                if content is not None:
+                    update_fields.append("content = ?")
+                    update_values.append(content)
 
-            if tags is not None:
-                update_fields.append("tags = ?")
-                update_values.append(json.dumps(tags))
+                if description is not None:
+                    update_fields.append("description = ?")
+                    update_values.append(description)
 
-            if mcp_enabled is not None:
-                update_fields.append("mcp_enabled = ?")
-                update_values.append(1 if mcp_enabled else 0)
+                if tags is not None:
+                    update_fields.append("tags = ?")
+                    update_values.append(json.dumps(tags))
 
-            if not update_fields:
-                conn.close()
-                return {'status': 'error', 'message': 'No fields to update'}
+                if mcp_enabled is not None:
+                    update_fields.append("mcp_enabled = ?")
+                    update_values.append(1 if mcp_enabled else 0)
 
-            update_fields.append("updated_at = ?")
-            update_values.append(datetime.now().isoformat())
+                if not update_fields:
+                    return {'status': 'error', 'message': 'No fields to update'}
 
-            update_values.append(prompt_id)
+                update_fields.append("updated_at = ?")
+                update_values.append(datetime.now().isoformat())
 
-            cursor.execute(f"""
-                UPDATE prompts
-                SET {', '.join(update_fields)}
-                WHERE id = ?
-            """, update_values)
+                update_values.append(prompt_id)
 
-            conn.commit()
-            conn.close()
+                cursor.execute(f"""
+                    UPDATE prompts
+                    SET {', '.join(update_fields)}
+                    WHERE id = ?
+                """, update_values)
+
+                conn.commit()
 
             print(f"✅ Updated prompt: {name or row['name']} ({prompt_id})")
 
@@ -386,26 +399,24 @@ class PromptsManager:
             dict: Status message.
         """
         try:
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
-            # Get prompt name before deleting
-            cursor.execute("SELECT name FROM prompts WHERE id = ?", (prompt_id,))
-            row = cursor.fetchone()
+                # Get prompt name before deleting
+                cursor.execute("SELECT name FROM prompts WHERE id = ?", (prompt_id,))
+                row = cursor.fetchone()
 
-            if not row:
-                conn.close()
-                return {
-                    'status': 'error',
-                    'message': f'Prompt with ID "{prompt_id}" not found'
-                }
+                if not row:
+                    return {
+                        'status': 'error',
+                        'message': f'Prompt with ID "{prompt_id}" not found'
+                    }
 
-            prompt_name = row['name']
+                prompt_name = row['name']
 
-            cursor.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
+                cursor.execute("DELETE FROM prompts WHERE id = ?", (prompt_id,))
 
-            conn.commit()
-            conn.close()
+                conn.commit()
 
             print(f"🗑️  Deleted prompt: {prompt_name} ({prompt_id})")
 
@@ -439,18 +450,17 @@ class PromptsManager:
 
             try:
                 # Update usage statistics
-                conn = self._get_connection()
-                cursor = conn.cursor()
+                with self._connect() as conn:
+                    cursor = conn.cursor()
 
-                cursor.execute("""
-                    UPDATE prompts
-                    SET usage_count = usage_count + 1,
-                        last_used = ?
-                    WHERE id = ?
-                """, (datetime.now().isoformat(), prompt_id_to_update))
+                    cursor.execute("""
+                        UPDATE prompts
+                        SET usage_count = usage_count + 1,
+                            last_used = ?
+                        WHERE id = ?
+                    """, (datetime.now().isoformat(), prompt_id_to_update))
 
-                conn.commit()
-                conn.close()
+                    conn.commit()
 
                 return {
                     'status': 'success',
@@ -482,29 +492,28 @@ class PromptsManager:
         """
         try:
             query_lower = query.lower()
-            conn = self._get_connection()
-            cursor = conn.cursor()
+            with self._connect() as conn:
+                cursor = conn.cursor()
 
-            # Search in name and description using LIKE
-            cursor.execute("""
-                SELECT * FROM prompts
-                WHERE LOWER(name) LIKE ?
-                   OR LOWER(description) LIKE ?
-                   OR LOWER(tags) LIKE ?
-                ORDER BY
-                    CASE
-                        WHEN LOWER(name) LIKE ? THEN 1
-                        WHEN LOWER(description) LIKE ? THEN 2
-                        WHEN LOWER(tags) LIKE ? THEN 3
-                        ELSE 4
-                    END,
-                    usage_count DESC,
-                    name ASC
-            """, (f'%{query_lower}%', f'%{query_lower}%', f'%{query_lower}%',
-                  f'%{query_lower}%', f'%{query_lower}%', f'%{query_lower}%'))
+                # Search in name and description using LIKE
+                cursor.execute("""
+                    SELECT * FROM prompts
+                    WHERE LOWER(name) LIKE ?
+                       OR LOWER(description) LIKE ?
+                       OR LOWER(tags) LIKE ?
+                    ORDER BY
+                        CASE
+                            WHEN LOWER(name) LIKE ? THEN 1
+                            WHEN LOWER(description) LIKE ? THEN 2
+                            WHEN LOWER(tags) LIKE ? THEN 3
+                            ELSE 4
+                        END,
+                        usage_count DESC,
+                        name ASC
+                """, (f'%{query_lower}%', f'%{query_lower}%', f'%{query_lower}%',
+                      f'%{query_lower}%', f'%{query_lower}%', f'%{query_lower}%'))
 
-            rows = cursor.fetchall()
-            conn.close()
+                rows = cursor.fetchall()
 
             matching_prompts = []
             for row in rows:

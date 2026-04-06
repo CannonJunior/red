@@ -23,7 +23,7 @@ try:
 except ImportError:
     _USE_POOL = False
 
-_DEFAULT_DB = "search_system.db"
+from config.database import DEFAULT_DB as _DEFAULT_DB
 
 
 class TrackingManager:

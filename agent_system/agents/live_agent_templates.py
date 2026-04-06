@@ -20,6 +20,7 @@ import uuid
 
 # Import coordination system
 from agent_system.coordination.redis_coordinator import ZeroCostRedisCoordinator, AgentTask
+from ollama_config import ollama_config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -39,7 +40,7 @@ class BaseZeroCostAgent:
         self.current_tasks = []
 
         # Local service endpoints
-        self.ollama_url = config.get("ollama_host", "http://localhost:11434")
+        self.ollama_url = config.get("ollama_host", ollama_config.base_url)
         self.chromadb_api = config.get("chromadb_api", "http://localhost:9090/api/rag")
 
         # Initialize Redis coordinator connection
@@ -235,7 +236,7 @@ class ZeroCostRAGResearchAgent(BaseZeroCostAgent):
     def __init__(self, agent_id: str = "rag_research_agent"):
         config = {
             "capabilities": ["vector_search", "document_analysis", "llm_inference", "multi_step_research"],
-            "ollama_host": "http://localhost:11434",
+            "ollama_host": ollama_config.base_url,
             "chromadb_api": "http://localhost:9090/api/rag",
             "max_concurrent_tasks": 3,
             "preferred_models": ["qwen2.5:7b", "qwen2.5:3b"]
@@ -268,7 +269,7 @@ class ZeroCostCodeReviewAgent(BaseZeroCostAgent):
     def __init__(self, agent_id: str = "code_review_agent"):
         config = {
             "capabilities": ["code_analysis", "security_review", "llm_inference", "static_analysis"],
-            "ollama_host": "http://localhost:11434",
+            "ollama_host": ollama_config.base_url,
             "max_concurrent_tasks": 2,
             "preferred_models": ["qwen2.5:7b"],
             "analysis_types": ["security", "performance", "maintainability", "best_practices"]
@@ -312,7 +313,7 @@ class ZeroCostVectorDataAnalyst(BaseZeroCostAgent):
     def __init__(self, agent_id: str = "vector_data_analyst"):
         config = {
             "capabilities": ["vector_analysis", "data_clustering", "similarity_search", "statistical_analysis"],
-            "ollama_host": "http://localhost:11434",
+            "ollama_host": ollama_config.base_url,
             "chromadb_api": "http://localhost:9090/api/rag",
             "max_concurrent_tasks": 2,
             "mojo_optimizations": ["simd_similarity", "parallel_clustering", "vectorized_stats"]

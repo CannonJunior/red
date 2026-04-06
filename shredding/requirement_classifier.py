@@ -14,6 +14,8 @@ import requests
 from typing import Dict, List, Optional
 from dataclasses import dataclass, asdict
 
+from ollama_config import ollama_config
+
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
@@ -87,7 +89,7 @@ Respond ONLY with valid JSON matching this exact structure:
 
     def __init__(
         self,
-        ollama_url: str = "http://localhost:11434",
+        ollama_url: Optional[str] = None,
         model: str = "qwen2.5:3b",
         batch_size: int = 1
     ):
@@ -99,13 +101,13 @@ Respond ONLY with valid JSON matching this exact structure:
             model: Model to use for classification
             batch_size: Number of requirements to classify in one call
         """
-        self.ollama_url = ollama_url
+        self.ollama_url = ollama_url or ollama_config.base_url
         self.model = model
         self.batch_size = batch_size
 
         # Test connection
         try:
-            response = requests.get(f"{ollama_url}/api/tags", timeout=5)
+            response = requests.get(f"{self.ollama_url}/api/tags", timeout=5)
             if response.status_code == 200:
                 models = response.json().get('models', [])
                 logger.info(f"Connected to Ollama. Available models: {len(models)}")

@@ -18,6 +18,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
+from ollama_config import ollama_config
 
 logger = logging.getLogger(__name__)
 
@@ -286,7 +287,7 @@ def generate_improvement_insights(record: HotwashRecord) -> str:
     Returns:
         str: Synthesized improvement recommendations, or plain summary.
     """
-    base_url = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
+    base_url = ollama_config.base_url.rstrip("/")
     model = os.getenv("OLLAMA_MODEL", "llama3.2:3b")
 
     critical = record.critical_lessons()

@@ -24,6 +24,7 @@ logger = logging.getLogger(__name__)
 
 # Import path utilities
 from project_paths import get_project_root, resolve_path
+from ollama_config import ollama_config
 
 # Import web tools for agent function calling
 try:
@@ -78,14 +79,14 @@ class OllamaAgentRuntime:
     - Skills loading and invocation
     """
 
-    def __init__(self, ollama_url: str = "http://localhost:11434"):
+    def __init__(self, ollama_url: Optional[str] = None):
         """
         Initialize Ollama agent runtime.
 
         Args:
             ollama_url: URL of local Ollama server (default: localhost:11434)
         """
-        self.ollama_url = ollama_url
+        self.ollama_url = ollama_url or ollama_config.base_url
         self.active_agents: Dict[str, OllamaAgentConfig] = {}
         self.skills_cache: Dict[str, AgentSkill] = {}
         self.skills_dir = get_project_root() / ".claude" / "skills"

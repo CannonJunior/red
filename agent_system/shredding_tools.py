@@ -11,6 +11,7 @@ from pathlib import Path
 from datetime import datetime
 
 from shredding import RFPShredder
+from ollama_config import ollama_config
 
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -132,7 +133,7 @@ def shred_rfp(
         # Initialize shredder
         shredder = RFPShredder(
             db_path="opportunities.db",
-            ollama_url="http://localhost:11434",
+            ollama_url=ollama_config.base_url,
             ollama_model="qwen2.5:3b"
         )
 

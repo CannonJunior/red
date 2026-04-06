@@ -17,11 +17,13 @@ try:
 except ImportError:
     _USE_POOL = False
 
+from config.database import DEFAULT_DB
+
 
 class OpportunitiesManager:
     """Manage opportunities with SQLite storage and knowledge graph integration."""
 
-    def __init__(self, db_path: str = "search_system.db"):
+    def __init__(self, db_path: str = DEFAULT_DB):
         """Initialize opportunities manager."""
         self.db_path = db_path
         self._init_database()

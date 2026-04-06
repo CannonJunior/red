@@ -22,6 +22,7 @@ from pathlib import Path
 from typing import Dict, List, Optional
 
 import requests
+from ollama_config import ollama_config
 
 logger = logging.getLogger(__name__)
 
@@ -39,8 +40,7 @@ def _outputs_dir() -> Path:
 
 
 def _ollama_url() -> str:
-    base = os.getenv("OLLAMA_BASE_URL", "http://localhost:11434").rstrip("/")
-    return f"{base}/api/generate"
+    return f"{ollama_config.base_url.rstrip('/')}/api/generate"
 
 
 def _ollama_model() -> str:

@@ -9,6 +9,8 @@ import requests
 import json
 import logging
 from typing import Dict, Optional
+
+from ollama_config import ollama_config
 from .data_models import (
     Candidate,
     HiringPosition,
@@ -25,7 +27,7 @@ class NarrativeGenerator:
 
     def __init__(
         self,
-        ollama_url: str = "http://localhost:11434",
+        ollama_url: Optional[str] = None,
         model: str = "qwen2.5:3b"
     ):
         """
@@ -35,7 +37,7 @@ class NarrativeGenerator:
             ollama_url: URL of Ollama server
             model: Model to use for generation
         """
-        self.ollama_url = ollama_url
+        self.ollama_url = ollama_url or ollama_config.base_url
         self.model = model
 
     def generate_assessment(

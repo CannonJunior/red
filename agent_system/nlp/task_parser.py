@@ -20,6 +20,7 @@ import requests
 
 # Import agent system components
 from coordination.redis_coordinator import AgentTask
+from ollama_config import ollama_config
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
@@ -63,7 +64,7 @@ class ZeroCostNLPTaskParser:
         self.config = config or {}
 
         # Local service endpoints
-        self.ollama_url = self.config.get("ollama_host", "http://localhost:11434")
+        self.ollama_url = self.config.get("ollama_host", ollama_config.base_url)
         self.model = self.config.get("nlp_model", "qwen2.5:3b")
 
         # Task patterns for fast classification

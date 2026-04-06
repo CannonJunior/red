@@ -10,6 +10,7 @@ from pathlib import Path
 
 from debug_logger import debug_log, error_log
 from ollama_config import ollama_config
+from server.utils.error_handler import error_handler
 
 # Import RAG functionality if available
 try:
@@ -34,6 +35,7 @@ except ImportError:
     debug_log("Ollama Agent Runtime not available", "⚠️")
 
 
+@error_handler
 def handle_chat_api(handler):
     """
     Handle chat API requests with MCP-style RAG tool integration.
@@ -41,139 +43,130 @@ def handle_chat_api(handler):
     Args:
         handler: The HTTP request handler instance
     """
-    try:
-        # Read request body
-        request_data = handler.get_request_body()
-        if request_data is None:
-            handler.send_json_response({'error': 'Invalid JSON'}, 400)
-            return
+    # Read request body
+    request_data = handler.get_request_body()
+    if request_data is None:
+        handler.send_json_response({'error': 'Invalid JSON'}, 400)
+        return
 
-        # Extract message, model, workspace, and knowledge mode
-        message = request_data.get('message', '').strip()
-        model = request_data.get('model', 'qwen2.5:3b')  # Default to smaller model
-        workspace = request_data.get('workspace', 'default')  # Extract workspace
-        knowledge_mode = request_data.get('knowledge_mode', 'none')  # Extract knowledge mode
-        mcp_tool_call = request_data.get('mcp_tool_call')  # Check for MCP tool call
-        agent_id = request_data.get('agent')  # Check for agent invocation
+    # Extract message, model, workspace, and knowledge mode
+    message = request_data.get('message', '').strip()
+    model = request_data.get('model', 'qwen2.5:3b')  # Default to smaller model
+    workspace = request_data.get('workspace', 'default')  # Extract workspace
+    knowledge_mode = request_data.get('knowledge_mode', 'none')  # Extract knowledge mode
+    mcp_tool_call = request_data.get('mcp_tool_call')  # Check for MCP tool call
+    agent_id = request_data.get('agent')  # Check for agent invocation
 
-        if not message:
-            handler.send_json_response({'error': 'Message is required'}, 400)
-            return
+    if not message:
+        handler.send_json_response({'error': 'Message is required'}, 400)
+        return
 
-        # Handle MCP tool calls
-        if mcp_tool_call:
-            debug_log(f"MCP Tool call: {mcp_tool_call.get('tool_name', 'unknown')}", "🔧")
-            handle_mcp_tool_call(handler, mcp_tool_call, model)
-            return
+    # Handle MCP tool calls
+    if mcp_tool_call:
+        debug_log(f"MCP Tool call: {mcp_tool_call.get('tool_name', 'unknown')}", "🔧")
+        handle_mcp_tool_call(handler, mcp_tool_call, model)
+        return
 
-        # Handle agent invocation
-        if agent_id and AGENTS_AVAILABLE:
-            debug_log(f"Agent invocation: {agent_id} - {message[:50]}...", "🤖")
-            handle_agent_invocation(handler, agent_id, message, model)
-            return
+    # Handle agent invocation
+    if agent_id and AGENTS_AVAILABLE:
+        debug_log(f"Agent invocation: {agent_id} - {message[:50]}...", "🤖")
+        handle_agent_invocation(handler, agent_id, message, model)
+        return
 
-        debug_log(f"Chat request: {message[:50]}... (model: {model}, knowledge_mode: {knowledge_mode})", "💬")
+    debug_log(f"Chat request: {message[:50]}... (model: {model}, knowledge_mode: {knowledge_mode})", "💬")
 
-        # Determine which mode to use based on knowledge_mode parameter
-        use_rag = knowledge_mode == 'rag' and RAG_AVAILABLE
-        use_cag = knowledge_mode == 'cag' and CAG_AVAILABLE
+    # Determine which mode to use based on knowledge_mode parameter
+    use_rag = knowledge_mode == 'rag' and RAG_AVAILABLE
+    use_cag = knowledge_mode == 'cag' and CAG_AVAILABLE
 
-        if use_rag:
-            # Use RAG-enhanced response
-            response_text, model_used, sources, token_info = get_rag_enhanced_response(message, model, workspace)
-            debug_log(f"RAG-enhanced response: {response_text[:50]}...", "🧠")
+    if use_rag:
+        # Use RAG-enhanced response
+        response_text, model_used, sources, token_info = get_rag_enhanced_response(message, model, workspace)
+        debug_log(f"RAG-enhanced response: {response_text[:50]}...", "🧠")
 
-            # Count unique source files instead of chunks
-            unique_sources = set()
-            if sources:
-                for source in sources:
-                    if 'metadata' in source and 'source' in source['metadata']:
-                        file_path = source['metadata']['source']
-                        document_name = os.path.basename(file_path)
-                        unique_sources.add(document_name)
+        # Count unique source files instead of chunks
+        unique_sources = set()
+        if sources:
+            for source in sources:
+                if 'metadata' in source and 'source' in source['metadata']:
+                    file_path = source['metadata']['source']
+                    document_name = os.path.basename(file_path)
+                    unique_sources.add(document_name)
 
-            # Send RAG response back to client
+        # Send RAG response back to client
+        handler.send_json_response({
+            'response': response_text,
+            'model': model_used,
+            'rag_enabled': True,
+            'sources_used': len(unique_sources),
+            'timestamp': '',
+            'tokens_used': token_info.get('total_tokens', 0),
+            'prompt_tokens': token_info.get('prompt_tokens', 0),
+            'completion_tokens': token_info.get('completion_tokens', 0)
+        })
+    elif use_cag:
+        # Use CAG-enhanced response (with preloaded context)
+        debug_log(f"Making CAG request with model: {model}", "💾")
+        result = ollama_config.generate_response(model, message)
+
+        if result['success']:
+            response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
+            debug_log(f"CAG response: {response_text[:50]}...", "💾")
+
+            # Extract token usage from Ollama response
+            prompt_tokens = result['data'].get('prompt_eval_count', 0)
+            completion_tokens = result['data'].get('eval_count', 0)
+            total_tokens = prompt_tokens + completion_tokens
+
+            # Send response back to client (with cag_enabled flag)
             handler.send_json_response({
                 'response': response_text,
-                'model': model_used,
-                'rag_enabled': True,
-                'sources_used': len(unique_sources),
-                'timestamp': '',
-                'tokens_used': token_info.get('total_tokens', 0),
-                'prompt_tokens': token_info.get('prompt_tokens', 0),
-                'completion_tokens': token_info.get('completion_tokens', 0)
+                'model': model,
+                'rag_enabled': False,
+                'cag_enabled': True,
+                'timestamp': result['data'].get('created_at', ''),
+                'connection_attempt': result['attempt'],
+                'tokens_used': total_tokens,
+                'prompt_tokens': prompt_tokens,
+                'completion_tokens': completion_tokens
             })
-        elif use_cag:
-            # Use CAG-enhanced response (with preloaded context)
-            debug_log(f"Making CAG request with model: {model}", "💾")
-            result = ollama_config.generate_response(model, message)
-
-            if result['success']:
-                response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
-                debug_log(f"CAG response: {response_text[:50]}...", "💾")
-
-                # Extract token usage from Ollama response
-                prompt_tokens = result['data'].get('prompt_eval_count', 0)
-                completion_tokens = result['data'].get('eval_count', 0)
-                total_tokens = prompt_tokens + completion_tokens
-
-                # Send response back to client (with cag_enabled flag)
-                handler.send_json_response({
-                    'response': response_text,
-                    'model': model,
-                    'rag_enabled': False,
-                    'cag_enabled': True,
-                    'timestamp': result['data'].get('created_at', ''),
-                    'connection_attempt': result['attempt'],
-                    'tokens_used': total_tokens,
-                    'prompt_tokens': prompt_tokens,
-                    'completion_tokens': completion_tokens
-                })
-            else:
-                print(f"❌ Ollama request failed: {result['error']}")
-                handler.send_json_response({
-                    'error': f"Ollama request failed: {result['error']}",
-                    'connection_attempt': result['attempt']
-                }, 503)
         else:
-            # Use robust Ollama configuration for standard response (no knowledge base)
-            debug_log(f"Making standard Ollama request with model: {model}", "📤")
-            result = ollama_config.generate_response(model, message)
+            print(f"❌ Ollama request failed: {result['error']}")
+            handler.send_json_response({
+                'error': f"Ollama request failed: {result['error']}",
+                'connection_attempt': result['attempt']
+            }, 503)
+    else:
+        # Use robust Ollama configuration for standard response (no knowledge base)
+        debug_log(f"Making standard Ollama request with model: {model}", "📤")
+        result = ollama_config.generate_response(model, message)
 
-            if result['success']:
-                response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
-                debug_log(f"Standard response: {response_text[:50]}...", "🤖")
+        if result['success']:
+            response_text = result['data'].get('response', 'Sorry, I could not generate a response.')
+            debug_log(f"Standard response: {response_text[:50]}...", "🤖")
 
-                # Extract token usage from Ollama response
-                prompt_tokens = result['data'].get('prompt_eval_count', 0)
-                completion_tokens = result['data'].get('eval_count', 0)
-                total_tokens = prompt_tokens + completion_tokens
+            # Extract token usage from Ollama response
+            prompt_tokens = result['data'].get('prompt_eval_count', 0)
+            completion_tokens = result['data'].get('eval_count', 0)
+            total_tokens = prompt_tokens + completion_tokens
 
-                # Send response back to client
-                handler.send_json_response({
-                    'response': response_text,
-                    'model': model,
-                    'rag_enabled': False,
-                    'timestamp': result['data'].get('created_at', ''),
-                    'connection_attempt': result['attempt'],
-                    'tokens_used': total_tokens,
-                    'prompt_tokens': prompt_tokens,
-                    'completion_tokens': completion_tokens
-                })
-            else:
-                print(f"❌ Ollama request failed: {result['error']}")
-                handler.send_json_response({
-                    'error': f"Ollama request failed: {result['error']}",
-                    'connection_attempt': result['attempt']
-                }, 503)
-
-    except json.JSONDecodeError as e:
-        print(f"❌ JSON decode error: {e}")
-        handler.send_json_response({'error': 'Invalid JSON in request'}, 400)
-
-    except Exception as e:
-        print(f"❌ Chat API error: {e}")
-        handler.send_json_response({'error': f'Chat API error: {str(e)}'}, 500)
+            # Send response back to client
+            handler.send_json_response({
+                'response': response_text,
+                'model': model,
+                'rag_enabled': False,
+                'timestamp': result['data'].get('created_at', ''),
+                'connection_attempt': result['attempt'],
+                'tokens_used': total_tokens,
+                'prompt_tokens': prompt_tokens,
+                'completion_tokens': completion_tokens
+            })
+        else:
+            print(f"❌ Ollama request failed: {result['error']}")
+            handler.send_json_response({
+                'error': f"Ollama request failed: {result['error']}",
+                'connection_attempt': result['attempt']
+            }, 503)
 
 
 def handle_agent_invocation(handler, agent_id, message, model):
@@ -237,9 +230,7 @@ def handle_agent_invocation(handler, agent_id, message, model):
         }, 404)
 
     except Exception as e:
-        print(f"❌ Agent invocation error: {e}")
-        import traceback
-        traceback.print_exc()
+        error_log(f"Agent invocation error: {e}", exception=e)
         handler.send_json_response({
             'error': f'Agent invocation error: {str(e)}'
         }, 500)
@@ -323,9 +314,7 @@ def handle_mcp_tool_call(handler, mcp_tool_call, model):
             }, 400)
 
     except Exception as e:
-        print(f"❌ MCP tool error: {e}")
-        import traceback
-        traceback.print_exc()
+        error_log(f"MCP tool error: {e}", exception=e)
         handler.send_json_response({
             'error': f'MCP tool error: {str(e)}'
         }, 500)
@@ -374,7 +363,7 @@ def _handle_whitepaper_review(handler, inputs, model):
         # Create async function to execute the tool
         async def execute_review():
             server = WhitePaperReviewServer(
-                ollama_url=os.getenv('OLLAMA_URL', 'http://localhost:11434'),
+                ollama_url=ollama_config.base_url,
                 default_model=review_model,
                 default_timeout=int(timeout_seconds)
             )

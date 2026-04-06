@@ -15,11 +15,13 @@ try:
 except ImportError:
     _USE_POOL = False
 
+from config.database import DEFAULT_DB
+
 
 class CaptureManager:
     """CRUD manager for Shipley capture intelligence tables."""
 
-    def __init__(self, db_path: str = "search_system.db"):
+    def __init__(self, db_path: str = DEFAULT_DB):
         self.db_path = db_path
         self._init_database()
 
