@@ -244,33 +244,43 @@ class OpportunitiesManager:
                 'message': f'Failed to create opportunity: {str(e)}'
             }
 
-    def list_opportunities(self, status: Optional[str] = None) -> Dict:
+    def list_opportunities(self, status: Optional[str] = None, limit: int = 100, offset: int = 0) -> Dict:
         """
-        List all opportunities, optionally filtered by status.
+        List opportunities with optional status filter and pagination.
 
         Args:
             status: Optional status filter
+            limit: Maximum number of results to return (default 100)
+            offset: Number of records to skip for pagination (default 0)
 
         Returns:
-            List of opportunities
+            Dict with opportunities list, total count, and pagination metadata.
         """
         try:
             with self._connect() as conn:
                 cursor = conn.cursor()
 
-            if status:
-                cursor.execute("""
-                    SELECT * FROM opportunities
-                    WHERE status = ?
-                    ORDER BY created_at DESC
-                """, (status,))
-            else:
-                cursor.execute("""
-                    SELECT * FROM opportunities
-                    ORDER BY created_at DESC
-                """)
+                if status:
+                    total = cursor.execute(
+                        "SELECT COUNT(*) FROM opportunities WHERE status = ?", (status,)
+                    ).fetchone()[0]
+                    cursor.execute("""
+                        SELECT * FROM opportunities
+                        WHERE status = ?
+                        ORDER BY created_at DESC
+                        LIMIT ? OFFSET ?
+                    """, (status, limit, offset))
+                else:
+                    total = cursor.execute(
+                        "SELECT COUNT(*) FROM opportunities"
+                    ).fetchone()[0]
+                    cursor.execute("""
+                        SELECT * FROM opportunities
+                        ORDER BY created_at DESC
+                        LIMIT ? OFFSET ?
+                    """, (limit, offset))
 
-            rows = cursor.fetchall()
+                rows = cursor.fetchall()
 
             opportunities = []
             for row in rows:
@@ -291,7 +301,11 @@ class OpportunitiesManager:
             return {
                 'status': 'success',
                 'opportunities': opportunities,
-                'count': len(opportunities)
+                'count': len(opportunities),
+                'total': total,
+                'limit': limit,
+                'offset': offset,
+                'has_more': (offset + len(opportunities)) < total,
             }
 
         except Exception as e:
@@ -299,7 +313,11 @@ class OpportunitiesManager:
                 'status': 'error',
                 'message': f'Failed to list opportunities: {str(e)}',
                 'opportunities': [],
-                'count': 0
+                'count': 0,
+                'total': 0,
+                'limit': limit,
+                'offset': offset,
+                'has_more': False,
             }
 
     def get_opportunity(self, opportunity_id: str) -> Dict:
@@ -901,7 +919,9 @@ def handle_opportunities_list_request(filters: Dict = None) -> Dict:
     """Handle list opportunities request."""
     manager = get_opportunities_manager()
     status = filters.get('status') if filters else None
-    return manager.list_opportunities(status=status)
+    limit = int(filters.get('limit', 100)) if filters else 100
+    offset = int(filters.get('offset', 0)) if filters else 0
+    return manager.list_opportunities(status=status, limit=limit, offset=offset)
 
 
 def handle_opportunities_create_request(data: Dict) -> Dict:

@@ -16,6 +16,12 @@ from enum import Enum
 
 from config.database import DEFAULT_DB
 
+try:
+    from server.db_pool import get_db as _get_db
+    _USE_POOL = True
+except ImportError:
+    _USE_POOL = False
+
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
@@ -192,7 +198,7 @@ class SearchDatabase:
             conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_type ON searchable_objects(type)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_title ON searchable_objects(title)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_created ON searchable_objects(created_date)")
-            conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_modified ON searchable_objects(modified_date)")
+            conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_modified ON searchable_objects(modified_date DESC)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_pinned ON searchable_objects(is_pinned)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_shared ON searchable_objects(is_shared)")
             conn.execute("CREATE INDEX IF NOT EXISTS idx_objects_archived ON searchable_objects(is_archived)")
@@ -216,15 +222,42 @@ class SearchDatabase:
 
 class UniversalSearchSystem:
     """Main search system class with all functionality."""
-    
+
     def __init__(self, db_path: str = DEFAULT_DB):
         self.db = SearchDatabase(db_path)
-    
+
+    def _connect(self):
+        """
+        Return a context manager for a database connection.
+
+        Uses the thread-local pool when available for WAL + busy_timeout
+        benefits; falls back to a plain sqlite3.connect otherwise.
+
+        Returns:
+            Context manager yielding sqlite3.Connection.
+        """
+        if _USE_POOL:
+            return _get_db(self.db.db_path)
+        from contextlib import contextmanager
+
+        @contextmanager
+        def _plain():
+            conn = sqlite3.connect(self.db.db_path)
+            conn.row_factory = sqlite3.Row
+            try:
+                yield conn
+            except Exception:
+                conn.rollback()
+                raise
+            finally:
+                conn.close()
+        return _plain()
+
     # Object Management
     def add_object(self, obj: SearchableObject) -> bool:
         """Add a searchable object to the system."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            with self._connect() as conn:
                 # Insert object
                 conn.execute("""
                     INSERT OR REPLACE INTO searchable_objects 
@@ -302,9 +335,7 @@ class UniversalSearchSystem:
     def search(self, search_filter: SearchFilter) -> Dict[str, Any]:
         """Perform universal search with filters."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
-                conn.row_factory = sqlite3.Row
-                
+            with self._connect() as conn:
                 # Build query parameters
                 params = []
                 where_conditions = []
@@ -430,9 +461,9 @@ class UniversalSearchSystem:
     def create_folder(self, folder: Folder) -> bool:
         """Create a new folder."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            with self._connect() as conn:
                 conn.execute("""
-                    INSERT INTO folders (id, name, parent_id, color, icon, object_types, created_date, is_shared)
+                    INSERT OR IGNORE INTO folders (id, name, parent_id, color, icon, object_types, created_date, is_shared)
                     VALUES (?, ?, ?, ?, ?, ?, ?, ?)
                 """, (
                     folder.id, folder.name, folder.parent_id, folder.color, folder.icon,
@@ -441,7 +472,8 @@ class UniversalSearchSystem:
                     folder.is_shared
                 ))
                 conn.commit()
-                logger.info(f"Created folder: {folder.name}")
+                if conn.execute("SELECT changes()").fetchone()[0]:
+                    logger.info(f"Created folder: {folder.name}")
                 return True
         except Exception as e:
             logger.error(f"Error creating folder: {e}")
@@ -450,7 +482,7 @@ class UniversalSearchSystem:
     def get_folders(self) -> List[Dict[str, Any]]:
         """Get all folders in hierarchical structure."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            with self._connect() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute("""
                     SELECT f.*, COUNT(o.id) as object_count
@@ -475,7 +507,7 @@ class UniversalSearchSystem:
     def get_tags(self) -> List[Dict[str, Any]]:
         """Get all tags sorted by usage count."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            with self._connect() as conn:
                 conn.row_factory = sqlite3.Row
                 cursor = conn.execute("""
                     SELECT * FROM tags 
@@ -539,7 +571,7 @@ class UniversalSearchSystem:
     def delete_object(self, object_id: str) -> bool:
         """Delete an object and its associations."""
         try:
-            with sqlite3.connect(self.db.db_path) as conn:
+            with self._connect() as conn:
                 # Delete from FTS
                 conn.execute("DELETE FROM objects_fts WHERE object_id = ?", (object_id,))
                 

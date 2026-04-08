@@ -8,6 +8,7 @@ Responsibilities:
   - Start the HTTPServer
 """
 
+import atexit
 import os
 import sys
 from http.server import HTTPServer
@@ -53,6 +54,10 @@ import server.request_handler as _handler_mod
 _handler_mod._router = build_router()
 
 from server.request_handler import CustomHTTPRequestHandler
+
+# Ensure pooled DB connections are released cleanly on server shutdown
+from server.db_pool import close_all
+atexit.register(close_all)
 
 
 # ---------------------------------------------------------------------------

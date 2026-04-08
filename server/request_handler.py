@@ -76,11 +76,20 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             else:
                 debug_log(f"Cache HIT: {file_path}", "⚡")
 
+            # Determine cache policy: immutable assets (images, fonts, woff) get 1h;
+            # mutable source files (JS, CSS, HTML) require revalidation every request.
+            _MUTABLE_TYPES = ('text/javascript', 'application/javascript', 'text/css', 'text/html')
+            cache_control = (
+                'no-cache, must-revalidate'
+                if any(content_type.startswith(t) for t in _MUTABLE_TYPES)
+                else 'public, max-age=3600'
+            )
+
             # Quick Win 2: If-None-Match → 304 Not Modified
             if self.headers.get('If-None-Match') == etag:
                 self.send_response(304)
                 self.send_header('ETag', etag)
-                self.send_header('Cache-Control', 'public, max-age=3600')
+                self.send_header('Cache-Control', cache_control)
                 self.end_headers()
                 return
 
@@ -94,7 +103,7 @@ class CustomHTTPRequestHandler(BaseHTTPRequestHandler):
             self.send_header('Content-Type', content_type)
             self.send_header('Content-Length', str(len(content)))
             self.send_header('ETag', etag)
-            self.send_header('Cache-Control', 'public, max-age=3600')
+            self.send_header('Cache-Control', cache_control)
             self.send_header('Access-Control-Allow-Origin', '*')
             self.send_header('Access-Control-Allow-Methods', 'GET, POST, OPTIONS')
             self.send_header('Access-Control-Allow-Headers', 'Content-Type')

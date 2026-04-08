@@ -71,9 +71,14 @@ class Navigation {
                     return;
                 }
 
-                if (listType === 'proposals' || listType === 'bnb' || listType === 'hotwash' || listType === 'tasks') {
-                    const names = { proposals: 'Proposals', bnb: 'Bid No-Bid', hotwash: 'Hotwash', tasks: 'Tasks' };
+                if (listType === 'proposals' || listType === 'bnb' || listType === 'hotwash') {
+                    const names = { proposals: 'Proposals', bnb: 'Bid No-Bid', hotwash: 'Hotwash' };
                     this._showTrackingPanel(listType, names[listType]);
+                    return;
+                }
+
+                if (listType === 'tasks') {
+                    this.navigateTo('tasks');
                     return;
                 }
 
@@ -424,11 +429,12 @@ class Navigation {
         document.getElementById('ollama-agent-create-area')?.classList.add('hidden');
         document.getElementById('workflows-area')?.classList.add('hidden');
         document.getElementById('pipeline-health-area')?.classList.add('hidden');
+        document.getElementById('tasks-area')?.classList.add('hidden');
         document.getElementById('lists-interface-area')?.classList.add('hidden');
 
         // Hide expandable submenu panels ONLY when navigating away from Lists-related pages
         // Don't hide them when navigating TO opportunities, todos, or the lists interface
-        if (page !== 'opportunities' && page !== 'todos' && page !== 'lists-interface') {
+        if (page !== 'opportunities' && page !== 'todos' && page !== 'lists-interface' && page !== 'tasks') {
             document.getElementById('opportunities-list')?.classList.add('hidden');
             document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
             document.getElementById('lists-submenu')?.classList.add('hidden');
@@ -542,6 +548,12 @@ class Navigation {
                 if (window.app?.opportunitiesManager) {
                     window.app.opportunitiesManager.loadOpportunities();
                 }
+                break;
+            case 'tasks':
+                document.getElementById('tasks-area')?.classList.remove('hidden');
+                pageTitle.textContent = 'Tasks';
+                this.currentPage = 'tasks';
+                if (window.tasksList) window.tasksList.show();
                 break;
             case 'lists-interface':
                 document.getElementById('lists-interface-area')?.classList.remove('hidden');

@@ -322,7 +322,8 @@ class ListsManager {
                 const id = btn.dataset.listId;
                 const name = btn.dataset.listName;
                 if (id === 'tasks') {
-                    if (window.tasksList) window.tasksList.openPanel(id, name);
+                    // Navigate to the dedicated tasks area
+                    if (window.app?.navigation) window.app.navigation.navigateTo('tasks');
                 } else {
                     if (window.trackingLists) window.trackingLists.openPanel(id, name);
                 }

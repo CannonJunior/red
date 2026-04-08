@@ -1,0 +1,10 @@
+{
+  "include": ["."],
+  "exclude": ["venv_linux", "__pycache__"],
+  "pythonVersion": "3.11",
+  "pythonPlatform": "Linux",
+  "venvPath": ".",
+  "venv": "venv_linux",
+  "reportMissingImports": "none",
+  "reportMissingModuleSource": "none"
+}

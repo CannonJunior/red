@@ -18,10 +18,11 @@ All handlers follow the existing server pattern: accept a handler object,
 call handler.send_json_response(data, status_code).
 """
 
-import json
 import logging
 import urllib.parse
 from typing import Any, Dict
+
+from server.utils.error_handler import error_handler
 
 logger = logging.getLogger(__name__)
 
@@ -100,6 +101,7 @@ def _get_body(handler) -> Dict[str, Any]:
 # GET /api/proposals
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_list_api(handler) -> None:
     """
     Handle GET /api/proposals — list proposals with optional filters.
@@ -108,126 +110,116 @@ def handle_proposals_list_api(handler) -> None:
     """
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        parsed = urllib.parse.urlparse(handler.path)
-        params = urllib.parse.parse_qs(parsed.query)
 
-        stage_str = params.get("stage", [None])[0]
-        agency = params.get("agency", [None])[0]
-        limit = int(params.get("limit", ["100"])[0])
+    parsed = urllib.parse.urlparse(handler.path)
+    params = urllib.parse.parse_qs(parsed.query)
 
-        stage = None
-        if stage_str:
-            try:
-                stage = PipelineStage(stage_str)
-            except ValueError:
-                handler.send_json_response({"error": f"Invalid stage: {stage_str}"}, 400)
-                return
+    stage_str = params.get("stage", [None])[0]
+    agency = params.get("agency", [None])[0]
+    limit = int(params.get("limit", ["100"])[0])
 
-        proposals = list_proposals(stage=stage, agency=agency, limit=limit)
-        handler.send_json_response({
-            "proposals": [p.model_dump() for p in proposals],
-            "count": len(proposals),
-        })
-    except Exception as exc:
-        logger.error("proposals list error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 500)
+    stage = None
+    if stage_str:
+        try:
+            stage = PipelineStage(stage_str)
+        except ValueError:
+            handler.send_json_response({"error": f"Invalid stage: {stage_str}"}, 400)
+            return
+
+    proposals = list_proposals(stage=stage, agency=agency, limit=limit)
+    handler.send_json_response({
+        "proposals": [p.model_dump() for p in proposals],
+        "count": len(proposals),
+    })
 
 
 # ---------------------------------------------------------------------------
 # POST /api/proposals
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_create_api(handler) -> None:
     """Handle POST /api/proposals — create a new proposal record."""
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        body = _get_body(handler)
-        if not body.get("title"):
-            handler.send_json_response({"error": "title is required"}, 400)
-            return
 
-        proposal = Proposal(**body)
-        create_proposal(proposal)
-        handler.send_json_response(proposal.model_dump(), 201)
-    except Exception as exc:
-        logger.error("proposals create error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 400)
+    body = _get_body(handler)
+    if not body.get("title"):
+        handler.send_json_response({"error": "title is required"}, 400)
+        return
+
+    proposal = Proposal(**body)
+    create_proposal(proposal)
+    handler.send_json_response(proposal.model_dump(), 201)
 
 
 # ---------------------------------------------------------------------------
 # GET /api/proposals/{id}
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_detail_api(handler) -> None:
     """Handle GET /api/proposals/{id} — get a single proposal."""
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        proposal_id = _parse_path_id(handler.path, "/api/proposals/")
-        proposal = get_proposal(proposal_id)
-        if not proposal:
-            handler.send_json_response({"error": "Proposal not found"}, 404)
-            return
 
-        data = proposal.model_dump()
-        data["valid_next_stages"] = [s.value for s in get_valid_next_stages(proposal.pipeline_stage)]
-        handler.send_json_response(data)
-    except Exception as exc:
-        logger.error("proposals detail error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 500)
+    proposal_id = _parse_path_id(handler.path, "/api/proposals/")
+    proposal = get_proposal(proposal_id)
+    if not proposal:
+        handler.send_json_response({"error": "Proposal not found"}, 404)
+        return
+
+    data = proposal.model_dump()
+    data["valid_next_stages"] = [s.value for s in get_valid_next_stages(proposal.pipeline_stage)]
+    handler.send_json_response(data)
 
 
 # ---------------------------------------------------------------------------
 # PUT /api/proposals/{id}
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_update_api(handler) -> None:
     """Handle PUT /api/proposals/{id} — update proposal fields."""
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        proposal_id = _parse_path_id(handler.path, "/api/proposals/")
-        existing = get_proposal(proposal_id)
-        if not existing:
-            handler.send_json_response({"error": "Proposal not found"}, 404)
-            return
 
-        body = _get_body(handler)
-        body.pop("id", None)  # Reason: never allow ID overwrite via PUT
-        updated = existing.model_copy(update=body)
-        update_proposal(updated)
-        handler.send_json_response(updated.model_dump())
-    except Exception as exc:
-        logger.error("proposals update error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 400)
+    proposal_id = _parse_path_id(handler.path, "/api/proposals/")
+    existing = get_proposal(proposal_id)
+    if not existing:
+        handler.send_json_response({"error": "Proposal not found"}, 404)
+        return
+
+    body = _get_body(handler)
+    body.pop("id", None)  # Reason: never allow ID overwrite via PUT
+    updated = existing.model_copy(update=body)
+    update_proposal(updated)
+    handler.send_json_response(updated.model_dump())
 
 
 # ---------------------------------------------------------------------------
 # DELETE /api/proposals/{id}
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_delete_api(handler) -> None:
     """Handle DELETE /api/proposals/{id} — delete a proposal record."""
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        proposal_id = _parse_path_id(handler.path, "/api/proposals/")
-        deleted = delete_proposal(proposal_id)
-        if not deleted:
-            handler.send_json_response({"error": "Proposal not found"}, 404)
-            return
-        handler.send_json_response({"status": "deleted", "id": proposal_id})
-    except Exception as exc:
-        logger.error("proposals delete error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 500)
+
+    proposal_id = _parse_path_id(handler.path, "/api/proposals/")
+    deleted = delete_proposal(proposal_id)
+    if not deleted:
+        handler.send_json_response({"error": "Proposal not found"}, 404)
+        return
+    handler.send_json_response({"status": "deleted", "id": proposal_id})
 
 
 # ---------------------------------------------------------------------------
 # POST /api/proposals/{id}/advance
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_advance_api(handler) -> None:
     """
     Handle POST /api/proposals/{id}/advance — advance pipeline stage.
@@ -236,142 +228,137 @@ def handle_proposals_advance_api(handler) -> None:
     """
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
+
+    proposal_id = _parse_path_id(handler.path, "/api/proposals/")
+    proposal = get_proposal(proposal_id)
+    if not proposal:
+        handler.send_json_response({"error": "Proposal not found"}, 404)
+        return
+
+    body = _get_body(handler)
+    stage_str = body.get("stage")
+    if not stage_str:
+        handler.send_json_response({"error": "stage is required"}, 400)
+        return
+
     try:
-        proposal_id = _parse_path_id(handler.path, "/api/proposals/")
-        proposal = get_proposal(proposal_id)
-        if not proposal:
-            handler.send_json_response({"error": "Proposal not found"}, 404)
+        target_stage = PipelineStage(stage_str)
+    except ValueError:
+        handler.send_json_response({"error": f"Invalid stage: {stage_str}"}, 400)
+        return
+
+    notes = body.get("notes", "")
+    force = bool(body.get("force", False))
+
+    # Validate before advancing (unless force)
+    if not force:
+        missing = validate_transition(proposal, target_stage)
+        if missing:
+            handler.send_json_response({
+                "error": "Missing required fields for transition",
+                "missing_fields": missing,
+            }, 422)
             return
 
-        body = _get_body(handler)
-        stage_str = body.get("stage")
-        if not stage_str:
-            handler.send_json_response({"error": "stage is required"}, 400)
-            return
-
-        try:
-            target_stage = PipelineStage(stage_str)
-        except ValueError:
-            handler.send_json_response({"error": f"Invalid stage: {stage_str}"}, 400)
-            return
-
-        notes = body.get("notes", "")
-        force = bool(body.get("force", False))
-
-        # Validate before advancing (unless force)
-        if not force:
-            missing = validate_transition(proposal, target_stage)
-            if missing:
-                handler.send_json_response({
-                    "error": "Missing required fields for transition",
-                    "missing_fields": missing,
-                }, 422)
-                return
-
+    try:
         advanced = advance_stage(proposal, target_stage, notes=notes, force=force)
-        update_proposal(advanced)
-        handler.send_json_response({
-            "status": "advanced",
-            "previous_stage": proposal.pipeline_stage.value,
-            "new_stage": advanced.pipeline_stage.value,
-            "proposal": advanced.model_dump(),
-        })
     except TransitionError as exc:
         handler.send_json_response({"error": str(exc)}, 422)
-    except Exception as exc:
-        logger.error("proposals advance error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 500)
+        return
+
+    update_proposal(advanced)
+    handler.send_json_response({
+        "status": "advanced",
+        "previous_stage": proposal.pipeline_stage.value,
+        "new_stage": advanced.pipeline_stage.value,
+        "proposal": advanced.model_dump(),
+    })
 
 
 # ---------------------------------------------------------------------------
 # GET /api/proposals/{id}/schedule
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_schedule_api(handler) -> None:
     """Handle GET /api/proposals/{id}/schedule — return generated milestone schedule."""
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        proposal_id = _parse_path_id(handler.path, "/api/proposals/")
-        proposal = get_proposal(proposal_id)
-        if not proposal:
-            handler.send_json_response({"error": "Proposal not found"}, 404)
-            return
 
-        if not proposal.proposal_due_date:
-            handler.send_json_response({"error": "proposal_due_date not set"}, 422)
-            return
+    proposal_id = _parse_path_id(handler.path, "/api/proposals/")
+    proposal = get_proposal(proposal_id)
+    if not proposal:
+        handler.send_json_response({"error": "Proposal not found"}, 404)
+        return
 
-        milestones = generate_schedule(proposal)
-        text = schedule_to_text(milestones, proposal)
-        handler.send_json_response({
-            "solicitation_number": proposal.solicitation_number,
-            "proposal_due_date": proposal.proposal_due_date,
-            "milestones": [
-                {
-                    "name": m.name,
-                    "date": m.date,
-                    "days_before_due": m.days_before_due,
-                    "owner": m.owner,
-                    "notes": m.notes,
-                }
-                for m in milestones
-            ],
-            "text_summary": text,
-        })
-    except Exception as exc:
-        logger.error("proposals schedule error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 500)
+    if not proposal.proposal_due_date:
+        handler.send_json_response({"error": "proposal_due_date not set"}, 422)
+        return
+
+    milestones = generate_schedule(proposal)
+    text = schedule_to_text(milestones, proposal)
+    handler.send_json_response({
+        "solicitation_number": proposal.solicitation_number,
+        "proposal_due_date": proposal.proposal_due_date,
+        "milestones": [
+            {
+                "name": m.name,
+                "date": m.date,
+                "days_before_due": m.days_before_due,
+                "owner": m.owner,
+                "notes": m.notes,
+            }
+            for m in milestones
+        ],
+        "text_summary": text,
+    })
 
 
 # ---------------------------------------------------------------------------
 # POST /api/proposals/{id}/folders
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_folders_api(handler) -> None:
     """Handle POST /api/proposals/{id}/folders — create local folder structure."""
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        proposal_id = _parse_path_id(handler.path, "/api/proposals/")
-        proposal = get_proposal(proposal_id)
-        if not proposal:
-            handler.send_json_response({"error": "Proposal not found"}, 404)
-            return
 
-        folders = create_proposal_folders(proposal)
-        summary = folder_summary(proposal)
-        handler.send_json_response({
-            "status": "created",
-            "root": str(folders["root"]),
-            "folders": {k: str(v) for k, v in folders.items()},
-            "summary": summary,
-        }, 201)
-    except Exception as exc:
-        logger.error("proposals folders error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 500)
+    proposal_id = _parse_path_id(handler.path, "/api/proposals/")
+    proposal = get_proposal(proposal_id)
+    if not proposal:
+        handler.send_json_response({"error": "Proposal not found"}, 404)
+        return
+
+    folders = create_proposal_folders(proposal)
+    summary = folder_summary(proposal)
+    handler.send_json_response({
+        "status": "created",
+        "root": str(folders["root"]),
+        "folders": {k: str(v) for k, v in folders.items()},
+        "summary": summary,
+    }, 201)
 
 
 # ---------------------------------------------------------------------------
 # GET/POST /api/proposals/{id}/bid-no-bid
 # ---------------------------------------------------------------------------
 
+@error_handler
 def handle_proposals_bid_no_bid_get_api(handler) -> None:
     """Handle GET /api/proposals/{id}/bid-no-bid — retrieve existing assessment."""
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        proposal_id = _parse_path_id(handler.path, "/api/proposals/")
-        assessment = get_bid_no_bid(proposal_id)
-        if not assessment:
-            handler.send_json_response({"error": "No B/NB assessment found"}, 404)
-            return
-        handler.send_json_response(assessment_to_dict(assessment))
-    except Exception as exc:
-        logger.error("proposals b/nb get error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 500)
+
+    proposal_id = _parse_path_id(handler.path, "/api/proposals/")
+    assessment = get_bid_no_bid(proposal_id)
+    if not assessment:
+        handler.send_json_response({"error": "No B/NB assessment found"}, 404)
+        return
+    handler.send_json_response(assessment_to_dict(assessment))
 
 
+@error_handler
 def handle_proposals_bid_no_bid_post_api(handler) -> None:
     """
     Handle POST /api/proposals/{id}/bid-no-bid — run and save a B/NB assessment.
@@ -387,35 +374,32 @@ def handle_proposals_bid_no_bid_post_api(handler) -> None:
     """
     if not PROPOSALS_AVAILABLE:
         return _unavailable(handler)
-    try:
-        proposal_id = _parse_path_id(handler.path, "/api/proposals/")
-        proposal = get_proposal(proposal_id)
-        if not proposal:
-            handler.send_json_response({"error": "Proposal not found"}, 404)
-            return
 
-        body = _get_body(handler)
-        final_dec_str = body.get("final_decision")
-        final_decision = BidDecision(final_dec_str) if final_dec_str else None
+    proposal_id = _parse_path_id(handler.path, "/api/proposals/")
+    proposal = get_proposal(proposal_id)
+    if not proposal:
+        handler.send_json_response({"error": "Proposal not found"}, 404)
+        return
 
-        assessment = run_assessment(
-            proposal,
-            scores=body.get("scores"),
-            win_themes=body.get("win_themes"),
-            discriminators=body.get("discriminators"),
-            risks=body.get("risks"),
-            mitigations=body.get("mitigations"),
-            assessor=body.get("assessor", ""),
-            final_decision=final_decision,
-            decision_made_by=body.get("decision_made_by", ""),
-            rationale=body.get("rationale", ""),
-            use_claude=bool(body.get("use_claude", False)),
-            additional_context=body.get("additional_context", ""),
-        )
-        save_bid_no_bid(assessment)
+    body = _get_body(handler)
+    final_dec_str = body.get("final_decision")
+    final_decision = BidDecision(final_dec_str) if final_dec_str else None
 
-        result = assessment_to_dict(assessment)
-        handler.send_json_response(result, 201)
-    except Exception as exc:
-        logger.error("proposals b/nb post error: %s", exc)
-        handler.send_json_response({"error": str(exc)}, 400)
+    assessment = run_assessment(
+        proposal,
+        scores=body.get("scores"),
+        win_themes=body.get("win_themes"),
+        discriminators=body.get("discriminators"),
+        risks=body.get("risks"),
+        mitigations=body.get("mitigations"),
+        assessor=body.get("assessor", ""),
+        final_decision=final_decision,
+        decision_made_by=body.get("decision_made_by", ""),
+        rationale=body.get("rationale", ""),
+        use_claude=bool(body.get("use_claude", False)),
+        additional_context=body.get("additional_context", ""),
+    )
+    save_bid_no_bid(assessment)
+
+    result = assessment_to_dict(assessment)
+    handler.send_json_response(result, 201)

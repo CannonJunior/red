@@ -130,12 +130,17 @@ def _trigger_tracking(opportunity_id: str, result: dict) -> None:
 @error_handler
 def handle_opportunities_list_api(handler):
     """Handle GET /api/opportunities - List all opportunities."""
-    request_data = handler.get_request_body()
-    filters = request_data if request_data else {}
+    qp = handler.get_query_params()
+    filters = {
+        'limit': int(qp.get('limit', 100)),
+        'offset': int(qp.get('offset', 0)),
+    }
+    if qp.get('status'):
+        filters['status'] = qp['status']
 
     result = handle_opportunities_list_request(filters)
 
-    debug_log(f"Opportunities list: {result.get('count', 0)} opportunities", "📋")
+    debug_log(f"Opportunities list: {result.get('count', 0)}/{result.get('total', '?')} opportunities", "📋")
     handler.send_json_response(result)
 
 

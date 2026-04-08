@@ -131,7 +131,7 @@ def handle_chat_api(handler):
                 'completion_tokens': completion_tokens
             })
         else:
-            print(f"❌ Ollama request failed: {result['error']}")
+            error_log(f"Ollama request failed: {result['error']}")
             handler.send_json_response({
                 'error': f"Ollama request failed: {result['error']}",
                 'connection_attempt': result['attempt']
@@ -162,7 +162,7 @@ def handle_chat_api(handler):
                 'completion_tokens': completion_tokens
             })
         else:
-            print(f"❌ Ollama request failed: {result['error']}")
+            error_log(f"Ollama request failed: {result['error']}")
             handler.send_json_response({
                 'error': f"Ollama request failed: {result['error']}",
                 'connection_attempt': result['attempt']
@@ -406,23 +406,18 @@ def _handle_whitepaper_review(handler, inputs, model):
             return formatted_result
 
         # Run the async function
-        loop = asyncio.new_event_loop()
-        asyncio.set_event_loop(loop)
-        try:
-            response_text = loop.run_until_complete(execute_review())
-            debug_log(f"MCP tool completed successfully", "✅")
+        response_text = asyncio.run(execute_review())
+        debug_log(f"MCP tool completed successfully", "✅")
 
-            handler.send_json_response({
-                'response': response_text,
-                'model': review_model,
-                'mcp_tool': 'whitepaper-review',
-                'status': 'success'
-            })
-        finally:
-            loop.close()
+        handler.send_json_response({
+            'response': response_text,
+            'model': review_model,
+            'mcp_tool': 'whitepaper-review',
+            'status': 'success'
+        })
 
     except ImportError as e:
-        print(f"❌ Failed to import MCP tool: {e}")
+        error_log(f"Failed to import MCP tool: {e}", exception=e)
         handler.send_json_response({
             'error': f'Failed to import MCP tool: {str(e)}. Make sure required packages are installed (uv add mcp python-docx PyPDF2).'
         }, 500)
@@ -495,7 +490,7 @@ def get_rag_enhanced_response(message, model, workspace='default'):
             return fallback_response, model, [], fallback_tokens
 
     except Exception as e:
-        print(f"❌ RAG enhancement error: {e}")
+        error_log(f"RAG enhancement error: {e}", exception=e)
         fallback_response, fallback_tokens = get_standard_ollama_response_with_tokens(message, model)
         return fallback_response, model, [], fallback_tokens
 

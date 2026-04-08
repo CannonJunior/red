@@ -6,13 +6,12 @@ Endpoints for RFP shredding, requirement management, and compliance tracking.
 
 import json
 import logging
-import sqlite3
 from pathlib import Path
 from typing import Dict, Any
 
 from shredding.rfp_shredder import RFPShredder
+from server.db_pool import get_db
 from server.utils.json_response import send_json_response
-from server.utils.request_helpers import get_request_body
 from server.utils.error_handler import error_handler
 from ollama_config import ollama_config
 
@@ -63,11 +62,8 @@ def handle_shredding_shred_api(handler, path: str, query_params: Dict):
         send_json_response(handler, {'error': 'Method not allowed'}, 405)
         return
 
-    try:
-        # Parse request body
-        body = get_request_body(handler)
-        data = json.loads(body)
-    except json.JSONDecodeError:
+    data = handler.get_request_body()
+    if data is None:
         send_json_response(handler, {'error': 'Invalid JSON'}, 400)
         return
 
@@ -231,10 +227,6 @@ def handle_shredding_requirements_api(handler, path: str, query_params: Dict):
     limit = int(query_params.get('limit', ['100'])[0]) if 'limit' in query_params else 100
     offset = int(query_params.get('offset', ['0'])[0]) if 'offset' in query_params else 0
 
-    # Build query
-    conn = sqlite3.connect(shredder.db_path)
-    cursor = conn.cursor()
-
     # Build WHERE clause
     where_clauses = ['opportunity_id = ?']
     params = [opportunity_id]
@@ -257,28 +249,31 @@ def handle_shredding_requirements_api(handler, path: str, query_params: Dict):
 
     where_clause = ' AND '.join(where_clauses)
 
-    # Count total
-    cursor.execute(f"""
-        SELECT COUNT(*) FROM requirements WHERE {where_clause}
-    """, params)
-    total = cursor.fetchone()[0]
+    # Build query
+    with get_db(shredder.db_path) as conn:
+        cursor = conn.cursor()
 
-    # Get requirements
-    cursor.execute(f"""
-        SELECT
-            id, section, page_number, paragraph_id, source_text,
-            compliance_type, requirement_category, priority, risk_level,
-            compliance_status, proposal_section, proposal_page,
-            assignee_id, assignee_type, assignee_name,
-            keywords, notes, due_date
-        FROM requirements
-        WHERE {where_clause}
-        ORDER BY section, id
-        LIMIT ? OFFSET ?
-    """, params + [limit, offset])
+        # Count total
+        cursor.execute(f"""
+            SELECT COUNT(*) FROM requirements WHERE {where_clause}
+        """, params)
+        total = cursor.fetchone()[0]
 
-    rows = cursor.fetchall()
-    conn.close()
+        # Get requirements
+        cursor.execute(f"""
+            SELECT
+                id, section, page_number, paragraph_id, source_text,
+                compliance_type, requirement_category, priority, risk_level,
+                compliance_status, proposal_section, proposal_page,
+                assignee_id, assignee_type, assignee_name,
+                keywords, notes, due_date
+            FROM requirements
+            WHERE {where_clause}
+            ORDER BY section, id
+            LIMIT ? OFFSET ?
+        """, params + [limit, offset])
+
+        rows = cursor.fetchall()
 
     # Format requirements
     requirements = []
@@ -350,10 +345,8 @@ def handle_shredding_requirement_update_api(handler, path: str, query_params: Di
     requirement_id = parts[4]
 
     # Parse body
-    try:
-        body = get_request_body(handler)
-        data = json.loads(body)
-    except json.JSONDecodeError:
+    data = handler.get_request_body()
+    if data is None:
         send_json_response(handler, {'error': 'Invalid JSON'}, 400)
         return
 
@@ -384,25 +377,21 @@ def handle_shredding_requirement_update_api(handler, path: str, query_params: Di
     update_fields.append("updated_at = CURRENT_TIMESTAMP")
 
     # Execute update
-    conn = sqlite3.connect(shredder.db_path)
-    cursor = conn.cursor()
-
+    params.append(requirement_id)
     query = f"""
         UPDATE requirements
         SET {', '.join(update_fields)}
         WHERE id = ?
     """
-    params.append(requirement_id)
+    with get_db(shredder.db_path) as conn:
+        cursor = conn.cursor()
+        cursor.execute(query, params)
+        conn.commit()
+        rowcount = cursor.rowcount
 
-    cursor.execute(query, params)
-    conn.commit()
-
-    if cursor.rowcount == 0:
-        conn.close()
+    if rowcount == 0:
         send_json_response(handler, {'error': 'Requirement not found'}, 404)
         return
-
-    conn.close()
 
     send_json_response(handler, {
         'status': 'success',

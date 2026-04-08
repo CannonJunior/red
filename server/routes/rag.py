@@ -2,7 +2,7 @@
 
 import os
 from pathlib import Path
-from debug_logger import debug_log
+from debug_logger import debug_log, error_log
 from server.utils.error_handler import error_handler
 
 try:
@@ -141,12 +141,10 @@ def _handle_file_upload(handler):
             debug_log(f"RAG ingest: '{file_path}' -> {ingest_result.get('status', 'unknown')}", "📄")
 
             if ingest_result.get('status') == 'error':
-                print(f"❌ RAG ingestion failed: {ingest_result.get('message', 'Unknown error')}")
+                error_log(f"RAG ingestion failed: {ingest_result.get('message', 'Unknown error')}")
 
         except Exception as ingest_error:
-            print(f"❌ RAG ingestion exception for '{file_path}': {ingest_error}")
-            import traceback
-            traceback.print_exc()
+            error_log(f"RAG ingestion exception for '{file_path}': {ingest_error}", exception=ingest_error)
             ingest_result = {
                 'status': 'error',
                 'message': f'RAG ingestion failed: {str(ingest_error)}'
@@ -156,12 +154,12 @@ def _handle_file_upload(handler):
             os.remove(file_path)
             debug_log(f"Cleaned up temporary file: {file_path}", "🧹")
         except OSError as cleanup_error:
-            print(f"⚠️  Could not clean up file {file_path}: {cleanup_error}")
+            error_log(f"Could not clean up file {file_path}: {cleanup_error}")
 
         handler.send_json_response(ingest_result)
 
     except Exception as e:
-        print(f"❌ File upload error: {e}")
+        error_log(f"File upload error: {e}", exception=e)
         handler.send_json_response({'error': f'File upload failed: {str(e)}'}, 500)
 
 

@@ -156,6 +156,13 @@
 
 ---
 
+## 🐛 Navigation / Tasks Bugs Fixed (2026-04-07)
+
+- [x] **Tasks sidebar click closes Lists submenu** — added `&& page !== 'tasks'` to the submenu-hide condition in `navigateTo()` (`js/navigation.js:437`)
+- [x] **Tasks panel stuck on "Loading tasks..."** — removed hardcoded static HTML from `#tasks-cards-container`; added HTTP status check + `console.error` logging in `TasksList._load()` (`js/tasks-list.js`)
+
+---
+
 ## 🐛 Discovered During Work
 
 - [x] Skills Interface → management page with skill on/off toggles (2026-03-29)

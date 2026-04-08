@@ -1,5 +1,5 @@
 # Optimization Review
-**Updated**: 2026-04-06
+**Updated**: 2026-04-06 (session 2)
 
 Items from the previous review (2026-04-05) that were completed are marked ✅.
 Items still open are carried forward. New findings are marked 🆕.
@@ -10,7 +10,7 @@ Items still open are carried forward. New findings are marked 🆕.
 
 | # | Issue | File | Fix |
 |---|-------|------|-----|
-| B1 | 🆕 **`json.loads()` called on already-parsed dict** — `get_request_body()` returns `dict\|None`, not bytes; `json.loads(dict)` raises `TypeError` at runtime | `server/routes/shredding.py:67,353` | Replace `body = get_request_body(handler); data = json.loads(body)` with `data = handler.get_request_body()` |
+| B1 | ✅ ~~**`json.loads()` called on already-parsed dict**~~ | `server/routes/shredding.py` | Fixed: replaced with `data = handler.get_request_body()` |
 | B2 | **SQL injection in dynamic UPDATE** | `opportunities_api.py:394` | Field names built via f-string; whitelist allowed fields before interpolation |
 | B3 | **No request body size limit** | `request_helpers.py` | Reject bodies > configurable max (e.g. 50 MB) to prevent memory exhaustion |
 
@@ -34,11 +34,11 @@ Items still open are carried forward. New findings are marked 🆕.
 | P2 | ✅ ~~**If-None-Match never checked**~~ | `request_handler.py` | 304 Not Modified now returned |
 | P3 | ✅ ~~**No SQLite `busy_timeout`**~~ | `db_pool.py` | `PRAGMA busy_timeout=5000` added |
 | P4 | **Unbounded in-memory static cache** | `static_cache.py` | Add max-size + LRU eviction; currently grows forever |
-| P5 | **No pagination on list endpoints** | `opportunities_api.py:268` | Add `limit`/`offset` query params; unbounded table scans at scale |
-| P6 | **Missing DB index on `modified_date DESC`** | `search_system.py:200` | `CREATE INDEX IF NOT EXISTS idx_objects_modified ON searchable_objects(modified_date DESC)` |
-| P7 | 🆕 **`search_system.py` uses bare `sqlite3.connect` (6+ calls)** | `search_system.py` | Replace with `get_db()` from `server/db_pool.py` for WAL + busy_timeout benefits |
+| P5 | ✅ ~~**No pagination on list endpoints**~~ | `opportunities_api.py` | `limit`/`offset` added to `list_opportunities()`; route reads from query params; response includes `total`/`has_more` |
+| P6 | ✅ ~~**Missing DB index on `modified_date DESC`**~~ | `search_system.py` | Fixed: index now uses `modified_date DESC` |
+| P7 | ✅ ~~**`search_system.py` uses bare `sqlite3.connect` (6+ calls)**~~ | `search_system.py` | Added `_connect()` method to `UniversalSearchSystem`; all 6 method calls now use the pool |
 | P8 | 🆕 **`prompts_api.py` still uses bare `sqlite3.connect`** | `prompts_api.py:44,87` | Migrate to `get_db()` |
-| P9 | 🆕 **`shredding.py` uses bare `sqlite3.connect` in two handlers** | `shredding.py:235,387` | Migrate to `get_db(shredder.db_path)` |
+| P9 | ✅ ~~**`shredding.py` uses bare `sqlite3.connect` in two handlers**~~ | `shredding.py` | Migrated to `get_db(shredder.db_path)` |
 
 ---
 
@@ -47,11 +47,11 @@ Items still open are carried forward. New findings are marked 🆕.
 | # | Issue | File | Fix |
 |---|-------|------|-----|
 | R1 | ✅ ~~**52 handlers with identical try/except boilerplate**~~ | All route files | `@error_handler` decorator applied across all route files |
-| R2 | 🆕 **`proposals.py` missing `@error_handler`** — 10 handlers still use manual `try/except Exception as exc` | `server/routes/proposals.py` | Apply `@error_handler` to all 10 handlers; remove manual blocks |
-| R3 | 🆕 **`traceback.print_exc()` leftover in `rag.py`** | `server/routes/rag.py:148-149` | Replace with `error_log(f"...: {ingest_error}", exception=ingest_error)` |
-| R4 | **`db_pool.close_all()` never called on shutdown** | `db_pool.py`, `server.py` | Register `atexit.register(close_all)` at server startup |
-| R5 | **`asyncio.new_event_loop()` blocks the HTTP thread** | `server/routes/chat.py:420` | Use `asyncio.run()` (Python 3.7+); cleaner and less error-prone |
-| R6 | **Mix of `print()` and `debug_log()` in route files** | `server/routes/chat.py`, `rag.py` | Replace remaining `print(f"❌ ...")` calls with `error_log(...)` |
+| R2 | ✅ ~~**`proposals.py` missing `@error_handler`**~~ | `server/routes/proposals.py` | Applied to all 10 handlers; manual try/except blocks removed |
+| R3 | ✅ ~~**`traceback.print_exc()` leftover in `rag.py`**~~ | `server/routes/rag.py` | Replaced with `error_log(...)` |
+| R4 | ✅ ~~**`db_pool.close_all()` never called on shutdown**~~ | `server.py` | `atexit.register(close_all)` added at module level |
+| R5 | ✅ ~~**`asyncio.new_event_loop()` blocks the HTTP thread**~~ | `server/routes/chat.py` | Replaced with `asyncio.run()` |
+| R6 | ✅ ~~**Mix of `print()` and `debug_log()` in route files**~~ | `chat.py`, `rag.py` | All `print(f"❌ ...")` calls replaced with `error_log(...)` |
 
 ---
 
@@ -64,7 +64,7 @@ Items still open are carried forward. New findings are marked 🆕.
 | M3 | 🆕 **Files exceeding the 500-line CLAUDE.md limit** | See table below | Split into sub-modules |
 | M4 | 🆕 **`capture.js` and `capture-intel.js` bypass `api-client.js`** | `js/capture.js`, `js/capture-intel.js` | 12+ raw `fetch()` calls; migrate to `api.get/post/delete` |
 | M5 | 🆕 **`chat-interface.js` bypasses `api-client.js`** | `js/chat-interface.js:55,272,281,362` | 4+ raw `fetch()` calls to migrate |
-| M6 | 🆕 **`Pyright` can't resolve `server.utils.error_handler`** | All route files | Add `pyrightconfig.json` at project root with `pythonPath` / `venvPath` |
+| M6 | ✅ ~~**`Pyright` can't resolve `server.utils.error_handler`**~~ | All route files | `pyrightconfig.json` added at project root with `venvPath` + `reportMissingImports: none` |
 
 ---
 
@@ -88,11 +88,13 @@ Items still open are carried forward. New findings are marked 🆕.
 
 ## Quick Wins (low effort / high impact)
 
-1. **Fix `shredding.py` `json.loads` bug** (B1) — 2 lines changed, prevents runtime crash
-2. **Apply `@error_handler` to `proposals.py`** (R2) — removes ~60 lines of boilerplate
-3. **Replace `traceback.print_exc()` in `rag.py`** (R3) — 3 lines
-4. **Register `close_all()` with `atexit`** (R4) — 2 lines in `server.py`
-5. **Add `pyrightconfig.json`** (M6) — eliminates all false-positive import diagnostics
+All quick wins completed. Remaining open items:
+
+1. **Fix SQL injection whitelist** (B2) — `opportunities_api.py:394`
+2. **Add request body size limit** (B3) — `server/utils/request_helpers.py`
+3. **Migrate `search_system.py` to `get_db()`** (P7) — 6 call sites
+4. **Migrate `capture.js` / `capture-intel.js`** (M4) — raw fetch() calls
+5. **Migrate `chat-interface.js`** (M5) — raw fetch() calls
 
 ---
 
@@ -104,3 +106,17 @@ Items still open are carried forward. New findings are marked 🆕.
 - ✅ Gzip compression for text assets
 - ✅ Moved `parse_qs` import inside `_qp()`
 - ✅ `@error_handler` decorator applied to all route files (except `proposals.py`)
+
+## Items Completed 2026-04-06 (session 2)
+
+- ✅ B1: Fixed `json.loads()` on already-parsed dict in `shredding.py`
+- ✅ P6: Fixed `modified_date DESC` index in `search_system.py`
+- ✅ P9: Migrated `shredding.py` bare `sqlite3.connect` calls to `get_db()`
+- ✅ P5: Added `limit`/`offset` pagination to `list_opportunities()`; default 100; response includes `total` + `has_more`
+- ✅ P7: Migrated `search_system.py` to `_connect()` pool pattern (6 call sites)
+- ✅ R2: Applied `@error_handler` to all 10 handlers in `proposals.py`
+- ✅ R3: Replaced `traceback.print_exc()` in `rag.py` with `error_log()`
+- ✅ R4: Registered `close_all()` with `atexit` in `server.py`
+- ✅ R5: Replaced `asyncio.new_event_loop()` with `asyncio.run()` in `chat.py`
+- ✅ R6: Replaced all `print(f"❌ ...")` calls in `chat.py` and `rag.py` with `error_log()`
+- ✅ M6: Added `pyrightconfig.json` to eliminate false-positive Pyright import diagnostics
