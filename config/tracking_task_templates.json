@@ -2,18 +2,21 @@
   "templates": [
     {
       "trigger": "proposal",
+      "trigger_stages": ["active"],
       "enabled": true,
       "task_name": "Schedule Proposal Kickoff",
       "task_description": "Schedule and conduct a Proposal Kickoff meeting to align the team on capture strategy, roles, timeline, and win themes."
     },
     {
       "trigger": "bnb",
+      "trigger_stages": ["bid_decision"],
       "enabled": true,
       "task_name": "Schedule Bid No-Bid Meeting",
       "task_description": "Schedule and conduct the Bid No-Bid decision meeting to evaluate opportunity fit, available resources, and competitive position."
     },
     {
       "trigger": "hotwash",
+      "trigger_stages": ["negotiating", "awarded", "lost", "no_bid"],
       "enabled": true,
       "task_name": "Schedule Hotwash Meeting",
       "task_description": "Schedule and conduct a Hotwash post-action review to capture lessons learned, outcomes, and action items for future pursuits."

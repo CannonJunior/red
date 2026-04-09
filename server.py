@@ -64,11 +64,14 @@ atexit.register(close_all)
 # Server entry point
 # ---------------------------------------------------------------------------
 
+_PORT = int(os.getenv('PORT', '9090'))
+
+
 def main():
-    """Start the HTTP server on port 9090."""
-    server_address = ('', 9090)
+    """Start the HTTP server on the configured port (default 9090, override with PORT env var)."""
+    server_address = ('', _PORT)
     httpd = HTTPServer(server_address, CustomHTTPRequestHandler)
-    print('🚀 Server running on http://localhost:9090')
+    print(f'🚀 Server running on http://localhost:{_PORT}')
     print(f'📂 Serving files from: {os.getcwd()}')
     httpd.serve_forever()
 

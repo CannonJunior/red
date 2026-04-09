@@ -13,6 +13,7 @@ class OpportunitiesImportExport {
         this._pendingCsvContent = null;
         this._pendingHeaders = [];
         this._opportunityFields = [];
+        this._autoFieldMap = {};   // server-detected column mapping (CRM export)
         this._init();
     }
 
@@ -131,14 +132,15 @@ class OpportunitiesImportExport {
             this._pendingCsvContent = csvContent;
             this._pendingHeaders = data.headers;
             this._opportunityFields = data.opportunity_fields || [];
-            this._renderMappingUI(data.headers, data.preview, data.row_count);
+            this._autoFieldMap = data.auto_field_map || {};
+            this._renderMappingUI(data.headers, data.preview, data.row_count, data.schema_detected);
             this._showModal();
         } catch (err) {
             alert(`Failed to parse CSV: ${err.message}`);
         }
     }
 
-    _renderMappingUI(headers, preview, rowCount) {
+    _renderMappingUI(headers, preview, rowCount, schemaDetected) {
         // --- row count label ---
         document.getElementById('csv-row-count').textContent =
             `${rowCount} data row${rowCount !== 1 ? 's' : ''} detected`;
@@ -152,13 +154,21 @@ class OpportunitiesImportExport {
         ].join('');
 
         const table = document.getElementById('csv-mapping-table');
-        table.innerHTML = headers.map((col, i) => {
-            // Auto-select if header name closely matches a field key or label
-            const autoMatch = this._autoMatch(col);
-            const selected = fieldOptions.replace(
-                `value="${autoMatch}"`,
-                `value="${autoMatch}" selected`
-            );
+
+        // Show auto-detection banner when server recognised the CRM schema
+        const banner = schemaDetected === 'crm_export'
+            ? `<div class="mb-3 px-3 py-2 bg-blue-50 dark:bg-blue-900/30 border border-blue-200 dark:border-blue-700 rounded-lg text-sm text-blue-700 dark:text-blue-300 flex items-center gap-2">
+                   <svg class="w-4 h-4 flex-shrink-0" fill="currentColor" viewBox="0 0 20 20"><path fill-rule="evenodd" d="M18 10a8 8 0 11-16 0 8 8 0 0116 0zm-7-4a1 1 0 11-2 0 1 1 0 012 0zM9 9a1 1 0 000 2v3a1 1 0 001 1h1a1 1 0 100-2v-3a1 1 0 00-1-1H9z" clip-rule="evenodd"/></svg>
+                   CRM export format detected — columns pre-mapped automatically. Review and adjust below.
+               </div>`
+            : '';
+
+        table.innerHTML = banner + headers.map(col => {
+            // Server auto_field_map takes priority; fallback to local heuristic
+            const autoMatch = this._autoFieldMap[col] || this._autoMatch(col);
+            const selected = autoMatch
+                ? fieldOptions.replace(`value="${autoMatch}"`, `value="${autoMatch}" selected`)
+                : fieldOptions;
             return `
                 <div class="flex items-center gap-3">
                     <span class="w-48 text-sm text-gray-700 dark:text-gray-300 truncate" title="${this._esc(col)}">

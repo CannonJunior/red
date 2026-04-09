@@ -1,4 +1,11 @@
 // Opportunities Manager
+
+/** Simple debounce — delays fn by ms after the last call. */
+function _debounce(fn, ms) {
+    let timer;
+    return (...args) => { clearTimeout(timer); timer = setTimeout(() => fn(...args), ms); };
+}
+
 // Pipeline stage definitions — must match KANBAN_STAGES in workflows.js
 const PIPELINE_STAGE_OPTIONS = [
     { value: 'identified',               label: '01 — Qualification' },
@@ -48,6 +55,22 @@ class OpportunitiesManager {
     }
 
     setupEventListeners() {
+        // Cache task-modal form elements once — avoids repeated getElementById in hot paths
+        this._tf = {
+            modal:    document.getElementById('task-modal'),
+            form:     document.getElementById('task-form'),
+            title:    document.getElementById('task-modal-title'),
+            id:       document.getElementById('task-id'),
+            oppId:    document.getElementById('task-opportunity-id'),
+            name:     document.getElementById('task-name'),
+            desc:     document.getElementById('task-description'),
+            start:    document.getElementById('task-start-date'),
+            end:      document.getElementById('task-end-date'),
+            status:   document.getElementById('task-status'),
+            progress: document.getElementById('task-progress'),
+            assignTo: document.getElementById('task-assigned-to'),
+        };
+
         // Add opportunity button (opens create modal)
         const addBtn = document.getElementById('add-opportunity-btn');
         if (addBtn) addBtn.addEventListener('click', () => this.showCreateOpportunityModal());
@@ -333,7 +356,9 @@ class OpportunitiesManager {
             prioritySelect.value,
         );
 
-        searchInput.addEventListener('input', refresh);
+        // Debounce free-text search to avoid rebuilding the table on every keystroke.
+        // Dropdown changes are intentionally instant.
+        searchInput.addEventListener('input', _debounce(refresh, 200));
         stageSelect.addEventListener('change', refresh);
         prioritySelect.addEventListener('change', refresh);
     }
@@ -361,12 +386,14 @@ class OpportunitiesManager {
         const name = document.getElementById('opportunity-name')?.value?.trim();
         if (!name) return;
 
-        const pipelineStage = document.getElementById('opportunity-status')?.value || 'identified';
-        const priority      = document.getElementById('opportunity-priority')?.value || 'medium';
+        const g = id => document.getElementById(id)?.value?.trim() || '';
+
+        const pipelineStage = g('opportunity-status') || 'identified';
+        const priority      = g('opportunity-priority') || 'medium';
         const value         = parseFloat(document.getElementById('opportunity-value')?.value) || 0;
-        const tagsRaw       = document.getElementById('opportunity-tags')?.value || '';
+        const tagsRaw       = g('opportunity-tags');
         const tags          = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(t => t) : [];
-        const description   = document.getElementById('opportunity-description')?.value || '';
+        const description   = g('opportunity-description');
 
         try {
             const response = await fetch('/api/opportunities', {
@@ -376,6 +403,15 @@ class OpportunitiesManager {
                     name, description,
                     pipeline_stage: pipelineStage,
                     priority, value, tags,
+                    probability:       g('opportunity-probability'),
+                    proposal_due_date: g('opportunity-proposal-due'),
+                    opp_number:        g('opportunity-opp-number'),
+                    is_iwa:            g('opportunity-is-iwa'),
+                    owning_org:        g('opportunity-owning-org'),
+                    proposal_folder:   g('opportunity-proposal-folder'),
+                    agency:            g('opportunity-agency'),
+                    solicitation_link: g('opportunity-solicitation-link'),
+                    deal_type:         g('opportunity-deal-type'),
                 })
             });
             if (response.ok) {
@@ -418,29 +454,30 @@ class OpportunitiesManager {
     _populateDetailFields(opp) {
         const stage = opp.pipeline_stage || LEGACY_STATUS_MAP[opp.status] || 'identified';
 
-        // Name input
-        const nameEl = document.getElementById('opportunity-detail-name');
-        if (nameEl) nameEl.value = opp.name || '';
+        const set = (id, val) => { const el = document.getElementById(id); if (el) el.value = val ?? ''; };
 
-        // Status select
+        set('opportunity-detail-name',            opp.name || '');
+        set('opportunity-detail-value',           opp.value || 0);
+        set('opportunity-detail-description',     opp.description || '');
+        set('opportunity-detail-probability',     opp.probability || '');
+        set('opportunity-detail-proposal-due',    opp.proposal_due_date || '');
+        set('opportunity-detail-opp-number',      opp.opp_number || '');
+        set('opportunity-detail-is-iwa',          opp.is_iwa || '');
+        set('opportunity-detail-owning-org',      opp.owning_org || '');
+        set('opportunity-detail-proposal-folder', opp.proposal_folder || '');
+        set('opportunity-detail-agency',          opp.agency || '');
+        set('opportunity-detail-solicitation-link', opp.solicitation_link || '');
+        set('opportunity-detail-deal-type',       opp.deal_type || '');
+
         const statusEl = document.getElementById('opportunity-detail-status');
         if (statusEl) statusEl.value = stage;
 
-        // Priority select
         const priorityEl = document.getElementById('opportunity-detail-priority');
         if (priorityEl) priorityEl.value = opp.priority || 'medium';
 
-        // Value input
-        const valueEl = document.getElementById('opportunity-detail-value');
-        if (valueEl) valueEl.value = opp.value || 0;
-
         // Created (plain text — always read-only)
         const createdEl = document.getElementById('opportunity-detail-created');
-        if (createdEl) createdEl.textContent = new Date(opp.created_at).toLocaleDateString();
-
-        // Description textarea
-        const descEl = document.getElementById('opportunity-detail-description');
-        if (descEl) descEl.value = opp.description || '';
+        if (createdEl) createdEl.textContent = opp.created_at ? new Date(opp.created_at).toLocaleDateString() : '-';
 
         // Tags: badge display (view mode)
         const tagsBadges = document.getElementById('opportunity-detail-tags');
@@ -551,12 +588,14 @@ class OpportunitiesManager {
         const name = document.getElementById('opportunity-detail-name')?.value?.trim();
         if (!name) return;
 
+        const g = id => document.getElementById(id)?.value?.trim() || '';
+
         const pipelineStage = document.getElementById('opportunity-detail-status')?.value || 'identified';
         const priority      = document.getElementById('opportunity-detail-priority')?.value || 'medium';
         const value         = parseFloat(document.getElementById('opportunity-detail-value')?.value) || 0;
-        const tagsRaw       = document.getElementById('opportunity-detail-tags-input')?.value || '';
+        const tagsRaw       = g('opportunity-detail-tags-input');
         const tags          = tagsRaw ? tagsRaw.split(',').map(t => t.trim()).filter(t => t) : [];
-        const description   = document.getElementById('opportunity-detail-description')?.value || '';
+        const description   = g('opportunity-detail-description');
 
         try {
             const response = await fetch(`/api/opportunities/${this.currentOpportunity.id}`, {
@@ -566,6 +605,15 @@ class OpportunitiesManager {
                     name, description,
                     pipeline_stage: pipelineStage,
                     priority, value, tags,
+                    probability:       g('opportunity-detail-probability'),
+                    proposal_due_date: g('opportunity-detail-proposal-due'),
+                    opp_number:        g('opportunity-detail-opp-number'),
+                    is_iwa:            g('opportunity-detail-is-iwa'),
+                    owning_org:        g('opportunity-detail-owning-org'),
+                    proposal_folder:   g('opportunity-detail-proposal-folder'),
+                    agency:            g('opportunity-detail-agency'),
+                    solicitation_link: g('opportunity-detail-solicitation-link'),
+                    deal_type:         g('opportunity-detail-deal-type'),
                 })
             });
 
@@ -722,10 +770,11 @@ class OpportunitiesManager {
             const row = document.createElement('tr');
             row.className = 'hover:bg-gray-50 dark:hover:bg-gray-700';
             row.dataset.taskId = task.id;
+            // Reason: no onclick= strings — inline handlers bypass CSP and couple to global state.
+            // All actions wired below with addEventListener after insertion.
             row.innerHTML = `
                 <td class="px-3 py-2">
-                    <button class="opp-task-banner w-full flex items-center gap-1.5 mb-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-left"
-                            onclick="window.tasksList?.highlightTaskCard('${task.id}')">
+                    <button class="opp-task-banner w-full flex items-center gap-1.5 mb-1 px-2 py-0.5 rounded bg-blue-50 dark:bg-blue-900/30 hover:bg-blue-100 dark:hover:bg-blue-900/50 transition-colors text-left">
                         <svg class="w-3 h-3 text-blue-500 dark:text-blue-400 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4"/>
                         </svg>
@@ -738,41 +787,44 @@ class OpportunitiesManager {
                 <td class="px-3 py-2 text-gray-700 dark:text-gray-300">${task.start_date}</td>
                 <td class="px-3 py-2 text-gray-700 dark:text-gray-300">${task.end_date}</td>
                 <td class="px-3 py-2">
-                    <button class="text-blue-600 hover:text-blue-800 mr-2" onclick="window.app.opportunitiesManager.editTask('${task.id}')">Edit</button>
-                    <button class="text-red-600 hover:text-red-800" onclick="window.app.opportunitiesManager.deleteTask('${task.id}')">Delete</button>
+                    <button class="task-edit-btn text-blue-600 hover:text-blue-800 mr-2">Edit</button>
+                    <button class="task-delete-btn text-red-600 hover:text-red-800">Delete</button>
                 </td>
             `;
+            row.querySelector('.opp-task-banner').addEventListener('click', () => window.tasksList?.highlightTaskCard(task.id));
+            row.querySelector('.task-edit-btn').addEventListener('click',   () => this.editTask(task.id));
+            row.querySelector('.task-delete-btn').addEventListener('click', () => this.deleteTask(task.id));
             tbody.appendChild(row);
         });
     }
 
     showCreateTaskModal() {
         if (!this.currentOpportunity) { alert('Please select an opportunity first'); return; }
-        const modal = document.getElementById('task-modal');
-        const form  = document.getElementById('task-form');
-        if (form) form.reset();
-        document.getElementById('task-id').value = '';
-        document.getElementById('task-opportunity-id').value = this.currentOpportunity.id;
-        document.getElementById('task-modal-title').textContent = 'Create Task';
-        if (modal) modal.classList.remove('hidden');
+        const tf = this._tf;
+        if (tf.form)  tf.form.reset();
+        if (tf.id)    tf.id.value    = '';
+        if (tf.oppId) tf.oppId.value = this.currentOpportunity.id;
+        if (tf.title) tf.title.textContent = 'Create Task';
+        if (tf.modal) tf.modal.classList.remove('hidden');
     }
 
     hideTaskModal() {
-        document.getElementById('task-modal')?.classList.add('hidden');
+        this._tf.modal?.classList.add('hidden');
     }
 
     async saveTask() {
-        const taskId       = document.getElementById('task-id').value;
-        const opportunityId = document.getElementById('task-opportunity-id').value;
+        const tf  = this._tf;
+        const taskId       = tf.id?.value    || '';
+        const opportunityId = tf.oppId?.value || '';
 
         const taskData = {
-            name:        document.getElementById('task-name').value,
-            description: document.getElementById('task-description').value,
-            start_date:  document.getElementById('task-start-date').value,
-            end_date:    document.getElementById('task-end-date').value,
-            status:      document.getElementById('task-status').value,
-            progress:    parseInt(document.getElementById('task-progress').value) || 0,
-            assigned_to: document.getElementById('task-assigned-to').value
+            name:        tf.name?.value    || '',
+            description: tf.desc?.value    || '',
+            start_date:  tf.start?.value   || '',
+            end_date:    tf.end?.value      || '',
+            status:      tf.status?.value  || 'pending',
+            progress:    parseInt(tf.progress?.value) || 0,
+            assigned_to: tf.assignTo?.value || '',
         };
 
         try {
@@ -799,17 +851,18 @@ class OpportunitiesManager {
             if (response.ok) {
                 const data = await response.json();
                 const task = data.task;
-                document.getElementById('task-id').value           = task.id;
-                document.getElementById('task-opportunity-id').value = task.opportunity_id;
-                document.getElementById('task-name').value         = task.name;
-                document.getElementById('task-description').value  = task.description || '';
-                document.getElementById('task-start-date').value   = task.start_date;
-                document.getElementById('task-end-date').value     = task.end_date;
-                document.getElementById('task-status').value       = task.status;
-                document.getElementById('task-progress').value     = task.progress;
-                document.getElementById('task-assigned-to').value  = task.assigned_to || '';
-                document.getElementById('task-modal-title').textContent = 'Edit Task';
-                document.getElementById('task-modal').classList.remove('hidden');
+                const tf = this._tf;
+                if (tf.id)       tf.id.value       = task.id;
+                if (tf.oppId)    tf.oppId.value     = task.opportunity_id;
+                if (tf.name)     tf.name.value      = task.name;
+                if (tf.desc)     tf.desc.value      = task.description || '';
+                if (tf.start)    tf.start.value     = task.start_date;
+                if (tf.end)      tf.end.value       = task.end_date;
+                if (tf.status)   tf.status.value    = task.status;
+                if (tf.progress) tf.progress.value  = task.progress;
+                if (tf.assignTo) tf.assignTo.value  = task.assigned_to || '';
+                if (tf.title)    tf.title.textContent = 'Edit Task';
+                if (tf.modal)    tf.modal.classList.remove('hidden');
             }
         } catch (error) {
             console.error('Error loading task:', error);

@@ -289,38 +289,52 @@ class UniversalSearchSystem:
             return False
     
     def _add_tags_to_object(self, conn, object_id: str, tags: List[str]):
-        """Add tags to an object, creating tags if they don't exist."""
+        """Add tags to an object, creating tags if they don't exist.
+
+        Bulk pre-fetches all existing tags in a single query to avoid N+1
+        SELECT pattern when the tag list is large.
+        """
+        if not tags:
+            return
+
+        # Pre-fetch all existing tags in one query
+        placeholders = ",".join("?" * len(tags))
+        existing = {
+            row[1]: row[0]
+            for row in conn.execute(
+                f"SELECT id, name FROM tags WHERE name IN ({placeholders})", tags
+            ).fetchall()
+        }
+
+        # Insert any tags that don't exist yet
         for tag_name in tags:
-            # Create tag if it doesn't exist
-            tag_id = self._create_tag_if_not_exists(conn, tag_name)
-            
-            # Link tag to object
-            conn.execute("""
-                INSERT OR IGNORE INTO object_tags (object_id, tag_id)
-                VALUES (?, ?)
-            """, (object_id, tag_id))
-            
-            # Update usage count
-            conn.execute("""
-                UPDATE tags SET usage_count = usage_count + 1 
-                WHERE id = ?
-            """, (tag_id,))
-    
+            if tag_name not in existing:
+                tag_id = hashlib.md5(tag_name.encode()).hexdigest()[:16]
+                conn.execute("INSERT OR IGNORE INTO tags (id, name) VALUES (?, ?)", (tag_id, tag_name))
+                existing[tag_name] = tag_id
+
+        # Link all tags to the object and increment usage counts in bulk
+        for tag_name in tags:
+            tag_id = existing[tag_name]
+            conn.execute(
+                "INSERT OR IGNORE INTO object_tags (object_id, tag_id) VALUES (?, ?)",
+                (object_id, tag_id),
+            )
+            conn.execute(
+                "UPDATE tags SET usage_count = usage_count + 1 WHERE id = ?",
+                (tag_id,),
+            )
+
     def _create_tag_if_not_exists(self, conn, tag_name: str) -> str:
         """Create a tag if it doesn't exist and return its ID."""
-        # Check if tag exists
         cursor = conn.execute("SELECT id FROM tags WHERE name = ?", (tag_name,))
         result = cursor.fetchone()
-        
+
         if result:
             return result[0]
-        
-        # Create new tag
+
         tag_id = hashlib.md5(tag_name.encode()).hexdigest()[:16]
-        conn.execute("""
-            INSERT INTO tags (id, name) VALUES (?, ?)
-        """, (tag_id, tag_name))
-        
+        conn.execute("INSERT INTO tags (id, name) VALUES (?, ?)", (tag_id, tag_name))
         return tag_id
     
     def _update_fts(self, conn, obj: SearchableObject):

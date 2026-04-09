@@ -1,0 +1,46 @@
+{
+  "task_statuses": [
+    {
+      "slug": "not_started",
+      "label": "Not Started",
+      "headerClass": "bg-gray-400",
+      "colorClass": "bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300",
+      "order": 1
+    },
+    {
+      "slug": "in_progress",
+      "label": "In Progress",
+      "headerClass": "bg-blue-500",
+      "colorClass": "bg-blue-100 dark:bg-blue-900/40 text-blue-700 dark:text-blue-300",
+      "order": 2
+    },
+    {
+      "slug": "pending",
+      "label": "Pending",
+      "headerClass": "bg-yellow-500",
+      "colorClass": "bg-yellow-100 dark:bg-yellow-900/40 text-yellow-700 dark:text-yellow-300",
+      "order": 3
+    },
+    {
+      "slug": "completed",
+      "label": "Completed",
+      "headerClass": "bg-green-500",
+      "colorClass": "bg-green-100 dark:bg-green-900/40 text-green-700 dark:text-green-300",
+      "order": 4
+    }
+  ],
+  "workflow_stages": [
+    { "slug": "01-qual",     "label": "01-Qualification",      "headerClass": "bg-blue-500",    "order": 1 },
+    { "slug": "02-lead",     "label": "02-Long Lead",          "headerClass": "bg-indigo-500",  "order": 2 },
+    { "slug": "03-bid",      "label": "03-Bid Decision",       "headerClass": "bg-purple-500",  "order": 3 },
+    { "slug": "04-progress", "label": "04-In Progress",        "headerClass": "bg-yellow-500",  "order": 4 },
+    { "slug": "05-review",   "label": "05-Waiting/Review",     "headerClass": "bg-orange-500",  "order": 5 },
+    { "slug": "06-nego",     "label": "06-In Negotiation",     "headerClass": "bg-amber-500",   "order": 6 },
+    { "slug": "07-won",      "label": "07-Closed Won",         "headerClass": "bg-green-600",   "order": 7 },
+    { "slug": "08-lost",     "label": "08-Closed Lost",        "headerClass": "bg-red-500",     "order": 8 },
+    { "slug": "09-nobid",    "label": "09-Closed No Bid",      "headerClass": "bg-gray-500",    "order": 9 },
+    { "slug": "20-other",    "label": "20-Closed Other",       "headerClass": "bg-slate-500",   "order": 10 },
+    { "slug": "98-vehicle",  "label": "98-Awarded Contract",   "headerClass": "bg-emerald-600", "order": 11 },
+    { "slug": "99-complete", "label": "99-Completed Contract", "headerClass": "bg-teal-600",    "order": 12 }
+  ]
+}

@@ -37,6 +37,16 @@ if _PYDANTIC:
         value: float = Field(0.0, ge=0)
         tags: List[str] = Field(default_factory=list)
         metadata: Dict[str, Any] = Field(default_factory=dict)
+        # CRM / GovCon fields
+        probability: str = Field("")
+        proposal_due_date: str = Field("")
+        opp_number: str = Field("")
+        is_iwa: str = Field("")
+        owning_org: str = Field("")
+        proposal_folder: str = Field("")
+        agency: str = Field("")
+        solicitation_link: str = Field("")
+        deal_type: str = Field("")
 
         @field_validator('name')
         @classmethod
@@ -65,6 +75,16 @@ if _PYDANTIC:
         value: Optional[float] = Field(None, ge=0)
         tags: Optional[List[str]] = None
         metadata: Optional[Dict[str, Any]] = None
+        # CRM / GovCon fields
+        probability: Optional[str] = None
+        proposal_due_date: Optional[str] = None
+        opp_number: Optional[str] = None
+        is_iwa: Optional[str] = None
+        owning_org: Optional[str] = None
+        proposal_folder: Optional[str] = None
+        agency: Optional[str] = None
+        solicitation_link: Optional[str] = None
+        deal_type: Optional[str] = None
 
     class CsvImportParseRequest(BaseModel):
         """Request body for POST /api/opportunities/import/parse."""

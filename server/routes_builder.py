@@ -104,6 +104,8 @@ from server.routes.source_tree import handle_source_tree_api as handle_source_tr
 from server.routes.settings_api import (
     handle_tracking_tasks_settings_get as handle_tracking_tasks_get_route,
     handle_tracking_tasks_settings_put as handle_tracking_tasks_put_route,
+    handle_categories_get as handle_categories_get_route,
+    handle_categories_put as handle_categories_put_route,
 )
 
 # Optional feature imports — availability flags set below
@@ -346,6 +348,7 @@ def build_router() -> Router:
     r.add('GET', lambda p: p == '/api/hotwash-items' and TRACKING_AVAILABLE,   handle_hotwash_items_list_route)
     r.add('GET', lambda p: p == '/api/all-tasks' and TRACKING_AVAILABLE,       handle_all_tasks_list_route)
     r.add('GET', lambda p: p == '/api/settings/tracking-tasks',               handle_tracking_tasks_get_route)
+    r.add('GET', lambda p: p == '/api/settings/categories',                   handle_categories_get_route)
 
     # ---- POST ---------------------------------------------------------------
     r.add('POST', lambda p: p == '/api/chat',                                 handle_chat_route)
@@ -446,6 +449,7 @@ def build_router() -> Router:
     r.add('PUT', lambda p: p.startswith('/api/bnb-items/') and TRACKING_AVAILABLE,      handle_bnb_item_update_route)
     r.add('PUT', lambda p: p.startswith('/api/hotwash-items/') and TRACKING_AVAILABLE,  handle_hotwash_item_update_route)
     r.add('PUT', lambda p: p == '/api/settings/tracking-tasks',               handle_tracking_tasks_put_route)
+    r.add('PUT', lambda p: p == '/api/settings/categories',                   handle_categories_put_route)
     r.add('PUT', lambda p: p.startswith('/api/proposals/') and PROPOSALS_AVAILABLE,          handle_proposals_update_route)
 
     return r

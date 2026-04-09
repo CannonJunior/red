@@ -1449,62 +1449,57 @@
                 </main>
 
                 <!-- Tasks Area -->
-                <main id="tasks-area" class="flex-1 flex flex-col hidden overflow-y-auto">
-                    <div class="p-6">
-                        <div class="max-w-7xl mx-auto">
+                <main id="tasks-area" class="flex-1 flex flex-col hidden overflow-hidden">
 
-                            <!-- Header -->
-                            <div class="mb-6 flex items-center justify-between">
-                                <div>
-                                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-1">Tasks</h3>
-                                    <p class="text-gray-600 dark:text-gray-400 text-sm">All tasks across all opportunities</p>
-                                </div>
-                                <button id="tasks-refresh-btn" class="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
-                                    <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
-                                    </svg>
-                                    Refresh
-                                </button>
+                    <!-- Header bar (fixed height) -->
+                    <div class="flex-shrink-0 px-6 py-4 border-b border-gray-200 dark:border-gray-700">
+                        <div class="flex items-center justify-between gap-4 mb-3">
+                            <div>
+                                <h3 class="text-xl font-semibold text-gray-900 dark:text-white">Tasks</h3>
+                                <p class="text-sm text-gray-500 dark:text-gray-400 mt-0.5">All tasks across all opportunities</p>
+                            </div>
+                            <button id="tasks-refresh-btn" class="flex items-center gap-2 px-4 py-2 border border-gray-300 dark:border-gray-600 text-gray-700 dark:text-gray-300 text-sm font-medium rounded-lg hover:bg-gray-50 dark:hover:bg-gray-700 transition-colors">
+                                <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15"/>
+                                </svg>
+                                Refresh
+                            </button>
+                        </div>
+
+                        <!-- Stats + Search row -->
+                        <div class="flex flex-wrap items-center gap-3">
+                            <!-- Mini stat chips -->
+                            <div class="flex items-center gap-2 text-sm">
+                                <span class="px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium">
+                                    Total: <span id="tasks-stat-total">—</span>
+                                </span>
+                                <span class="px-2.5 py-1 rounded-full bg-gray-100 dark:bg-gray-700 text-gray-600 dark:text-gray-300 font-medium hidden" id="tasks-stat-not-started-chip">
+                                    NS: <span id="tasks-stat-not-started">—</span>
+                                </span>
+                                <span class="px-2.5 py-1 rounded-full bg-blue-100 dark:bg-blue-900/30 text-blue-700 dark:text-blue-300 font-medium">
+                                    In Progress: <span id="tasks-stat-in-progress">—</span>
+                                </span>
+                                <span class="px-2.5 py-1 rounded-full bg-yellow-100 dark:bg-yellow-900/30 text-yellow-700 dark:text-yellow-300 font-medium">
+                                    Pending: <span id="tasks-stat-pending">—</span>
+                                </span>
+                                <span class="px-2.5 py-1 rounded-full bg-green-100 dark:bg-green-900/30 text-green-700 dark:text-green-300 font-medium">
+                                    Completed: <span id="tasks-stat-completed">—</span>
+                                </span>
                             </div>
 
-                            <!-- Stats row -->
-                            <div class="grid grid-cols-2 sm:grid-cols-4 gap-4 mb-6">
-                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-                                    <div class="text-2xl font-bold text-gray-900 dark:text-white" id="tasks-stat-total">—</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide font-medium">Total</div>
-                                </div>
-                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-                                    <div class="text-2xl font-bold text-yellow-600 dark:text-yellow-400" id="tasks-stat-pending">—</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide font-medium">Pending</div>
-                                </div>
-                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-                                    <div class="text-2xl font-bold text-blue-600 dark:text-blue-400" id="tasks-stat-in-progress">—</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide font-medium">In Progress</div>
-                                </div>
-                                <div class="bg-white dark:bg-gray-800 rounded-lg border border-gray-200 dark:border-gray-700 p-4 text-center">
-                                    <div class="text-2xl font-bold text-green-600 dark:text-green-400" id="tasks-stat-completed">—</div>
-                                    <div class="text-xs text-gray-500 dark:text-gray-400 mt-1 uppercase tracking-wide font-medium">Completed</div>
-                                </div>
-                            </div>
-
-                            <!-- Filter bar -->
-                            <div class="flex flex-wrap items-center gap-3 mb-6">
-                                <div class="flex items-center gap-1 bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-700 rounded-lg p-1">
-                                    <button data-status-filter="all" class="tasks-filter-btn px-3 py-1.5 text-sm font-medium rounded-md bg-blue-600 text-white transition-colors">All</button>
-                                    <button data-status-filter="pending" class="tasks-filter-btn px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Pending</button>
-                                    <button data-status-filter="in_progress" class="tasks-filter-btn px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">In Progress</button>
-                                    <button data-status-filter="completed" class="tasks-filter-btn px-3 py-1.5 text-sm font-medium rounded-md text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 transition-colors">Completed</button>
-                                </div>
-                                <input type="text" id="tasks-search-input" placeholder="Search tasks or opportunities…"
-                                    class="flex-1 min-w-48 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500">
-                            </div>
-
-                            <!-- Cards grid -->
-                            <div id="tasks-cards-container" class="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                            </div>
-
+                            <!-- Search -->
+                            <input type="text" id="tasks-search-input" placeholder="Search tasks or opportunities…"
+                                class="flex-1 min-w-48 px-3 py-2 text-sm border border-gray-300 dark:border-gray-600 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 dark:bg-gray-800 dark:text-white dark:placeholder-gray-500">
                         </div>
                     </div>
+
+                    <!-- Kanban board — horizontally scrollable -->
+                    <div class="flex-1 overflow-x-auto overflow-y-hidden">
+                        <div id="tasks-kanban-board" class="flex h-full gap-3 p-4 min-w-max items-start">
+                            <!-- Columns built dynamically by tasks-list.js -->
+                        </div>
+                    </div>
+
                 </main>
 
                 <!-- Settings Area (hidden by default) -->
@@ -1550,6 +1545,14 @@
                                     <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M10 20l4-16m4 4l4 4-4 4M6 16l-4-4 4-4"></path>
                                 </svg>
                                 Source Code
+                            </button>
+
+                            <!-- Categories -->
+                            <button class="settings-tab w-full flex items-center px-3 py-2 rounded-md text-sm font-medium transition-colors text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700 hover:text-gray-900 dark:hover:text-white" data-tab="categories">
+                                <svg class="w-4 h-4 mr-2.5 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M7 7h.01M7 3h5c.512 0 1.024.195 1.414.586l7 7a2 2 0 010 2.828l-7 7a2 2 0 01-2.828 0l-7-7A2 2 0 013 12V7a2 2 0 012-2z"></path>
+                                </svg>
+                                Categories
                             </button>
 
                             <!-- Pipeline Tasks -->
@@ -1831,6 +1834,42 @@
 
                             </div>
 
+                            <!-- ── CATEGORIES TAB ── -->
+                            <div id="categories-tab" class="settings-tab-content hidden space-y-6">
+
+                                <div>
+                                    <h3 class="text-xl font-semibold text-gray-900 dark:text-white mb-1">Categories</h3>
+                                    <p class="text-sm text-gray-500 dark:text-gray-400">Edit display labels for Task statuses and Workflow stages. Changes are saved and applied at runtime.</p>
+                                </div>
+
+                                <!-- Task Statuses -->
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Task Statuses</h4>
+                                    <div id="categories-task-statuses" class="space-y-2">
+                                        <div class="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
+                                    </div>
+                                </div>
+
+                                <!-- Workflow Stages -->
+                                <div>
+                                    <h4 class="text-sm font-semibold text-gray-700 dark:text-gray-300 mb-3 uppercase tracking-wide">Workflow Stages</h4>
+                                    <p class="text-xs text-gray-400 dark:text-gray-500 mb-3">Only display labels can be changed. Internal slugs and pipeline stage values are fixed.</p>
+                                    <div id="categories-workflow-stages" class="space-y-2">
+                                        <div class="text-center py-6 text-gray-400 dark:text-gray-500 text-sm">Loading…</div>
+                                    </div>
+                                </div>
+
+                                <div class="flex items-center justify-between pt-2 border-t border-gray-200 dark:border-gray-700">
+                                    <button id="categories-apply-btn" class="px-4 py-2 border border-blue-300 dark:border-blue-700 text-blue-700 dark:text-blue-300 text-sm font-medium rounded-md hover:bg-blue-50 dark:hover:bg-blue-900/20 transition-colors">
+                                        Apply at Runtime
+                                    </button>
+                                    <button id="categories-save-btn" class="px-4 py-2 bg-blue-600 text-white text-sm font-medium rounded-md hover:bg-blue-700 transition-colors">
+                                        Save
+                                    </button>
+                                </div>
+
+                            </div>
+
                         </div><!-- /max-w -->
                     </div><!-- /content panel -->
 
@@ -2047,7 +2086,7 @@
                                             </button>
                                         </div>
                                     </div>
-                                    <!-- 2-col metadata grid -->
+                                    <!-- Row 1: Stage / Priority / Value / Created -->
                                     <div class="grid grid-cols-2 gap-4 mb-4">
                                         <div>
                                             <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Stage</label>
@@ -2081,16 +2120,83 @@
                                             </select>
                                         </div>
                                         <div>
-                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Value ($)</label>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Est. Value ($)</label>
                                             <input type="number" id="opportunity-detail-value"
                                                    data-opp-field="value"
                                                    class="opp-field mt-1 text-gray-900 dark:text-white"
                                                    min="0" step="0.01" readonly>
                                         </div>
                                         <div>
-                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Created</label>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Date Created</label>
                                             <p id="opportunity-detail-created" class="text-gray-900 dark:text-white mt-1">-</p>
                                         </div>
+                                    </div>
+                                    <!-- Row 2: CRM fields (3-col) -->
+                                    <div class="grid grid-cols-3 gap-4 mb-4">
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Opp Number</label>
+                                            <input type="text" id="opportunity-detail-opp-number"
+                                                   data-opp-field="opp_number"
+                                                   class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                   placeholder="e.g. 240162" readonly>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Agency / Client</label>
+                                            <input type="text" id="opportunity-detail-agency"
+                                                   data-opp-field="agency"
+                                                   class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                   placeholder="e.g. DoD, NASA" readonly>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Owning Org</label>
+                                            <input type="text" id="opportunity-detail-owning-org"
+                                                   data-opp-field="owning_org"
+                                                   class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                   placeholder="e.g. Defense and Security" readonly>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Probability of Win</label>
+                                            <input type="text" id="opportunity-detail-probability"
+                                                   data-opp-field="probability"
+                                                   class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                   placeholder="e.g. 25%" readonly>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Proposal Due Date</label>
+                                            <input type="text" id="opportunity-detail-proposal-due"
+                                                   data-opp-field="proposal_due_date"
+                                                   class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                   placeholder="e.g. 12/31/2026" readonly>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Deal Type</label>
+                                            <input type="text" id="opportunity-detail-deal-type"
+                                                   data-opp-field="deal_type"
+                                                   class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                   placeholder="e.g. New Business" readonly>
+                                        </div>
+                                        <div>
+                                            <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Is IWA?</label>
+                                            <input type="text" id="opportunity-detail-is-iwa"
+                                                   data-opp-field="is_iwa"
+                                                   class="opp-field mt-1 text-gray-900 dark:text-white"
+                                                   placeholder="yes / no" readonly>
+                                        </div>
+                                    </div>
+                                    <!-- Full-width CRM links -->
+                                    <div class="mb-4">
+                                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Solicitation Link</label>
+                                        <input type="url" id="opportunity-detail-solicitation-link"
+                                               data-opp-field="solicitation_link"
+                                               class="opp-field mt-1 text-gray-900 dark:text-white"
+                                               placeholder="https://sam.gov/..." readonly>
+                                    </div>
+                                    <div class="mb-4">
+                                        <label class="text-sm font-medium text-gray-700 dark:text-gray-300">Proposal Folder Location</label>
+                                        <input type="text" id="opportunity-detail-proposal-folder"
+                                               data-opp-field="proposal_folder"
+                                               class="opp-field mt-1 text-gray-900 dark:text-white"
+                                               placeholder="URL or path to proposal folder" readonly>
                                     </div>
                                     <!-- Description -->
                                     <div class="mb-4">
@@ -2627,7 +2733,7 @@
                                     </svg>
                                 </button>
                             </div>
-                            <form id="opportunity-form" class="space-y-4">
+                            <form id="opportunity-form" class="space-y-4 overflow-y-auto max-h-[70vh] pr-1">
                                 <input type="hidden" id="opportunity-id">
                                 <div>
                                     <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
@@ -2636,14 +2742,6 @@
                                     <input type="text" id="opportunity-name" required
                                         placeholder="e.g., Enterprise Deal Q4"
                                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
-                                </div>
-                                <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Description
-                                    </label>
-                                    <textarea id="opportunity-description" rows="3"
-                                        placeholder="Describe this opportunity..."
-                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
                                 </div>
                                 <div class="grid grid-cols-2 gap-4">
                                     <div>
@@ -2674,18 +2772,80 @@
                                         </select>
                                     </div>
                                 </div>
+                                <div class="grid grid-cols-2 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Est. Value ($)</label>
+                                        <input type="number" id="opportunity-value" min="0" step="0.01" value="0"
+                                            placeholder="0.00"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Probability of Win</label>
+                                        <input type="text" id="opportunity-probability"
+                                            placeholder="e.g. 25%"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Opp Number</label>
+                                        <input type="text" id="opportunity-opp-number"
+                                            placeholder="e.g. 240162"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Agency / Client</label>
+                                        <input type="text" id="opportunity-agency"
+                                            placeholder="e.g. DoD"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Owning Org</label>
+                                        <input type="text" id="opportunity-owning-org"
+                                            placeholder="e.g. Defense and Security"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
+                                <div class="grid grid-cols-3 gap-4">
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Proposal Due Date</label>
+                                        <input type="text" id="opportunity-proposal-due"
+                                            placeholder="e.g. 12/31/2026"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Deal Type</label>
+                                        <input type="text" id="opportunity-deal-type"
+                                            placeholder="e.g. New Business"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                    <div>
+                                        <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Is IWA?</label>
+                                        <input type="text" id="opportunity-is-iwa"
+                                            placeholder="yes / no"
+                                            class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                    </div>
+                                </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Estimated Value ($)
-                                    </label>
-                                    <input type="number" id="opportunity-value" min="0" step="0.01" value="0"
-                                        placeholder="0.00"
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Solicitation Link</label>
+                                    <input type="url" id="opportunity-solicitation-link"
+                                        placeholder="https://sam.gov/..."
                                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
                                 </div>
                                 <div>
-                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">
-                                        Tags (comma-separated)
-                                    </label>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Proposal Folder Location</label>
+                                    <input type="text" id="opportunity-proposal-folder"
+                                        placeholder="URL or path to proposal folder"
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Description</label>
+                                    <textarea id="opportunity-description" rows="3"
+                                        placeholder="Describe this opportunity..."
+                                        class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent"></textarea>
+                                </div>
+                                <div>
+                                    <label class="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">Tags (comma-separated)</label>
                                     <input type="text" id="opportunity-tags"
                                         placeholder="e.g., enterprise, high-value, urgent"
                                         class="w-full px-3 py-2 border border-gray-300 dark:border-gray-600 rounded-lg bg-white dark:bg-gray-700 text-gray-900 dark:text-white focus:ring-2 focus:ring-blue-500 focus:border-transparent">
@@ -2818,7 +2978,8 @@
     <script src="js/capture-intel.js"></script>
     <script src="js/lists-manager.js"></script>
     <script src="js/tracking-lists.js"></script>
-    <script src="js/tasks-list.js?v=2"></script>
+    <script src="js/tasks-list.js?v=5"></script>
     <script src="js/pipeline-tasks-settings.js"></script>
+    <script src="js/categories-settings.js"></script>
 </body>
 </html>

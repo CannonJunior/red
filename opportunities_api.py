@@ -174,6 +174,24 @@ class OpportunitiesManager:
             ON opportunities(pipeline_stage)
         """)
 
+        # Add CRM-sourced columns (idempotent ALTER TABLE ADD COLUMN)
+        _new_cols = [
+            "probability TEXT",
+            "proposal_due_date TEXT",
+            "opp_number TEXT",
+            "is_iwa TEXT",
+            "owning_org TEXT",
+            "proposal_folder TEXT",
+            "agency TEXT",
+            "solicitation_link TEXT",
+            "deal_type TEXT",
+        ]
+        for col_def in _new_cols:
+            try:
+                cursor.execute(f"ALTER TABLE opportunities ADD COLUMN {col_def}")
+            except Exception:
+                pass  # Column already exists
+
         conn.commit()
         conn.close()
 
@@ -181,7 +199,16 @@ class OpportunitiesManager:
                           status: str = "open", priority: str = "medium",
                           value: float = 0.0, tags: List[str] = None,
                           metadata: Dict = None,
-                          pipeline_stage: str = "identified") -> Dict:
+                          pipeline_stage: str = "identified",
+                          probability: str = "",
+                          proposal_due_date: str = "",
+                          opp_number: str = "",
+                          is_iwa: str = "",
+                          owning_org: str = "",
+                          proposal_folder: str = "",
+                          agency: str = "",
+                          solicitation_link: str = "",
+                          deal_type: str = "") -> Dict:
         """
         Create a new opportunity.
 
@@ -190,13 +217,22 @@ class OpportunitiesManager:
             description: Detailed description
             status: Legacy status field (open, in_progress, won, lost)
             priority: Priority level (low, medium, high)
-            value: Estimated value
+            value: Estimated contract value ($)
             tags: List of tags
             metadata: Additional metadata
-            pipeline_stage: Workflow pipeline stage (identified, qualifying, etc.)
+            pipeline_stage: Workflow pipeline stage slug
+            probability: Probability of win (e.g. "25%")
+            proposal_due_date: Proposal due date string
+            opp_number: CRM opportunity number
+            is_iwa: Is IWA flag ("yes"/"no")
+            owning_org: Owning organization / division
+            proposal_folder: URL or path to proposal folder
+            agency: Client agency name
+            solicitation_link: Link to solicitation (SAM.gov etc.)
+            deal_type: Deal type (e.g. "New Business", "Recompete")
 
         Returns:
-            Created opportunity data
+            Created opportunity data dict.
         """
         try:
             opportunity_id = str(uuid.uuid4())
@@ -211,10 +247,15 @@ class OpportunitiesManager:
             cursor.execute("""
                 INSERT INTO opportunities
                 (id, name, description, status, priority, value, tags, metadata,
-                 pipeline_stage, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+                 pipeline_stage, probability, proposal_due_date, opp_number, is_iwa,
+                 owning_org, proposal_folder, agency, solicitation_link, deal_type,
+                 created_at, updated_at)
+                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
             """, (opportunity_id, name, description, status, priority, value,
-                  tags_json, metadata_json, pipeline_stage, now, now))
+                  tags_json, metadata_json, pipeline_stage,
+                  probability, proposal_due_date, opp_number, is_iwa,
+                  owning_org, proposal_folder, agency, solicitation_link, deal_type,
+                  now, now))
 
             conn.commit()
 
@@ -233,8 +274,17 @@ class OpportunitiesManager:
                     'value': value,
                     'tags': tags or [],
                     'metadata': metadata or {},
+                    'probability': probability,
+                    'proposal_due_date': proposal_due_date,
+                    'opp_number': opp_number,
+                    'is_iwa': is_iwa,
+                    'owning_org': owning_org,
+                    'proposal_folder': proposal_folder,
+                    'agency': agency,
+                    'solicitation_link': solicitation_link,
+                    'deal_type': deal_type,
                     'created_at': now,
-                    'updated_at': now
+                    'updated_at': now,
                 }
             }
 
@@ -265,7 +315,11 @@ class OpportunitiesManager:
                         "SELECT COUNT(*) FROM opportunities WHERE status = ?", (status,)
                     ).fetchone()[0]
                     cursor.execute("""
-                        SELECT * FROM opportunities
+                        SELECT id, name, description, status, pipeline_stage, priority,
+                               value, tags, metadata, probability, proposal_due_date,
+                               opp_number, is_iwa, owning_org, proposal_folder, agency,
+                               solicitation_link, deal_type, created_at, updated_at
+                        FROM opportunities
                         WHERE status = ?
                         ORDER BY created_at DESC
                         LIMIT ? OFFSET ?
@@ -275,7 +329,11 @@ class OpportunitiesManager:
                         "SELECT COUNT(*) FROM opportunities"
                     ).fetchone()[0]
                     cursor.execute("""
-                        SELECT * FROM opportunities
+                        SELECT id, name, description, status, pipeline_stage, priority,
+                               value, tags, metadata, probability, proposal_due_date,
+                               opp_number, is_iwa, owning_org, proposal_folder, agency,
+                               solicitation_link, deal_type, created_at, updated_at
+                        FROM opportunities
                         ORDER BY created_at DESC
                         LIMIT ? OFFSET ?
                     """, (limit, offset))
@@ -289,13 +347,22 @@ class OpportunitiesManager:
                     'name': row['name'],
                     'description': row['description'],
                     'status': row['status'],
-                    'pipeline_stage': row['pipeline_stage'] if 'pipeline_stage' in row.keys() else 'identified',
+                    'pipeline_stage': row['pipeline_stage'] or 'identified',
                     'priority': row['priority'],
                     'value': row['value'],
                     'tags': json.loads(row['tags']) if row['tags'] else [],
                     'metadata': json.loads(row['metadata']) if row['metadata'] else {},
+                    'probability': row['probability'] or '',
+                    'proposal_due_date': row['proposal_due_date'] or '',
+                    'opp_number': row['opp_number'] or '',
+                    'is_iwa': row['is_iwa'] or '',
+                    'owning_org': row['owning_org'] or '',
+                    'proposal_folder': row['proposal_folder'] or '',
+                    'agency': row['agency'] or '',
+                    'solicitation_link': row['solicitation_link'] or '',
+                    'deal_type': row['deal_type'] or '',
                     'created_at': row['created_at'],
-                    'updated_at': row['updated_at']
+                    'updated_at': row['updated_at'],
                 })
 
             return {
@@ -335,7 +402,11 @@ class OpportunitiesManager:
                 cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT * FROM opportunities WHERE id = ?
+                SELECT id, name, description, status, pipeline_stage, priority,
+                       value, tags, metadata, probability, proposal_due_date,
+                       opp_number, is_iwa, owning_org, proposal_folder, agency,
+                       solicitation_link, deal_type, created_at, updated_at
+                FROM opportunities WHERE id = ?
             """, (opportunity_id,))
 
             row = cursor.fetchone()
@@ -353,13 +424,22 @@ class OpportunitiesManager:
                     'name': row['name'],
                     'description': row['description'],
                     'status': row['status'],
-                    'pipeline_stage': row['pipeline_stage'] if 'pipeline_stage' in row.keys() else 'identified',
+                    'pipeline_stage': row['pipeline_stage'] or 'identified',
                     'priority': row['priority'],
                     'value': row['value'],
                     'tags': json.loads(row['tags']) if row['tags'] else [],
                     'metadata': json.loads(row['metadata']) if row['metadata'] else {},
+                    'probability': row['probability'] or '',
+                    'proposal_due_date': row['proposal_due_date'] or '',
+                    'opp_number': row['opp_number'] or '',
+                    'is_iwa': row['is_iwa'] or '',
+                    'owning_org': row['owning_org'] or '',
+                    'proposal_folder': row['proposal_folder'] or '',
+                    'agency': row['agency'] or '',
+                    'solicitation_link': row['solicitation_link'] or '',
+                    'deal_type': row['deal_type'] or '',
                     'created_at': row['created_at'],
-                    'updated_at': row['updated_at']
+                    'updated_at': row['updated_at'],
                 }
             }
 
@@ -388,7 +468,12 @@ class OpportunitiesManager:
             update_fields = []
             update_values = []
 
-            for field in ['name', 'description', 'status', 'pipeline_stage', 'priority', 'value']:
+            _updatable = [
+                'name', 'description', 'status', 'pipeline_stage', 'priority', 'value',
+                'probability', 'proposal_due_date', 'opp_number', 'is_iwa',
+                'owning_org', 'proposal_folder', 'agency', 'solicitation_link', 'deal_type',
+            ]
+            for field in _updatable:
                 if field in updates:
                     update_fields.append(f"{field} = ?")
                     update_values.append(updates[field])
@@ -682,7 +767,9 @@ Type: Business Opportunity
                 cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT * FROM tasks
+                SELECT id, opportunity_id, name, description, start_date, end_date,
+                       status, progress, assigned_to, created_at, updated_at
+                FROM tasks
                 WHERE opportunity_id = ?
                 ORDER BY start_date ASC
             """, (opportunity_id,))
@@ -736,7 +823,11 @@ Type: Business Opportunity
                 cursor = conn.cursor()
 
             # Get current task state for history
-            cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+            cursor.execute("""
+                SELECT id, opportunity_id, name, description, start_date, end_date,
+                       status, progress, assigned_to, created_at, updated_at
+                FROM tasks WHERE id = ?
+            """, (task_id,))
             current_task = cursor.fetchone()
 
             if not current_task:
@@ -808,7 +899,11 @@ Type: Business Opportunity
             with self._connect() as conn:
                 cursor = conn.cursor()
 
-            cursor.execute("SELECT * FROM tasks WHERE id = ?", (task_id,))
+            cursor.execute("""
+                SELECT id, opportunity_id, name, description, start_date, end_date,
+                       status, progress, assigned_to, created_at, updated_at
+                FROM tasks WHERE id = ?
+            """, (task_id,))
             row = cursor.fetchone()
 
             if not row:
@@ -844,7 +939,9 @@ Type: Business Opportunity
                 cursor = conn.cursor()
 
             cursor.execute("""
-                SELECT * FROM task_history
+                SELECT id, task_id, opportunity_id, name, description, start_date, end_date,
+                       status, progress, assigned_to, edited_by, edited_at, change_description
+                FROM task_history
                 WHERE task_id = ?
                 ORDER BY edited_at DESC
             """, (task_id,))
@@ -935,7 +1032,16 @@ def handle_opportunities_create_request(data: Dict) -> Dict:
         value=data.get('value', 0.0),
         tags=data.get('tags', []),
         metadata=data.get('metadata', {}),
-        pipeline_stage=data.get('pipeline_stage', 'identified')
+        pipeline_stage=data.get('pipeline_stage', 'identified'),
+        probability=data.get('probability', ''),
+        proposal_due_date=data.get('proposal_due_date', ''),
+        opp_number=data.get('opp_number', ''),
+        is_iwa=data.get('is_iwa', ''),
+        owning_org=data.get('owning_org', ''),
+        proposal_folder=data.get('proposal_folder', ''),
+        agency=data.get('agency', ''),
+        solicitation_link=data.get('solicitation_link', ''),
+        deal_type=data.get('deal_type', ''),
     )
 
 

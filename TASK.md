@@ -13,6 +13,8 @@
 | PLANNING.md — Proposal Workflow Architecture | 2026-03-28 | See PLANNING.md |
 | Shipley Capture Intelligence — full feature set | 2026-04-01 | capture_api.py, server/routes/capture.py, js/capture.js, js/capture-intel.js; Win Strategy/PTW/Contacts/Competitors/Activities tabs |
 | Auto-task creation + Pipeline Tasks settings + All-Tasks list | 2026-04-04 | config/tracking_task_templates.json; server/routes/settings_api.py; /api/settings/tracking-tasks GET/PUT; /api/all-tasks GET; js/tasks-list.js; js/pipeline-tasks-settings.js; Tasks sidebar item in Lists |
+| Tasks Kanban + Categories Settings | 2026-04-07 | Tasks panel restructured as horizontal Kanban (Not Started/In Progress/Pending/Completed); config/categories.json; /api/settings/categories GET/PUT; Categories tab in Settings with apply-at-runtime; js/categories-settings.js |
+| Pipeline Tasks Settings — editable trigger type + stages | 2026-04-07 | tracking_task_templates.json adds trigger_stages[]; _trigger_tracking() now config-driven (no hardcoded stages); pipeline-tasks-settings.js shows List Item Type dropdown + per-stage checkboxes + task name/desc editors + add/remove templates |
 
 ---
 
@@ -175,6 +177,75 @@
   - Root cause: tests used dict access (`result['category']`) but `classify()` returns `RequirementClassification` dataclass; batch test passed `List[str]` not `List[Dict]`; rewrote with mocked Ollama for determinism
 - [x] **FIX: `tests/shredding/test_requirement_extractor.py`** — 17 tests passing (2026-03-30)
   - Root cause: tests passed `page=N` kwarg (actual: `start_page=N`); used dict access on `Requirement` dataclass; deduplication test needed explicit `deduplicate_requirements()` call
+
+---
+
+## 🗺️ Pipeline Task Trigger Expansion Plan
+
+The trigger system in `config/tracking_task_templates.json` currently supports three
+tracking list types (`proposal`, `bnb`, `hotwash`) fired when an opportunity enters a
+configured `pipeline_stage`. The following trigger categories are planned for future
+development. Each requires both a backend handler in `server/routes/opportunities.py`
+and (where applicable) a new tracking list type with its own `ensure_*_item()` method.
+
+### 🔵 Stage-Based Triggers (extend existing pattern — low effort)
+
+| Trigger ID | List Type | Suggested Default Stage(s) | Description |
+|---|---|---|---|
+| `qualification_review` | Qualification | `identifying`, `qualifying` | Fire at pipeline entry for early-stage capture planning |
+| `contract_start` | Contract Start | `contract_vehicle_won` | Award notification / kickoff task on contract award |
+| `closeout` | Closeout | `contract_vehicle_complete` | End-of-contract lessons-learned and closeout tasks |
+| `submission_followup` | Submission Follow-Up | `submitted` | Task to follow up N days after submission |
+
+**Implementation path:** Add new trigger IDs to `TRIGGER_TYPES` in `pipeline-tasks-settings.js`
+and add matching `elif trigger == '<id>': tracking_result = ...` branch in `_trigger_tracking()`.
+New `ensure_*_item()` methods go in `proposal_tracking_api.py`.
+
+### 🟡 Date-Proximity Triggers (requires cron / scheduled evaluation — medium effort)
+
+| Trigger ID | Fire Condition | Description |
+|---|---|---|
+| `pre_solicitation` | N days before `solicitation_date` | Capture prep tasks (price review, team confirm) |
+| `pre_due_date` | N days before `due_date` on opportunity | Final review / submission go / no-go |
+| `pop_expiry` | N days before period-of-performance end | Contract renewal / re-compete analysis |
+
+**Implementation path:** Add a cron job (via `CronCreate`) that runs daily, queries
+opportunities for upcoming dates, and fires matching templates. Store `offset_days`
+per template. Requires new `trigger_type: "date"` category in the template schema.
+
+### 🟠 Event-Based Triggers (requires field-change detection — medium effort)
+
+| Trigger ID | Fire Condition | Description |
+|---|---|---|
+| `priority_escalated` | Priority changes to `high` | Assign capture manager, schedule review |
+| `win_probability_low` | Win probability drops below threshold | Trigger go/no-go re-evaluation task |
+| `stage_regression` | Opportunity moves to an earlier stage | Flag for management review |
+
+**Implementation path:** Compare old vs new field values in `handle_opportunities_update_api()`
+before saving, then call template evaluator when a matching condition is detected.
+
+### 🟣 External System Triggers (requires integration — high effort)
+
+| Trigger ID | Source | Description |
+|---|---|---|
+| `unanet_stage_sync` | Unanet CRM | Mirror a stage transition from Unanet into a task |
+| `sharepoint_doc_uploaded` | SharePoint | Task when an RFP document is uploaded to the linked library |
+| `sam_amendment` | SAM.gov | Task when a solicitation amendment is detected |
+
+**Implementation path:** Webhook receivers or polling jobs in `proposal/integrations/`.
+Unanet and SharePoint clients already exist (`proposal/integrations/unanet_client.py`,
+`proposal/integrations/sharepoint_client.py`).
+
+### 🟢 User-Defined Custom Triggers (requires UI + schema extension — future)
+
+Allow users to create fully custom trigger conditions without code changes:
+- Custom tracking list types (beyond proposal/bnb/hotwash)
+- Field-value condition rules (e.g., `contract_type == 'IDIQ'`)
+- Multi-condition AND/OR logic
+
+**Implementation path:** Extend the template schema with a `conditions[]` array.
+Backend evaluates conditions against the updated opportunity object. Frontend provides
+a condition-builder UI in Settings > Pipeline Tasks.
 
 ---
 
