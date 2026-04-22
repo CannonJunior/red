@@ -1,9 +1,12 @@
 """
 server/router.py — Lightweight URL router for CustomHTTPRequestHandler.
 
-Routes are ordered tuples: (method, match_fn, action_name).
+Routes are stored per HTTP method so dispatch only scans same-method routes
+(O(k) where k is the count for that verb, not O(n) total).
+
 `match_fn(path)` returns True when the route applies.
-`action_name` is the no-argument method name on the handler instance.
+`action` is either a no-argument method name on the handler instance
+or a callable(handler) that handles the request directly.
 
 All handler methods must be *argument-free* — they extract any path
 parameters from `self.path` internally.
@@ -21,7 +24,7 @@ Usage:
     self.send_error(404, f"Not found: {self.path}")
 """
 
-from typing import Callable, List, NamedTuple, Union
+from typing import Callable, Dict, List, NamedTuple, Union
 
 
 class _Route(NamedTuple):
@@ -31,10 +34,11 @@ class _Route(NamedTuple):
 
 
 class Router:
-    """Ordered route registry with O(n) dispatch."""
+    """Route registry with per-method O(k) dispatch."""
 
     def __init__(self) -> None:
-        self._routes: List[_Route] = []
+        # Keyed by uppercase HTTP verb → ordered list of routes for that verb.
+        self._routes: Dict[str, List[_Route]] = {}
 
     def add(self, method: str, match: Callable[[str], bool], action: Union[str, Callable]) -> None:
         """
@@ -46,11 +50,14 @@ class Router:
             action: Zero-argument method name on the handler instance,
                     OR a callable(handler) that handles the request directly.
         """
-        self._routes.append(_Route(method.upper(), match, action))
+        verb = method.upper()
+        if verb not in self._routes:
+            self._routes[verb] = []
+        self._routes[verb].append(_Route(verb, match, action))
 
     def dispatch(self, method: str, path: str, handler) -> bool:
         """
-        Find and invoke the first matching route.
+        Find and invoke the first matching route for this HTTP method.
 
         Args:
             method: HTTP verb of the incoming request.
@@ -60,11 +67,14 @@ class Router:
         Returns:
             True if a route matched and was invoked, False otherwise.
         """
-        method = method.upper()
+        verb = method.upper()
+        routes = self._routes.get(verb)
+        if not routes:
+            return False
         # Strip query string for matching
         bare = path.split('?')[0]
-        for route in self._routes:
-            if route.method == method and route.match(bare):
+        for route in routes:
+            if route.match(bare):
                 if callable(route.action) and not isinstance(route.action, str):
                     route.action(handler)
                 else:

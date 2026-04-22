@@ -1,7 +1,14 @@
 """
-Opportunities API for managing business opportunities and tracking.
+opportunities_api.py — Core opportunities CRUD for OpportunitiesManager.
 
-Stores opportunities in both SQLite and knowledge graph for reference.
+Task management and pipeline stats live in opportunities_tasks_mixin.py.
+Schema creation lives in opportunities_schema.py.
+Module-level request handler functions live in opportunities_handlers.py.
+
+Public surface (re-exported for backwards compatibility):
+    OpportunitiesManager
+    get_opportunities_manager
+    handle_opportunities_* / handle_tasks_* / handle_pipeline_stats_request
 """
 
 import sqlite3
@@ -18,9 +25,11 @@ except ImportError:
     _USE_POOL = False
 
 from config.database import DEFAULT_DB
+from opportunities_schema import init_opportunities_schema
+from opportunities_tasks_mixin import _TasksMixin
 
 
-class OpportunitiesManager:
+class OpportunitiesManager(_TasksMixin):
     """Manage opportunities with SQLite storage and knowledge graph integration."""
 
     def __init__(self, db_path: str = DEFAULT_DB):
@@ -57,179 +66,50 @@ class OpportunitiesManager:
         return _plain()
 
     def _init_database(self):
-        """Initialize opportunities and tasks tables in database."""
+        """Initialize all tables and indexes via the schema module."""
         conn = sqlite3.connect(self.db_path)
-        cursor = conn.cursor()
-
-        # Create opportunities table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS opportunities (
-                id TEXT PRIMARY KEY,
-                name TEXT NOT NULL,
-                description TEXT,
-                status TEXT DEFAULT 'open',
-                priority TEXT DEFAULT 'medium',
-                value REAL DEFAULT 0.0,
-                tags TEXT,
-                metadata TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL
-            )
-        """)
-
-        # Create index for faster queries
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_opportunities_status
-            ON opportunities(status)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_opportunities_created
-            ON opportunities(created_at DESC)
-        """)
-
-        # Create tasks table
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS tasks (
-                id TEXT PRIMARY KEY,
-                opportunity_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT,
-                start_date TEXT NOT NULL,
-                end_date TEXT NOT NULL,
-                status TEXT DEFAULT 'pending',
-                progress INTEGER DEFAULT 0,
-                assigned_to TEXT,
-                created_at TEXT NOT NULL,
-                updated_at TEXT NOT NULL,
-                FOREIGN KEY (opportunity_id) REFERENCES opportunities(id) ON DELETE CASCADE
-            )
-        """)
-
-        # Create indexes for tasks
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_tasks_opportunity
-            ON tasks(opportunity_id)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_tasks_dates
-            ON tasks(start_date, end_date)
-        """)
-
-        # Create task_history table for tracking edits
-        cursor.execute("""
-            CREATE TABLE IF NOT EXISTS task_history (
-                id TEXT PRIMARY KEY,
-                task_id TEXT NOT NULL,
-                opportunity_id TEXT NOT NULL,
-                name TEXT NOT NULL,
-                description TEXT,
-                start_date TEXT NOT NULL,
-                end_date TEXT NOT NULL,
-                status TEXT,
-                progress INTEGER,
-                assigned_to TEXT,
-                edited_by TEXT,
-                edited_at TEXT NOT NULL,
-                change_description TEXT,
-                FOREIGN KEY (task_id) REFERENCES tasks(id) ON DELETE CASCADE
-            )
-        """)
-
-        # Create index for task history
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_task_history_task
-            ON task_history(task_id, edited_at DESC)
-        """)
-
-        # Additional performance indexes (not pipeline_stage — column added below)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_opportunities_priority
-            ON opportunities(priority)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_tasks_status
-            ON tasks(status)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_tasks_assigned
-            ON tasks(assigned_to)
-        """)
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_task_history_opportunity
-            ON task_history(opportunity_id)
-        """)
-
-        # Add pipeline_stage column if it doesn't exist yet (migration)
-        # Reason: ALTER TABLE must precede index creation on the column
-        try:
-            cursor.execute(
-                "ALTER TABLE opportunities ADD COLUMN pipeline_stage TEXT DEFAULT 'identified'"
-            )
-        except Exception:
-            pass  # Column already exists
-
-        # Index pipeline_stage after the column is guaranteed to exist
-        cursor.execute("""
-            CREATE INDEX IF NOT EXISTS idx_opportunities_pipeline_stage
-            ON opportunities(pipeline_stage)
-        """)
-
-        # Add CRM-sourced columns (idempotent ALTER TABLE ADD COLUMN)
-        _new_cols = [
-            "probability TEXT",
-            "proposal_due_date TEXT",
-            "opp_number TEXT",
-            "is_iwa TEXT",
-            "owning_org TEXT",
-            "proposal_folder TEXT",
-            "agency TEXT",
-            "solicitation_link TEXT",
-            "deal_type TEXT",
-        ]
-        for col_def in _new_cols:
-            try:
-                cursor.execute(f"ALTER TABLE opportunities ADD COLUMN {col_def}")
-            except Exception:
-                pass  # Column already exists
-
-        conn.commit()
+        init_opportunities_schema(conn)
         conn.close()
 
+    # -------------------------------------------------------------------------
+    # Opportunity CRUD
+    # -------------------------------------------------------------------------
+
     def create_opportunity(self, name: str, description: str = "",
-                          status: str = "open", priority: str = "medium",
-                          value: float = 0.0, tags: List[str] = None,
-                          metadata: Dict = None,
-                          pipeline_stage: str = "identified",
-                          probability: str = "",
-                          proposal_due_date: str = "",
-                          opp_number: str = "",
-                          is_iwa: str = "",
-                          owning_org: str = "",
-                          proposal_folder: str = "",
-                          agency: str = "",
-                          solicitation_link: str = "",
-                          deal_type: str = "") -> Dict:
+                           status: str = "open", priority: str = "medium",
+                           value: float = 0.0, tags: List[str] = None,
+                           metadata: Dict = None,
+                           pipeline_stage: str = "identified",
+                           probability: str = "",
+                           proposal_due_date: str = "",
+                           opp_number: str = "",
+                           is_iwa: str = "",
+                           owning_org: str = "",
+                           proposal_folder: str = "",
+                           agency: str = "",
+                           solicitation_link: str = "",
+                           deal_type: str = "") -> Dict:
         """
         Create a new opportunity.
 
         Args:
-            name: Opportunity name
-            description: Detailed description
-            status: Legacy status field (open, in_progress, won, lost)
-            priority: Priority level (low, medium, high)
-            value: Estimated contract value ($)
-            tags: List of tags
-            metadata: Additional metadata
-            pipeline_stage: Workflow pipeline stage slug
-            probability: Probability of win (e.g. "25%")
-            proposal_due_date: Proposal due date string
-            opp_number: CRM opportunity number
-            is_iwa: Is IWA flag ("yes"/"no")
-            owning_org: Owning organization / division
-            proposal_folder: URL or path to proposal folder
-            agency: Client agency name
-            solicitation_link: Link to solicitation (SAM.gov etc.)
-            deal_type: Deal type (e.g. "New Business", "Recompete")
+            name: Opportunity name.
+            description: Detailed description.
+            status: Legacy status field (open, in_progress, won, lost).
+            priority: Priority level (low, medium, high).
+            value: Estimated contract value ($).
+            tags: List of tags.
+            metadata: Additional metadata.
+            pipeline_stage: Workflow pipeline stage slug.
+            probability: Probability of win (e.g. "25%").
+            proposal_due_date: Proposal due date string.
+            opp_number: CRM opportunity number.
+            is_iwa: Is IWA flag ("yes"/"no").
+            owning_org: Owning organization / division.
+            proposal_folder: URL or path to proposal folder.
+            agency: Client agency name.
+            solicitation_link: Link to solicitation (SAM.gov etc.).
+            deal_type: Deal type (e.g. "New Business", "Recompete").
 
         Returns:
             Created opportunity data dict.
@@ -259,49 +139,35 @@ class OpportunitiesManager:
 
             conn.commit()
 
-            # Add to knowledge graph
             self._add_to_knowledge_graph(opportunity_id, name, description, tags or [])
 
             return {
                 'status': 'success',
                 'opportunity': {
-                    'id': opportunity_id,
-                    'name': name,
-                    'description': description,
-                    'status': status,
-                    'pipeline_stage': pipeline_stage,
-                    'priority': priority,
-                    'value': value,
-                    'tags': tags or [],
-                    'metadata': metadata or {},
-                    'probability': probability,
-                    'proposal_due_date': proposal_due_date,
-                    'opp_number': opp_number,
-                    'is_iwa': is_iwa,
-                    'owning_org': owning_org,
-                    'proposal_folder': proposal_folder,
-                    'agency': agency,
-                    'solicitation_link': solicitation_link,
-                    'deal_type': deal_type,
-                    'created_at': now,
-                    'updated_at': now,
+                    'id': opportunity_id, 'name': name, 'description': description,
+                    'status': status, 'pipeline_stage': pipeline_stage,
+                    'priority': priority, 'value': value,
+                    'tags': tags or [], 'metadata': metadata or {},
+                    'probability': probability, 'proposal_due_date': proposal_due_date,
+                    'opp_number': opp_number, 'is_iwa': is_iwa,
+                    'owning_org': owning_org, 'proposal_folder': proposal_folder,
+                    'agency': agency, 'solicitation_link': solicitation_link,
+                    'deal_type': deal_type, 'created_at': now, 'updated_at': now,
                 }
             }
 
         except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to create opportunity: {str(e)}'
-            }
+            return {'status': 'error', 'message': f'Failed to create opportunity: {str(e)}'}
 
-    def list_opportunities(self, status: Optional[str] = None, limit: int = 100, offset: int = 0) -> Dict:
+    def list_opportunities(self, status: Optional[str] = None,
+                           limit: int = 100, offset: int = 0) -> Dict:
         """
         List opportunities with optional status filter and pagination.
 
         Args:
-            status: Optional status filter
-            limit: Maximum number of results to return (default 100)
-            offset: Number of records to skip for pagination (default 0)
+            status: Optional status filter.
+            limit: Maximum results (default 100).
+            offset: Records to skip for pagination (default 0).
 
         Returns:
             Dict with opportunities list, total count, and pagination metadata.
@@ -340,31 +206,27 @@ class OpportunitiesManager:
 
                 rows = cursor.fetchall()
 
-            opportunities = []
-            for row in rows:
-                opportunities.append({
-                    'id': row['id'],
-                    'name': row['name'],
-                    'description': row['description'],
-                    'status': row['status'],
-                    'pipeline_stage': row['pipeline_stage'] or 'identified',
-                    'priority': row['priority'],
-                    'value': row['value'],
-                    'tags': json.loads(row['tags']) if row['tags'] else [],
-                    'metadata': json.loads(row['metadata']) if row['metadata'] else {},
-                    'probability': row['probability'] or '',
-                    'proposal_due_date': row['proposal_due_date'] or '',
-                    'opp_number': row['opp_number'] or '',
-                    'is_iwa': row['is_iwa'] or '',
-                    'owning_org': row['owning_org'] or '',
-                    'proposal_folder': row['proposal_folder'] or '',
-                    'agency': row['agency'] or '',
-                    'solicitation_link': row['solicitation_link'] or '',
-                    'deal_type': row['deal_type'] or '',
-                    'created_at': row['created_at'],
-                    'updated_at': row['updated_at'],
-                })
+            def _row(r):
+                return {
+                    'id': r['id'], 'name': r['name'], 'description': r['description'],
+                    'status': r['status'],
+                    'pipeline_stage': r['pipeline_stage'] or 'identified',
+                    'priority': r['priority'], 'value': r['value'],
+                    'tags': json.loads(r['tags']) if r['tags'] else [],
+                    'metadata': json.loads(r['metadata']) if r['metadata'] else {},
+                    'probability': r['probability'] or '',
+                    'proposal_due_date': r['proposal_due_date'] or '',
+                    'opp_number': r['opp_number'] or '',
+                    'is_iwa': r['is_iwa'] or '',
+                    'owning_org': r['owning_org'] or '',
+                    'proposal_folder': r['proposal_folder'] or '',
+                    'agency': r['agency'] or '',
+                    'solicitation_link': r['solicitation_link'] or '',
+                    'deal_type': r['deal_type'] or '',
+                    'created_at': r['created_at'], 'updated_at': r['updated_at'],
+                }
 
+            opportunities = [_row(r) for r in rows]
             return {
                 'status': 'success',
                 'opportunities': opportunities,
@@ -377,14 +239,9 @@ class OpportunitiesManager:
 
         except Exception as e:
             return {
-                'status': 'error',
-                'message': f'Failed to list opportunities: {str(e)}',
-                'opportunities': [],
-                'count': 0,
-                'total': 0,
-                'limit': limit,
-                'offset': offset,
-                'has_more': False,
+                'status': 'error', 'message': f'Failed to list opportunities: {str(e)}',
+                'opportunities': [], 'count': 0, 'total': 0,
+                'limit': limit, 'offset': offset, 'has_more': False,
             }
 
     def get_opportunity(self, opportunity_id: str) -> Dict:
@@ -392,10 +249,10 @@ class OpportunitiesManager:
         Get a specific opportunity by ID.
 
         Args:
-            opportunity_id: Opportunity ID
+            opportunity_id: Opportunity ID.
 
         Returns:
-            Opportunity data
+            Opportunity data dict.
         """
         try:
             with self._connect() as conn:
@@ -410,23 +267,16 @@ class OpportunitiesManager:
             """, (opportunity_id,))
 
             row = cursor.fetchone()
-
             if not row:
-                return {
-                    'status': 'error',
-                    'message': 'Opportunity not found'
-                }
+                return {'status': 'error', 'message': 'Opportunity not found'}
 
             return {
                 'status': 'success',
                 'opportunity': {
-                    'id': row['id'],
-                    'name': row['name'],
-                    'description': row['description'],
-                    'status': row['status'],
+                    'id': row['id'], 'name': row['name'],
+                    'description': row['description'], 'status': row['status'],
                     'pipeline_stage': row['pipeline_stage'] or 'identified',
-                    'priority': row['priority'],
-                    'value': row['value'],
+                    'priority': row['priority'], 'value': row['value'],
                     'tags': json.loads(row['tags']) if row['tags'] else [],
                     'metadata': json.loads(row['metadata']) if row['metadata'] else {},
                     'probability': row['probability'] or '',
@@ -438,45 +288,35 @@ class OpportunitiesManager:
                     'agency': row['agency'] or '',
                     'solicitation_link': row['solicitation_link'] or '',
                     'deal_type': row['deal_type'] or '',
-                    'created_at': row['created_at'],
-                    'updated_at': row['updated_at'],
+                    'created_at': row['created_at'], 'updated_at': row['updated_at'],
                 }
             }
 
         except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to get opportunity: {str(e)}'
-            }
+            return {'status': 'error', 'message': f'Failed to get opportunity: {str(e)}'}
 
     def update_opportunity(self, opportunity_id: str, **updates) -> Dict:
         """
         Update an opportunity.
 
         Args:
-            opportunity_id: Opportunity ID
-            **updates: Fields to update
+            opportunity_id: Opportunity ID.
+            **updates: Fields to update.
 
         Returns:
-            Updated opportunity data
+            Updated opportunity data dict.
         """
         try:
             with self._connect() as conn:
                 cursor = conn.cursor()
-
-            # Build update query
-            update_fields = []
-            update_values = []
 
             _updatable = [
                 'name', 'description', 'status', 'pipeline_stage', 'priority', 'value',
                 'probability', 'proposal_due_date', 'opp_number', 'is_iwa',
                 'owning_org', 'proposal_folder', 'agency', 'solicitation_link', 'deal_type',
             ]
-            for field in _updatable:
-                if field in updates:
-                    update_fields.append(f"{field} = ?")
-                    update_values.append(updates[field])
+            update_fields = [f"{f} = ?" for f in _updatable if f in updates]
+            update_values = [updates[f] for f in _updatable if f in updates]
 
             if 'tags' in updates:
                 update_fields.append("tags = ?")
@@ -490,195 +330,76 @@ class OpportunitiesManager:
                 return {'status': 'error', 'message': 'No fields to update'}
 
             update_fields.append("updated_at = ?")
-            update_values.append(datetime.now().isoformat())
+            update_values.extend([datetime.now().isoformat(), opportunity_id])
 
-            update_values.append(opportunity_id)
-
-            cursor.execute(f"""
-                UPDATE opportunities
-                SET {', '.join(update_fields)}
-                WHERE id = ?
-            """, update_values)
-
+            cursor.execute(
+                f"UPDATE opportunities SET {', '.join(update_fields)} WHERE id = ?",
+                update_values,
+            )
             conn.commit()
 
-            # Update knowledge graph if name or description changed
             if 'name' in updates or 'description' in updates or 'tags' in updates:
                 self._update_knowledge_graph(opportunity_id, updates)
 
             return self.get_opportunity(opportunity_id)
 
         except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to update opportunity: {str(e)}'
-            }
+            return {'status': 'error', 'message': f'Failed to update opportunity: {str(e)}'}
 
     def delete_opportunity(self, opportunity_id: str) -> Dict:
         """
         Delete an opportunity.
 
         Args:
-            opportunity_id: Opportunity ID
+            opportunity_id: Opportunity ID.
 
         Returns:
-            Success status
+            Success status dict.
         """
         try:
             with self._connect() as conn:
                 cursor = conn.cursor()
 
             cursor.execute("DELETE FROM opportunities WHERE id = ?", (opportunity_id,))
-
             conn.commit()
-
-            # Remove from knowledge graph
             self._remove_from_knowledge_graph(opportunity_id)
 
-            return {
-                'status': 'success',
-                'message': 'Opportunity deleted successfully'
-            }
+            return {'status': 'success', 'message': 'Opportunity deleted successfully'}
 
         except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to delete opportunity: {str(e)}'
-            }
+            return {'status': 'error', 'message': f'Failed to delete opportunity: {str(e)}'}
 
-    def get_pipeline_stats(self) -> Dict:
-        """
-        Compute pipeline health statistics.
-
-        Calculates win rate, stage distribution, priority breakdown,
-        and total/active/won pipeline value from current DB state.
-
-        Returns:
-            Dict with status, stats sub-dict containing all metrics.
-        """
-        # Canonical closed-won and closed-lost pipeline stage values
-        _WON_STAGES  = {'awarded', 'contract_vehicle_won', 'contract_vehicle_complete'}
-        _LOST_STAGES = {'lost', 'no_bid', 'cancelled'}
-        _OPEN_STAGES = {
-            'identified', 'qualifying', 'long_lead', 'bid_decision',
-            'active', 'submitted', 'negotiating',
-        }
-
-        try:
-            with self._connect() as conn:
-                cursor = conn.cursor()
-
-            cursor.execute(
-                "SELECT pipeline_stage, priority, value FROM opportunities"
-            )
-            rows = cursor.fetchall()
-
-            total = len(rows)
-            by_stage: Dict[str, Dict] = {}
-            by_priority: Dict[str, int] = {}
-            total_value = 0.0
-            active_value = 0.0
-            won_value = 0.0
-            won_count = 0
-            lost_count = 0
-
-            for row in rows:
-                stage    = row['pipeline_stage'] or 'identified'
-                priority = row['priority'] or 'medium'
-                value    = float(row['value'] or 0)
-
-                # Stage bucket
-                if stage not in by_stage:
-                    by_stage[stage] = {'count': 0, 'value': 0.0}
-                by_stage[stage]['count'] += 1
-                by_stage[stage]['value'] += value
-
-                # Priority bucket
-                by_priority[priority] = by_priority.get(priority, 0) + 1
-
-                total_value += value
-                if stage in _WON_STAGES:
-                    won_value += value
-                    won_count += 1
-                elif stage in _OPEN_STAGES:
-                    active_value += value
-
-                if stage in _WON_STAGES:
-                    won_count  # already counted above
-                elif stage in _LOST_STAGES:
-                    lost_count += 1
-
-            decided = won_count + lost_count
-            win_rate = round(won_count / decided, 4) if decided > 0 else None
-
-            return {
-                'status': 'success',
-                'stats': {
-                    'total':         total,
-                    'won_count':     won_count,
-                    'lost_count':    lost_count,
-                    'active_count':  sum(
-                        v['count'] for s, v in by_stage.items()
-                        if s in _OPEN_STAGES
-                    ),
-                    'win_rate':      win_rate,
-                    'total_value':   round(total_value, 2),
-                    'active_value':  round(active_value, 2),
-                    'won_value':     round(won_value, 2),
-                    'by_stage':      by_stage,
-                    'by_priority':   by_priority,
-                },
-            }
-
-        except Exception as e:
-            return {'status': 'error', 'message': f'Failed to compute pipeline stats: {e}'}
+    # -------------------------------------------------------------------------
+    # Knowledge Graph helpers (optional RAG integration)
+    # -------------------------------------------------------------------------
 
     def _add_to_knowledge_graph(self, opportunity_id: str, name: str,
                                 description: str, tags: List[str]):
         """Add opportunity to knowledge graph for RAG reference."""
         try:
-            # Try to import RAG API to add to knowledge graph
             from rag_api import handle_rag_ingest_request
 
-            # Create a text document for the opportunity
-            opportunity_text = f"""
-Opportunity: {name}
-ID: {opportunity_id}
-Description: {description}
-Tags: {', '.join(tags)}
-Type: Business Opportunity
-"""
-
-            # Write to temp file
+            opportunity_text = (
+                f"Opportunity: {name}\nID: {opportunity_id}\n"
+                f"Description: {description}\nTags: {', '.join(tags)}\n"
+                f"Type: Business Opportunity\n"
+            )
             temp_file = Path(f"/tmp/opportunity_{opportunity_id}.txt")
             temp_file.write_text(opportunity_text)
-
-            # Ingest into RAG system
             handle_rag_ingest_request(str(temp_file), workspace='opportunities')
-
-            # Clean up temp file
             temp_file.unlink()
-
         except Exception as e:
-            # Knowledge graph integration is optional
             print(f"Note: Could not add to knowledge graph: {e}")
 
     def _update_knowledge_graph(self, opportunity_id: str, updates: Dict):
-        """Update opportunity in knowledge graph."""
-        # For now, we'll delete and re-add
-        # A more sophisticated approach would update the specific chunks
+        """Update opportunity in knowledge graph (delete + re-add)."""
         try:
             self._remove_from_knowledge_graph(opportunity_id)
-
-            # Get current opportunity data
             result = self.get_opportunity(opportunity_id)
             if result['status'] == 'success':
                 opp = result['opportunity']
                 self._add_to_knowledge_graph(
-                    opportunity_id,
-                    opp['name'],
-                    opp['description'],
-                    opp['tags']
+                    opportunity_id, opp['name'], opp['description'], opp['tags']
                 )
         except Exception as e:
             print(f"Note: Could not update knowledge graph: {e}")
@@ -687,435 +408,8 @@ Type: Business Opportunity
         """Remove opportunity from knowledge graph."""
         try:
             from rag_api import handle_rag_document_delete_request
-            handle_rag_document_delete_request(f"opportunity_{opportunity_id}", workspace='opportunities')
+            handle_rag_document_delete_request(
+                f"opportunity_{opportunity_id}", workspace='opportunities'
+            )
         except Exception as e:
             print(f"Note: Could not remove from knowledge graph: {e}")
-
-    # Task Management Methods
-
-    def create_task(self, opportunity_id: str, name: str, start_date: str, end_date: str,
-                   description: str = "", status: str = "pending", progress: int = 0,
-                   assigned_to: str = "") -> Dict:
-        """
-        Create a new task for an opportunity.
-
-        Args:
-            opportunity_id: Parent opportunity ID
-            name: Task name
-            start_date: Task start date (ISO format)
-            end_date: Task end date (ISO format)
-            description: Task description
-            status: Task status (pending, in_progress, completed)
-            progress: Progress percentage (0-100)
-            assigned_to: Person assigned to the task
-
-        Returns:
-            Created task data
-        """
-        try:
-            task_id = str(uuid.uuid4())
-            now = datetime.now().isoformat()
-
-            with self._connect() as conn:
-                cursor = conn.cursor()
-
-            cursor.execute("""
-                INSERT INTO tasks
-                (id, opportunity_id, name, description, start_date, end_date,
-                 status, progress, assigned_to, created_at, updated_at)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (task_id, opportunity_id, name, description, start_date, end_date,
-                  status, progress, assigned_to, now, now))
-
-            conn.commit()
-
-            return {
-                'status': 'success',
-                'task': {
-                    'id': task_id,
-                    'opportunity_id': opportunity_id,
-                    'name': name,
-                    'description': description,
-                    'start_date': start_date,
-                    'end_date': end_date,
-                    'status': status,
-                    'progress': progress,
-                    'assigned_to': assigned_to,
-                    'created_at': now,
-                    'updated_at': now
-                }
-            }
-
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to create task: {str(e)}'
-            }
-
-    def list_tasks(self, opportunity_id: str) -> Dict:
-        """
-        List all tasks for an opportunity.
-
-        Args:
-            opportunity_id: Opportunity ID
-
-        Returns:
-            List of tasks
-        """
-        try:
-            with self._connect() as conn:
-                cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT id, opportunity_id, name, description, start_date, end_date,
-                       status, progress, assigned_to, created_at, updated_at
-                FROM tasks
-                WHERE opportunity_id = ?
-                ORDER BY start_date ASC
-            """, (opportunity_id,))
-
-            rows = cursor.fetchall()
-
-            tasks = []
-            for row in rows:
-                tasks.append({
-                    'id': row['id'],
-                    'opportunity_id': row['opportunity_id'],
-                    'name': row['name'],
-                    'description': row['description'],
-                    'start_date': row['start_date'],
-                    'end_date': row['end_date'],
-                    'status': row['status'],
-                    'progress': row['progress'],
-                    'assigned_to': row['assigned_to'],
-                    'created_at': row['created_at'],
-                    'updated_at': row['updated_at']
-                })
-
-            return {
-                'status': 'success',
-                'tasks': tasks,
-                'count': len(tasks)
-            }
-
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to list tasks: {str(e)}',
-                'tasks': [],
-                'count': 0
-            }
-
-    def update_task(self, task_id: str, edited_by: str = "system", **updates) -> Dict:
-        """
-        Update a task and save history.
-
-        Args:
-            task_id: Task ID
-            edited_by: User who made the edit
-            **updates: Fields to update
-
-        Returns:
-            Updated task data
-        """
-        try:
-            with self._connect() as conn:
-                cursor = conn.cursor()
-
-            # Get current task state for history
-            cursor.execute("""
-                SELECT id, opportunity_id, name, description, start_date, end_date,
-                       status, progress, assigned_to, created_at, updated_at
-                FROM tasks WHERE id = ?
-            """, (task_id,))
-            current_task = cursor.fetchone()
-
-            if not current_task:
-                    return {'status': 'error', 'message': 'Task not found'}
-
-            # Save current state to history
-            history_id = str(uuid.uuid4())
-            now = datetime.now().isoformat()
-
-            # Determine what changed
-            changes = []
-            for field in ['name', 'description', 'start_date', 'end_date', 'status', 'progress', 'assigned_to']:
-                if field in updates and updates[field] != current_task[field]:
-                    old_val = current_task[field] or "None"
-                    new_val = updates[field] or "None"
-                    changes.append(f"{field}: '{old_val}' → '{new_val}'")
-
-            change_description = "; ".join(changes) if changes else "No changes"
-
-            cursor.execute("""
-                INSERT INTO task_history
-                (id, task_id, opportunity_id, name, description, start_date, end_date,
-                 status, progress, assigned_to, edited_by, edited_at, change_description)
-                VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-            """, (
-                history_id, task_id, current_task['opportunity_id'],
-                current_task['name'], current_task['description'],
-                current_task['start_date'], current_task['end_date'],
-                current_task['status'], current_task['progress'],
-                current_task['assigned_to'], edited_by, now, change_description
-            ))
-
-            # Build update query
-            update_fields = []
-            update_values = []
-
-            for field in ['name', 'description', 'start_date', 'end_date', 'status', 'progress', 'assigned_to']:
-                if field in updates:
-                    update_fields.append(f"{field} = ?")
-                    update_values.append(updates[field])
-
-            if not update_fields:
-                    return {'status': 'error', 'message': 'No fields to update'}
-
-            update_fields.append("updated_at = ?")
-            update_values.append(now)
-
-            update_values.append(task_id)
-
-            cursor.execute(f"""
-                UPDATE tasks
-                SET {', '.join(update_fields)}
-                WHERE id = ?
-            """, update_values)
-
-            conn.commit()
-
-            return self.get_task(task_id)
-
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to update task: {str(e)}'
-            }
-
-    def get_task(self, task_id: str) -> Dict:
-        """Get a specific task by ID."""
-        try:
-            with self._connect() as conn:
-                cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT id, opportunity_id, name, description, start_date, end_date,
-                       status, progress, assigned_to, created_at, updated_at
-                FROM tasks WHERE id = ?
-            """, (task_id,))
-            row = cursor.fetchone()
-
-            if not row:
-                return {'status': 'error', 'message': 'Task not found'}
-
-            return {
-                'status': 'success',
-                'task': {
-                    'id': row['id'],
-                    'opportunity_id': row['opportunity_id'],
-                    'name': row['name'],
-                    'description': row['description'],
-                    'start_date': row['start_date'],
-                    'end_date': row['end_date'],
-                    'status': row['status'],
-                    'progress': row['progress'],
-                    'assigned_to': row['assigned_to'],
-                    'created_at': row['created_at'],
-                    'updated_at': row['updated_at']
-                }
-            }
-
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to get task: {str(e)}'
-            }
-
-    def get_task_history(self, task_id: str) -> Dict:
-        """Get edit history for a task."""
-        try:
-            with self._connect() as conn:
-                cursor = conn.cursor()
-
-            cursor.execute("""
-                SELECT id, task_id, opportunity_id, name, description, start_date, end_date,
-                       status, progress, assigned_to, edited_by, edited_at, change_description
-                FROM task_history
-                WHERE task_id = ?
-                ORDER BY edited_at DESC
-            """, (task_id,))
-
-            rows = cursor.fetchall()
-
-            history_items = []
-            for row in rows:
-                history_items.append({
-                    'id': row['id'],
-                    'task_id': row['task_id'],
-                    'name': row['name'],
-                    'description': row['description'],
-                    'start_date': row['start_date'],
-                    'end_date': row['end_date'],
-                    'status': row['status'],
-                    'progress': row['progress'],
-                    'assigned_to': row['assigned_to'],
-                    'edited_by': row['edited_by'],
-                    'edited_at': row['edited_at'],
-                    'change_description': row['change_description']
-                })
-
-            return {
-                'status': 'success',
-                'history': history_items,
-                'count': len(history_items)
-            }
-
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to get task history: {str(e)}'
-            }
-
-    def delete_task(self, task_id: str) -> Dict:
-        """Delete a task."""
-        try:
-            with self._connect() as conn:
-                cursor = conn.cursor()
-
-            cursor.execute("DELETE FROM tasks WHERE id = ?", (task_id,))
-
-            conn.commit()
-
-            return {
-                'status': 'success',
-                'message': 'Task deleted successfully'
-            }
-
-        except Exception as e:
-            return {
-                'status': 'error',
-                'message': f'Failed to delete task: {str(e)}'
-            }
-
-
-# Global instance
-_opportunities_manager = None
-
-
-def get_opportunities_manager() -> OpportunitiesManager:
-    """Get or create the global opportunities manager instance."""
-    global _opportunities_manager
-    if _opportunities_manager is None:
-        _opportunities_manager = OpportunitiesManager()
-    return _opportunities_manager
-
-
-# API Request Handlers
-def handle_opportunities_list_request(filters: Dict = None) -> Dict:
-    """Handle list opportunities request."""
-    manager = get_opportunities_manager()
-    status = filters.get('status') if filters else None
-    limit = int(filters.get('limit', 100)) if filters else 100
-    offset = int(filters.get('offset', 0)) if filters else 0
-    return manager.list_opportunities(status=status, limit=limit, offset=offset)
-
-
-def handle_opportunities_create_request(data: Dict) -> Dict:
-    """Handle create opportunity request."""
-    manager = get_opportunities_manager()
-    return manager.create_opportunity(
-        name=data.get('name', 'Untitled Opportunity'),
-        description=data.get('description', ''),
-        status=data.get('status', 'open'),
-        priority=data.get('priority', 'medium'),
-        value=data.get('value', 0.0),
-        tags=data.get('tags', []),
-        metadata=data.get('metadata', {}),
-        pipeline_stage=data.get('pipeline_stage', 'identified'),
-        probability=data.get('probability', ''),
-        proposal_due_date=data.get('proposal_due_date', ''),
-        opp_number=data.get('opp_number', ''),
-        is_iwa=data.get('is_iwa', ''),
-        owning_org=data.get('owning_org', ''),
-        proposal_folder=data.get('proposal_folder', ''),
-        agency=data.get('agency', ''),
-        solicitation_link=data.get('solicitation_link', ''),
-        deal_type=data.get('deal_type', ''),
-    )
-
-
-def handle_opportunities_get_request(opportunity_id: str) -> Dict:
-    """Handle get opportunity request."""
-    manager = get_opportunities_manager()
-    return manager.get_opportunity(opportunity_id)
-
-
-def handle_opportunities_update_request(opportunity_id: str, data: Dict) -> Dict:
-    """Handle update opportunity request."""
-    manager = get_opportunities_manager()
-    return manager.update_opportunity(opportunity_id, **data)
-
-
-def handle_opportunities_delete_request(opportunity_id: str) -> Dict:
-    """Handle delete opportunity request."""
-    manager = get_opportunities_manager()
-    return manager.delete_opportunity(opportunity_id)
-
-
-# Task Request Handlers
-def handle_tasks_list_request(opportunity_id: str) -> Dict:
-    """Handle list tasks request."""
-    manager = get_opportunities_manager()
-    return manager.list_tasks(opportunity_id)
-
-
-def handle_tasks_create_request(opportunity_id: str, data: Dict) -> Dict:
-    """Handle create task request."""
-    manager = get_opportunities_manager()
-    return manager.create_task(
-        opportunity_id=opportunity_id,
-        name=data.get('name', 'Untitled Task'),
-        start_date=data.get('start_date'),
-        end_date=data.get('end_date'),
-        description=data.get('description', ''),
-        status=data.get('status', 'pending'),
-        progress=data.get('progress', 0),
-        assigned_to=data.get('assigned_to', '')
-    )
-
-
-def handle_tasks_update_request(task_id: str, data: Dict) -> Dict:
-    """Handle update task request."""
-    manager = get_opportunities_manager()
-    return manager.update_task(task_id, **data)
-
-
-def handle_task_get_request(task_id: str) -> Dict:
-    """Handle get task request."""
-    manager = get_opportunities_manager()
-    return manager.get_task(task_id)
-
-
-def handle_tasks_delete_request(task_id: str) -> Dict:
-    """Handle delete task request."""
-    manager = get_opportunities_manager()
-    return manager.delete_task(task_id)
-
-
-def handle_task_history_request(task_id: str) -> Dict:
-    """Handle get task history request."""
-    manager = get_opportunities_manager()
-    return manager.get_task_history(task_id)
-
-
-def handle_pipeline_stats_request() -> Dict:
-    """
-    Compute pipeline health statistics from the opportunities table.
-
-    Returns:
-        Dict with keys: total, by_stage, by_priority, win_rate,
-        total_value, active_value, won_value.
-    """
-    manager = get_opportunities_manager()
-    return manager.get_pipeline_stats()

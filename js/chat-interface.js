@@ -144,15 +144,19 @@ class ChatInterface {
             }
         });
 
-        // Input changes
+        // Input changes — updateSendButtonState fires immediately; autocomplete
+        // calls are debounced at 150 ms to avoid hammering the DOM on fast typing.
+        let _autocompleteTimer = null;
         this.messageInput?.addEventListener('input', (e) => {
             this.updateSendButtonState();
-            this.handleMCPToolAutocomplete(e);
-            this.handlePromptAutocomplete(e);
-            // Handle agent mentions (@)
-            if (this.agentMentionAutocomplete) {
-                this.agentMentionAutocomplete.handleInput();
-            }
+            clearTimeout(_autocompleteTimer);
+            _autocompleteTimer = setTimeout(() => {
+                this.handleMCPToolAutocomplete(e);
+                this.handlePromptAutocomplete(e);
+                if (this.agentMentionAutocomplete) {
+                    this.agentMentionAutocomplete.handleInput();
+                }
+            }, 150);
         });
     }
 

@@ -47,8 +47,12 @@ Object.assign(CapturePanel.prototype, {
             document.getElementById('comp-cancel-btn').addEventListener('click', () =>
                 document.getElementById('comp-form').classList.add('hidden'));
             document.getElementById('comp-save-btn').addEventListener('click', () => this._saveCompetitor());
-            document.querySelectorAll('.delete-comp').forEach(b =>
-                b.addEventListener('click', e => this._deleteCompetitor(e.target.dataset.id)));
+            // Delegated: one listener on the container handles all delete buttons,
+            // including any added after initial render.
+            this._content.addEventListener('click', e => {
+                const btn = e.target.closest('.delete-comp');
+                if (btn) this._deleteCompetitor(btn.dataset.id);
+            });
         } catch (e) { this._setError(e.message); }
     },
 
@@ -162,8 +166,11 @@ Object.assign(CapturePanel.prototype, {
             document.getElementById('act-cancel-btn').addEventListener('click', () =>
                 document.getElementById('act-form').classList.add('hidden'));
             document.getElementById('act-save-btn').addEventListener('click', () => this._saveActivity());
-            document.querySelectorAll('.delete-act').forEach(b =>
-                b.addEventListener('click', e => this._deleteActivity(e.target.dataset.id)));
+            // Delegated: one listener on the container handles all delete buttons.
+            this._content.addEventListener('click', e => {
+                const btn = e.target.closest('.delete-act');
+                if (btn) this._deleteActivity(btn.dataset.id);
+            });
         } catch (e) { this._setError(e.message); }
     },
 

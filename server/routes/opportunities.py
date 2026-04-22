@@ -17,7 +17,7 @@ from server.request_models import (
 from server.routes.settings_api import get_task_templates as _get_task_templates
 
 try:
-    from opportunities_api import (
+    from opportunities_handlers import (
         handle_opportunities_list_request,
         handle_opportunities_create_request,
         handle_opportunities_get_request,
@@ -39,6 +39,7 @@ try:
     from opportunities_import_export import (
         handle_opportunities_delete_all_request,
         handle_opportunities_parse_csv_request,
+        handle_opportunities_parse_xls_request,
         handle_opportunities_import_confirm_request,
         handle_opportunities_export_request,
     )
@@ -338,6 +339,20 @@ def handle_opportunities_import_parse_api(handler):
         handler.send_json_response({'error': 'Missing csv_content field'}, 400)
         return
     result = handle_opportunities_parse_csv_request(body['csv_content'])
+    handler.send_json_response(result)
+
+
+@error_handler
+def handle_opportunities_import_xls_parse_api(handler):
+    """Handle POST /api/opportunities/import/xls-parse - Parse XLS file & preview."""
+    if not IMPORT_EXPORT_AVAILABLE:
+        handler.send_json_response({'error': 'Import/export module not available'}, 503)
+        return
+    body = handler.get_request_body()
+    if body is None or 'xls_content' not in body:
+        handler.send_json_response({'error': 'Missing xls_content field (base64)'}, 400)
+        return
+    result = handle_opportunities_parse_xls_request(body['xls_content'])
     handler.send_json_response(result)
 
 

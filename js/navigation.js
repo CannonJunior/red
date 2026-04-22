@@ -77,6 +77,11 @@ class Navigation {
                     return;
                 }
 
+                if (listType === 'proposal-docs') {
+                    this._showProposalDocs();
+                    return;
+                }
+
                 if (listType === 'tasks') {
                     this.navigateTo('tasks');
                     return;
@@ -116,6 +121,36 @@ class Navigation {
         const pageTitle = document.getElementById('page-title');
         if (pageTitle) {
             pageTitle.textContent = 'Career-Monster';
+        }
+    }
+
+    async _showProposalDocs() {
+        this.navigateTo('proposal-docs');
+        const pageTitle = document.getElementById('page-title');
+        if (pageTitle) pageTitle.textContent = 'Proposal Docs';
+
+        // Populate proposal selector
+        const sel = document.getElementById('pw-proposal-selector');
+        if (!sel) return;
+        try {
+            const res = await fetch('/api/proposals');
+            const data = await res.json();
+            const proposals = data.proposals || [];
+            sel.innerHTML = '<option value="">— Select a Proposal —</option>' +
+                proposals.map(p => `<option value="${p.id}">${p.title || p.name || p.id}</option>`).join('');
+            sel.onchange = () => {
+                const pid = sel.value;
+                if (!pid) return;
+                const proposal = proposals.find(p => p.id === pid);
+                ProposalWriter.init(
+                    pid,
+                    proposal?.title || proposal?.name || '',
+                    proposal?.win_themes || [],
+                    proposal?.opportunity_id || ''
+                );
+            };
+        } catch {
+            sel.innerHTML = '<option value="">No proposals available</option>';
         }
     }
 
@@ -431,10 +466,11 @@ class Navigation {
         document.getElementById('pipeline-health-area')?.classList.add('hidden');
         document.getElementById('tasks-area')?.classList.add('hidden');
         document.getElementById('lists-interface-area')?.classList.add('hidden');
+        document.getElementById('proposal-docs-area')?.classList.add('hidden');
 
         // Hide expandable submenu panels ONLY when navigating away from Lists-related pages
         // Don't hide them when navigating TO opportunities, todos, or the lists interface
-        if (page !== 'opportunities' && page !== 'todos' && page !== 'lists-interface' && page !== 'tasks') {
+        if (page !== 'opportunities' && page !== 'todos' && page !== 'lists-interface' && page !== 'tasks' && page !== 'proposal-docs') {
             document.getElementById('opportunities-list')?.classList.add('hidden');
             document.getElementById('todo-lists-dropdown')?.classList.add('hidden');
             document.getElementById('lists-submenu')?.classList.add('hidden');
@@ -575,6 +611,11 @@ class Navigation {
                 pageTitle.textContent = 'Create New Ollama Agent';
                 this.currentPage = 'ollama-agent-create';
                 this.loadOllamaAgentCreatePage();
+                break;
+            case 'proposal-docs':
+                document.getElementById('proposal-docs-area')?.classList.remove('hidden');
+                if (pageTitle) pageTitle.textContent = 'Proposal Docs';
+                this.currentPage = 'proposal-docs';
                 break;
         }
     }

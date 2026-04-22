@@ -9,7 +9,7 @@
 
 class OpportunitiesImportExport {
     constructor() {
-        // Populated after CSV parse step; held for the confirm step.
+        // Populated after parse step; held for the confirm step (always CSV string).
         this._pendingCsvContent = null;
         this._pendingHeaders = [];
         this._opportunityFields = [];
@@ -38,7 +38,7 @@ class OpportunitiesImportExport {
             <div class="absolute inset-0 flex items-center justify-center p-4">
                 <div class="bg-white dark:bg-gray-800 rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] flex flex-col">
                     <div class="flex items-center justify-between p-6 border-b border-gray-200 dark:border-gray-700">
-                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Import Opportunities from CSV</h3>
+                        <h3 class="text-lg font-semibold text-gray-900 dark:text-white">Import Opportunities from CSV / XLS</h3>
                         <button id="csv-import-modal-close" class="text-gray-400 hover:text-gray-600 dark:hover:text-gray-200">
                             <svg class="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M6 18L18 6M6 6l12 12"/>
@@ -47,8 +47,8 @@ class OpportunitiesImportExport {
                     </div>
                     <div class="flex-1 overflow-y-auto p-6">
                         <p class="text-sm text-gray-600 dark:text-gray-400 mb-4">
-                            Map each column from your CSV to an Opportunity field. Columns mapped to
-                            <strong>Name</strong> are required.
+                            Map each column from your CSV or XLS file to an Opportunity field.
+                            Columns mapped to <strong>Name</strong> are required.
                         </p>
                         <div id="csv-mapping-table" class="space-y-2"></div>
                         <div id="csv-preview-section" class="mt-6 hidden">
@@ -98,7 +98,7 @@ class OpportunitiesImportExport {
     }
 
     // -----------------------------------------------------------------------
-    // CSV Import — Step 1: Parse headers
+    // Import — Step 1: Parse headers (CSV or XLS/XLSX)
     // -----------------------------------------------------------------------
 
     async _handleFileSelected(event) {
@@ -108,36 +108,66 @@ class OpportunitiesImportExport {
         // Reset file input so the same file can be re-selected after cancel.
         event.target.value = '';
 
-        let csvContent;
-        try {
-            csvContent = await file.text();
-        } catch {
-            alert('Could not read file.');
-            return;
-        }
+        const isXls = /\.(xls|xlsx)$/i.test(file.name);
 
         try {
-            const res = await fetch('/api/opportunities/import/parse', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ csv_content: csvContent }),
-            });
-            const data = await res.json();
+            let data;
+            if (isXls) {
+                data = await this._parseXls(file);
+            } else {
+                data = await this._parseCsv(file);
+            }
 
             if (data.status !== 'success') {
-                alert(`CSV parse error: ${data.message}`);
+                alert(`Parse error: ${data.message}`);
                 return;
             }
 
-            this._pendingCsvContent = csvContent;
+            // csv_content is always a CSV string — either read directly (CSV)
+            // or returned from the server's XLS→CSV conversion.
+            this._pendingCsvContent = data.csv_content;
             this._pendingHeaders = data.headers;
             this._opportunityFields = data.opportunity_fields || [];
             this._autoFieldMap = data.auto_field_map || {};
             this._renderMappingUI(data.headers, data.preview, data.row_count, data.schema_detected);
             this._showModal();
         } catch (err) {
-            alert(`Failed to parse CSV: ${err.message}`);
+            alert(`Failed to parse file: ${err.message}`);
         }
+    }
+
+    async _parseCsv(file) {
+        const csvContent = await file.text();
+        const res = await fetch('/api/opportunities/import/parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ csv_content: csvContent }),
+        });
+        const data = await res.json();
+        // Attach csv_content so the caller can store it uniformly.
+        if (data.status === 'success') data.csv_content = csvContent;
+        return data;
+    }
+
+    async _parseXls(file) {
+        // Read binary, base64-encode, send to server for XLS→CSV conversion.
+        // Chunk size MUST be a multiple of 3 so each chunk encodes to base64
+        // without padding — otherwise intermediate '=' chars corrupt the result.
+        const buf = await file.arrayBuffer();
+        const bytes = new Uint8Array(buf);
+        let b64 = '';
+        const CHUNK = 3 * 4096; // 12288 — multiple of 3, no mid-string padding
+        for (let i = 0; i < bytes.byteLength; i += CHUNK) {
+            b64 += btoa(String.fromCharCode(...bytes.subarray(i, i + CHUNK)));
+        }
+
+        const res = await fetch('/api/opportunities/import/xls-parse', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ xls_content: b64 }),
+        });
+        // Server returns the converted csv_content along with headers/preview.
+        return res.json();
     }
 
     _renderMappingUI(headers, preview, rowCount, schemaDetected) {

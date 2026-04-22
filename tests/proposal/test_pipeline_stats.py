@@ -201,8 +201,8 @@ class TestPriorityBreakdown:
 
 class TestHandlePipelineStatsRequest:
     def test_handler_returns_success(self, mgr):
-        with patch('opportunities_api._opportunities_manager', mgr):
-            from opportunities_api import handle_pipeline_stats_request
+        with patch('opportunities_handlers._opportunities_manager', mgr):
+            from opportunities_handlers import handle_pipeline_stats_request
             result = handle_pipeline_stats_request()
         assert result['status'] == 'success'
         assert 'stats' in result

@@ -94,6 +94,9 @@
             border-color: #3b82f6;
             box-shadow: 0 0 0 2px rgba(59,130,246,0.3);
         }
+        /* Selected row highlight */
+        .opp-row-selected { background-color: rgb(239 246 255); }
+        .dark .opp-row-selected { background-color: rgba(30,58,138,0.2); }
         /* Skills filter pills */
         .skills-filter-pill {
             display: inline-flex; align-items: center; gap: 0.35rem;
@@ -355,6 +358,15 @@
                                         <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"></path>
                                     </svg>
                                     Proposals
+                                </span>
+                            </button>
+
+                            <button class="sub-nav-item w-full text-left px-3 py-1.5 rounded-md text-sm font-medium text-gray-600 dark:text-gray-400 hover:bg-gray-100 dark:hover:bg-gray-700" data-list="proposal-docs">
+                                <span class="flex items-center">
+                                    <svg class="w-3.5 h-3.5 mr-2 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z"></path>
+                                    </svg>
+                                    Proposal Docs
                                 </span>
                             </button>
 
@@ -1987,10 +1999,10 @@
                                     <p class="text-gray-600 dark:text-gray-400">Track and manage business opportunities with knowledge graph integration</p>
                                 </div>
                                 <div class="flex items-center gap-2 flex-wrap">
-                                    <!-- CSV import (hidden file input + trigger button) -->
-                                    <input type="file" id="import-csv-file-input" accept=".csv" class="hidden">
+                                    <!-- CSV / XLS import (hidden file input + trigger button) -->
+                                    <input type="file" id="import-csv-file-input" accept=".csv,.xls,.xlsx" class="hidden">
                                     <button id="import-csv-btn" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm">
-                                        Import CSV
+                                        Import CSV / XLS
                                     </button>
                                     <button id="export-csv-btn" class="px-3 py-2 bg-gray-100 dark:bg-gray-700 text-gray-700 dark:text-gray-200 rounded-lg hover:bg-gray-200 dark:hover:bg-gray-600 transition-colors text-sm">
                                         Export CSV
@@ -2039,6 +2051,12 @@
                                         <option value="medium">Medium</option>
                                         <option value="low">Low</option>
                                     </select>
+                                    <button id="opp-delete-selected-btn" class="hidden items-center gap-1.5 px-3 py-2 bg-red-600 text-white rounded-lg hover:bg-red-700 transition-colors text-sm">
+                                        <svg class="w-4 h-4 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2" d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
+                                        </svg>
+                                        <span id="opp-delete-selected-label">Delete Selected</span>
+                                    </button>
                                 </div>
 
                                 <!-- Table -->
@@ -2046,6 +2064,11 @@
                                     <table class="w-full text-sm">
                                         <thead class="bg-gray-50 dark:bg-gray-700 border-b border-gray-200 dark:border-gray-600">
                                             <tr>
+                                                <th class="px-4 py-3 w-10">
+                                                    <input type="checkbox" id="opp-select-all"
+                                                           class="w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                           title="Select / deselect all">
+                                                </th>
                                                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Opportunity</th>
                                                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Stage</th>
                                                 <th class="px-4 py-3 text-left text-xs font-semibold text-gray-600 dark:text-gray-300 uppercase tracking-wide">Priority</th>
@@ -2056,7 +2079,7 @@
                                         </thead>
                                         <tbody id="opp-main-table-body" class="divide-y divide-gray-100 dark:divide-gray-700">
                                             <tr id="opp-main-empty-row">
-                                                <td colspan="6" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
+                                                <td colspan="7" class="px-4 py-12 text-center text-gray-400 dark:text-gray-500 text-sm">
                                                     No opportunities yet. Click <strong>New Opportunity</strong> to get started.
                                                 </td>
                                             </tr>
@@ -2944,6 +2967,28 @@
                 </div>
 
                 <!-- Settings Modal removed — settings now live in the main panel -->
+
+                <!-- Proposal Docs Writer Area -->
+                <main id="proposal-docs-area" class="flex-1 flex flex-col hidden overflow-hidden">
+                    <div class="border-b border-gray-200 dark:border-zinc-700 px-6 py-3 flex items-center justify-between bg-white dark:bg-zinc-900">
+                        <div>
+                            <h3 class="text-base font-semibold text-gray-900 dark:text-white">Proposal Docs</h3>
+                            <p class="text-xs text-gray-500 dark:text-zinc-400">Draft, review, and collaborate on proposal volumes</p>
+                        </div>
+                        <div class="flex items-center gap-3">
+                            <select id="pw-proposal-selector"
+                                class="text-sm bg-white dark:bg-zinc-800 border border-gray-300 dark:border-zinc-600 rounded-lg px-3 py-1.5 text-gray-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-blue-500">
+                                <option value="">— Select a Proposal —</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div id="proposal-writer-panel" class="flex-1 overflow-hidden">
+                        <div class="flex items-center justify-center h-full text-zinc-500 text-sm">
+                            Select a proposal above to open the writing workspace.
+                        </div>
+                    </div>
+                </main>
+
             </div>
         </div>
     </div>
@@ -2957,6 +3002,8 @@
     <script src="js/visualization-manager.js"></script>
     <script src="js/opportunities-manager.js"></script>
     <script src="js/opportunities-import-export.js"></script>
+    <script src="js/proposal-writer.js"></script>
+    <script src="js/proposal-comments.js"></script>
     <script src="js/navigation.js?v=2"></script>
     <script src="js/integration-manager.js"></script>
     <!-- Orchestrator (must load after all modules) -->

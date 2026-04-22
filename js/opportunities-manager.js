@@ -37,6 +37,7 @@ class OpportunitiesManager {
         this.calendarManager = null;
         this.ganttManager = null;
         this._editMode = false;
+        this._selectedIds = new Set();
         this.init();
     }
 
@@ -305,9 +306,15 @@ class OpportunitiesManager {
             const priLabel   = priority.charAt(0).toUpperCase() + priority.slice(1);
             const priCls     = PRI_COLORS[priority]  || PRI_COLORS.medium;
 
+            const oppId = String(opp.id || '');
+            const isSelected = this._selectedIds.has(oppId);
             const tr = document.createElement('tr');
-            tr.className = 'hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer transition-colors';
+            tr.className = 'hover:bg-gray-50 dark:hover:bg-gray-700/40 cursor-pointer transition-colors' + (isSelected ? ' opp-row-selected' : '');
             tr.innerHTML = `
+                <td class="px-4 py-3 w-10">
+                    <input type="checkbox" class="opp-row-check w-4 h-4 rounded border-gray-300 dark:border-gray-600 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                           data-id="${this.escapeHtml(oppId)}"${isSelected ? ' checked' : ''}>
+                </td>
                 <td class="px-4 py-3">
                     <div class="font-medium text-gray-900 dark:text-white leading-snug">${this.escapeHtml(opp.name || 'Untitled')}</div>
                     ${opp.agency ? `<div class="text-xs text-gray-500 dark:text-gray-400 mt-0.5">${this.escapeHtml(opp.agency)}</div>` : ''}
@@ -321,7 +328,7 @@ class OpportunitiesManager {
                 <td class="px-4 py-3 text-sm text-gray-700 dark:text-gray-300 font-medium">${valueStr}</td>
                 <td class="px-4 py-3 text-sm ${dueCls}">${dueStr}</td>
                 <td class="px-4 py-3 text-right">
-                    <button class="opp-row-delete p-1.5 text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors rounded" title="Delete" data-id="${this.escapeHtml(String(opp.id || ''))}">
+                    <button class="opp-row-delete p-1.5 text-gray-300 hover:text-red-500 dark:hover:text-red-400 transition-colors rounded" title="Delete" data-id="${this.escapeHtml(oppId)}">
                         <svg class="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path stroke-linecap="round" stroke-linejoin="round" stroke-width="2"
                                   d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16"/>
@@ -332,7 +339,18 @@ class OpportunitiesManager {
 
             tr.addEventListener('click', (e) => {
                 if (e.target.closest('.opp-row-delete')) return;
+                if (e.target.tagName === 'INPUT') return;
                 this.showOpportunityDetail(opp);
+            });
+            tr.querySelector('.opp-row-check')?.addEventListener('change', (e) => {
+                if (e.target.checked) {
+                    this._selectedIds.add(oppId);
+                    tr.classList.add('opp-row-selected');
+                } else {
+                    this._selectedIds.delete(oppId);
+                    tr.classList.remove('opp-row-selected');
+                }
+                this._updateSelectionUI();
             });
             tr.querySelector('.opp-row-delete')?.addEventListener('click', (e) => {
                 e.stopPropagation();
@@ -341,6 +359,9 @@ class OpportunitiesManager {
 
             tbody.appendChild(tr);
         });
+
+        // Sync select-all state after (re-)render
+        this._updateSelectionUI();
     }
 
     _wireMainTableFilters() {
@@ -361,6 +382,94 @@ class OpportunitiesManager {
         searchInput.addEventListener('input', _debounce(refresh, 200));
         stageSelect.addEventListener('change', refresh);
         prioritySelect.addEventListener('change', refresh);
+
+        const selectAllChk = document.getElementById('opp-select-all');
+        if (selectAllChk) {
+            selectAllChk.addEventListener('change', () => {
+                const checks = document.querySelectorAll('#opp-main-table-body .opp-row-check');
+                checks.forEach(chk => {
+                    chk.checked = selectAllChk.checked;
+                    const id = String(chk.dataset.id);
+                    const row = chk.closest('tr');
+                    if (selectAllChk.checked) {
+                        this._selectedIds.add(id);
+                        row?.classList.add('opp-row-selected');
+                    } else {
+                        this._selectedIds.delete(id);
+                        row?.classList.remove('opp-row-selected');
+                    }
+                });
+                this._updateSelectionUI();
+            });
+        }
+
+        const deleteSelectedBtn = document.getElementById('opp-delete-selected-btn');
+        if (deleteSelectedBtn) {
+            deleteSelectedBtn.addEventListener('click', () => this.deleteSelectedOpportunities());
+        }
+    }
+
+    // -----------------------------------------------------------------------
+    // Selection helpers
+    // -----------------------------------------------------------------------
+
+    _updateSelectionUI() {
+        const allChecks = document.querySelectorAll('#opp-main-table-body .opp-row-check');
+        const visibleIds = new Set([...allChecks].map(c => String(c.dataset.id)));
+        const checkedVisible = [...allChecks].filter(c => c.checked).length;
+        const total = allChecks.length;
+
+        const selectAll = document.getElementById('opp-select-all');
+        if (selectAll) {
+            selectAll.checked = total > 0 && checkedVisible === total;
+            selectAll.indeterminate = checkedVisible > 0 && checkedVisible < total;
+        }
+
+        const count = this._selectedIds.size;
+        const deleteBtn = document.getElementById('opp-delete-selected-btn');
+        const label = document.getElementById('opp-delete-selected-label');
+        if (deleteBtn) {
+            if (count > 0) {
+                deleteBtn.classList.remove('hidden');
+                deleteBtn.classList.add('flex');
+                if (label) label.textContent = `Delete Selected (${count})`;
+            } else {
+                deleteBtn.classList.add('hidden');
+                deleteBtn.classList.remove('flex');
+            }
+        }
+    }
+
+    async deleteSelectedOpportunities() {
+        const ids = [...this._selectedIds];
+        if (ids.length === 0) return;
+
+        const noun = ids.length === 1 ? 'opportunity' : 'opportunities';
+        if (!window.confirm(`Delete ${ids.length} selected ${noun}? This cannot be undone.`)) return;
+
+        const btn = document.getElementById('opp-delete-selected-btn');
+        if (btn) { btn.disabled = true; btn.textContent = 'Deleting…'; }
+
+        let deleted = 0, failed = 0;
+        for (const id of ids) {
+            try {
+                const res = await fetch(`/api/opportunities/${id}`, { method: 'DELETE' });
+                const data = await res.json();
+                if (data.status === 'success') {
+                    deleted++;
+                    this._selectedIds.delete(id);
+                    this.opportunities = this.opportunities.filter(o => String(o.id) !== id);
+                } else {
+                    failed++;
+                }
+            } catch (_) {
+                failed++;
+            }
+        }
+
+        if (btn) { btn.disabled = false; }
+        this.renderOpportunitiesList();
+        if (failed > 0) alert(`Deleted ${deleted}, failed to delete ${failed}.`);
     }
 
     // -----------------------------------------------------------------------

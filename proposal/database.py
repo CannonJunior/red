@@ -527,7 +527,6 @@ def update_meeting(
         conn.execute(
             f"UPDATE proposal_meetings SET {set_clause} WHERE id = ?", values
         )
-    with get_conn(db_path) as conn:
         row = conn.execute(
             "SELECT * FROM proposal_meetings WHERE id = ?", (meeting_id,)
         ).fetchone()

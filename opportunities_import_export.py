@@ -41,15 +41,44 @@ OPPORTUNITY_FIELDS = [
     {'key': 'solicitation_link',  'label': 'Solicitation Link',       'required': False},
     {'key': 'deal_type',          'label': 'Deal Type',               'required': False},
     # Overflow → metadata
-    {'key': 'meta_award_date',    'label': 'Scheduled Award Date',    'required': False},
-    {'key': 'meta_solicitation',  'label': 'Solicitation Number',     'required': False},
-    {'key': 'meta_teaming_role',  'label': 'Teaming Role',            'required': False},
-    {'key': 'meta_contract_type', 'label': 'Contract Type',           'required': False},
-    {'key': 'meta_capture_mgr',   'label': 'Capture Manager',         'required': False},
-    {'key': 'meta_portfolio',     'label': 'Portfolio',               'required': False},
-    {'key': 'meta_divisions',     'label': 'Divisions',               'required': False},
-    {'key': 'meta_acq_type',      'label': 'Acquisition Type',        'required': False},
-    {'key': 'meta_set_aside',     'label': 'Set Aside Type',          'required': False},
+    {'key': 'meta_award_date',      'label': 'Scheduled Award Date',          'required': False},
+    {'key': 'meta_solicitation',    'label': 'Solicitation Number',           'required': False},
+    {'key': 'meta_teaming_role',    'label': 'Teaming Role',                  'required': False},
+    {'key': 'meta_contract_type',   'label': 'Contract Type',                 'required': False},
+    {'key': 'meta_capture_mgr',     'label': 'Capture Manager',               'required': False},
+    {'key': 'meta_portfolio',       'label': 'Portfolio',                      'required': False},
+    {'key': 'meta_divisions',       'label': 'Divisions',                      'required': False},
+    {'key': 'meta_acq_type',        'label': 'Acquisition Type',              'required': False},
+    {'key': 'meta_set_aside',       'label': 'Set Aside Type',                'required': False},
+    # Extended CRM XLS columns
+    {'key': 'meta_proposal_lead',   'label': 'Proposal Lead',                 'required': False},
+    {'key': 'meta_staff_team',      'label': 'Staff Team',                    'required': False},
+    {'key': 'meta_next_action',     'label': 'Next Action',                   'required': False},
+    {'key': 'meta_next_action_task','label': 'Next Action – Task',            'required': False},
+    {'key': 'meta_pop_begin',       'label': 'Est. PoP Begin Date',           'required': False},
+    {'key': 'meta_pop_end',         'label': 'Est. PoP End Date',             'required': False},
+    {'key': 'meta_pop_months',      'label': 'Period of Performance (months)','required': False},
+    {'key': 'meta_rfi_date',        'label': "RFI Expected/Rec'd Date",       'required': False},
+    {'key': 'meta_rfp_date',        'label': "RFP Expected/Rec'd Date",       'required': False},
+    {'key': 'meta_rfp_received',    'label': 'RFP Received',                  'required': False},
+    {'key': 'meta_proposal_submitted', 'label': 'Proposal Submitted',         'required': False},
+    {'key': 'meta_bid_decision_due','label': 'Bid/No Bid Decision Due',       'required': False},
+    {'key': 'meta_close_date',      'label': 'Opportunity Close Date',        'required': False},
+    {'key': 'meta_ceiling_value',   'label': 'Total Ceiling Value',           'required': False},
+    {'key': 'meta_ccri_ceiling',    'label': 'CCRi Est. Total Ceiling Value', 'required': False},
+    {'key': 'meta_original_value',  'label': 'Original Est. Contract Value',  'required': False},
+    {'key': 'meta_weighted_amount', 'label': 'Weighted Amount',               'required': False},
+    {'key': 'meta_forecast',        'label': 'Include In Forecast?',          'required': False},
+    {'key': 'meta_classification',  'label': 'Classification',                'required': False},
+    {'key': 'meta_submittal_type',  'label': 'Submittal Type',                'required': False},
+    {'key': 'meta_proposal_number', 'label': 'Proposal Number',               'required': False},
+    {'key': 'meta_sub_opps',        'label': 'Sub-Opps',                      'required': False},
+    {'key': 'meta_lead_source',     'label': 'Lead Source',                   'required': False},
+    {'key': 'meta_referred_by',     'label': 'Referred By',                   'required': False},
+    {'key': 'meta_owner',           'label': 'Owner',                         'required': False},
+    {'key': 'meta_primary_contact', 'label': 'Primary Contact',               'required': False},
+    {'key': 'meta_notes',           'label': 'Notes',                         'required': False},
+    {'key': 'meta_timestamped_notes','label': 'Time-Stamped Notes',           'required': False},
 ]
 
 DB_PATH = DEFAULT_DB
@@ -59,52 +88,84 @@ DB_PATH = DEFAULT_DB
 # ---------------------------------------------------------------------------
 
 # Maps CRM stage labels (case-insensitive prefix match) → our pipeline_stage slugs.
-# Reason: The CRM exports stages as "02-Long Lead"; our app uses "02-lead".
+# Reason: The CRM exports stages as "02-Long Lead"; our DB/UI uses slugs like "long_lead".
 _STAGE_LABEL_TO_SLUG: Dict[str, str] = {
-    '01':   '01-qual',
-    '02':   '02-lead',
-    '03':   '03-bid',
-    '04':   '04-progress',
-    '05':   '05-review',
-    '06':   '06-nego',
-    '07':   '07-won',
-    '08':   '08-lost',
-    '09':   '09-nobid',
-    '20':   '20-other',
-    '98':   '98-vehicle',
-    '99':   '99-complete',
+    '01':   'identified',
+    '02':   'long_lead',
+    '03':   'bid_decision',
+    '04':   'active',
+    '05':   'submitted',
+    '06':   'negotiating',
+    '07':   'awarded',
+    '08':   'lost',
+    '09':   'no_bid',
+    '20':   'cancelled',
+    '98':   'contract_vehicle_won',
+    '99':   'contract_vehicle_complete',
 }
 
 # Known CRM column-name → opportunity field key.
 # Used by _detect_crm_field_map() to auto-populate the mapping UI.
+# Covers both the legacy CSV export and the current XLS grid export format.
 _CRM_COLUMN_MAP: Dict[str, str] = {
-    'opportunity name':                        'name',
-    'stage':                                   'pipeline_stage',
-    "ccri's est. funded/award contract value": 'value',
-    'ccri est. funded/award contract value':   'value',
-    'est. funded/award contract value':        'value',
-    'description':                             'description',
-    'status':                                  'status',
-    'client':                                  'agency',
-    'probability of win':                      'probability',
-    'proposal due date':                       'proposal_due_date',
-    'opp number':                              'opp_number',
-    'proposal number':                         'opp_number',
-    'is iwa?':                                 'is_iwa',
-    'owning org':                              'owning_org',
-    'proposal folder location':                'proposal_folder',
-    'solicitation link':                       'solicitation_link',
-    'deal type':                               'deal_type',
-    # Remaining fields → metadata blob
-    'portfolio':                               'meta_portfolio',
-    'divisions':                               'meta_divisions',
-    'scheduled award date':                    'meta_award_date',
-    'solicitation number':                     'meta_solicitation',
-    'teaming role':                            'meta_teaming_role',
-    'contract type':                           'meta_contract_type',
-    'capture manager':                         'meta_capture_mgr',
-    'acquisition type':                        'meta_acq_type',
-    'set aside type':                          'meta_set_aside',
+    # Core identity
+    'opportunity name':                                    'name',
+    'stage':                                               'pipeline_stage',
+    "ccri's est. funded/award contract value":             'value',
+    'ccri est. funded/award contract value':               'value',
+    'est. funded/award contract value':                    'value',
+    'description':                                         'description',
+    'status':                                              'status',
+    'client':                                              'agency',
+    'probability of win':                                  'probability',
+    'proposal due date':                                   'proposal_due_date',
+    'opp number':                                          'opp_number',
+    'is iwa?':                                             'is_iwa',
+    'owning org':                                          'owning_org',
+    'proposal folder location':                            'proposal_folder',
+    'solicitation link':                                   'solicitation_link',
+    'deal type':                                           'deal_type',
+    # Metadata — existing
+    'portfolio':                                           'meta_portfolio',
+    'divisions':                                           'meta_divisions',
+    'scheduled award date':                                'meta_award_date',
+    'solicitation number':                                 'meta_solicitation',
+    'teaming role':                                        'meta_teaming_role',
+    'contract type':                                       'meta_contract_type',
+    'capture manager':                                     'meta_capture_mgr',
+    'acquisition type':                                    'meta_acq_type',
+    'set aside type':                                      'meta_set_aside',
+    # Metadata — extended XLS columns
+    'proposal lead':                                       'meta_proposal_lead',
+    'staff team':                                          'meta_staff_team',
+    'next action':                                         'meta_next_action',
+    'next action - task':                                  'meta_next_action_task',
+    'est. pop begin date':                                 'meta_pop_begin',
+    'est. pop end date':                                   'meta_pop_end',
+    'period of performance (in months)':                   'meta_pop_months',
+    "rfi expected/rec'd date":                             'meta_rfi_date',
+    "rfp expected/rec'd date":                             'meta_rfp_date',
+    'rfp received':                                        'meta_rfp_received',
+    'proposal submitted':                                  'meta_proposal_submitted',
+    'bid/no bid decision due':                             'meta_bid_decision_due',
+    'opportunity close date':                              'meta_close_date',
+    'total ceiling value (vehicle or prime)':              'meta_ceiling_value',
+    'ccri est. total ceiling value':                       'meta_ccri_ceiling',
+    "original ccri's est. funded/award contract value":    'meta_original_value',
+    'weighted amount':                                     'meta_weighted_amount',
+    'include in forecast?':                                'meta_forecast',
+    'classification':                                      'meta_classification',
+    'submittal type':                                      'meta_submittal_type',
+    'proposal number':                                     'meta_proposal_number',
+    'sub-opps':                                            'meta_sub_opps',
+    'lead source':                                         'meta_lead_source',
+    'referred by':                                         'meta_referred_by',
+    'owner':                                               'meta_owner',
+    'primary contact':                                     'meta_primary_contact',
+    'notes':                                               'meta_notes',
+    'time-stamped notes':                                  'meta_timestamped_notes',
+    # Intentionally skipped: 'days in stage' (computed), 'date created',
+    # 'date modified' (managed by our DB), address fields (not in schema).
 }
 
 # Signature columns that identify this as the known CRM export format.
@@ -160,7 +221,7 @@ def _normalize_stage(raw: str) -> str:
     """
     Normalize a CRM stage label to our pipeline_stage slug.
 
-    Maps "02-Long Lead" → "02-lead", "07-Closed Won" → "07-won", etc.
+    Maps "02-Long Lead" → "long_lead", "07-Closed Won" → "awarded", etc.
     Falls back to 'identified' for unrecognised values.
 
     Args:
@@ -262,6 +323,99 @@ def handle_opportunities_delete_all_request(db_path: str = DB_PATH) -> Dict:
                 'message': f'Deleted {count} opportunities'}
     except Exception as e:
         return {'status': 'error', 'message': str(e)}
+
+
+# ---------------------------------------------------------------------------
+# XLS → CSV converter
+# ---------------------------------------------------------------------------
+
+def xls_to_csv(xls_bytes: bytes) -> str:
+    """
+    Convert an .xls workbook (first sheet) to a CSV string.
+
+    Handles xlrd cell types: numeric (preserves integers), date (MM/DD/YYYY),
+    boolean (yes/no), text, and empty.
+
+    Args:
+        xls_bytes: Raw bytes of the .xls file.
+
+    Returns:
+        str: CSV text with the same column order as the spreadsheet.
+
+    Raises:
+        ImportError: If xlrd is not installed.
+        Exception: On malformed workbook.
+    """
+    try:
+        import xlrd
+    except ImportError as exc:
+        raise ImportError(
+            "xlrd is required for XLS import. Run: uv add xlrd"
+        ) from exc
+
+    wb = xlrd.open_workbook(file_contents=xls_bytes)
+    ws = wb.sheet_by_index(0)
+
+    buf = io.StringIO()
+    writer = csv.writer(buf)
+
+    for row_idx in range(ws.nrows):
+        row_vals: List[str] = []
+        for col_idx in range(ws.ncols):
+            cell = ws.cell(row_idx, col_idx)
+            ct = cell.ctype
+            if ct == xlrd.XL_CELL_EMPTY:
+                row_vals.append('')
+            elif ct == xlrd.XL_CELL_NUMBER:
+                # Preserve whole numbers as integers (e.g. opp_number 260052.0 → "260052")
+                val = cell.value
+                row_vals.append(str(int(val)) if val == int(val) else str(val))
+            elif ct == xlrd.XL_CELL_DATE:
+                try:
+                    import datetime as _dt
+                    dt = xlrd.xldate_as_datetime(cell.value, wb.datemode)
+                    row_vals.append(dt.strftime('%m/%d/%Y'))
+                except Exception:
+                    row_vals.append(str(cell.value))
+            elif ct == xlrd.XL_CELL_BOOLEAN:
+                row_vals.append('yes' if cell.value else 'no')
+            else:
+                row_vals.append(str(cell.value))
+        writer.writerow(row_vals)
+
+    return buf.getvalue()
+
+
+def handle_opportunities_parse_xls_request(xls_b64: str,
+                                           preview_rows: int = 5) -> Dict:
+    """
+    Parse a base64-encoded .xls file, convert to CSV, and return the same
+    response shape as handle_opportunities_parse_csv_request.
+
+    Args:
+        xls_b64: Base64-encoded bytes of the .xls workbook.
+        preview_rows: How many data rows to include in the preview.
+
+    Returns:
+        dict: Same shape as handle_opportunities_parse_csv_request, plus
+              'csv_content' so the caller can store it for the confirm step.
+    """
+    import base64
+    try:
+        xls_bytes = base64.b64decode(xls_b64)
+    except Exception as e:
+        return {'status': 'error', 'message': f'Base64 decode error: {e}'}
+
+    try:
+        csv_content = xls_to_csv(xls_bytes)
+    except Exception as e:
+        return {'status': 'error', 'message': f'XLS conversion error: {e}'}
+
+    result = handle_opportunities_parse_csv_request(csv_content, preview_rows)
+    if result.get('status') == 'success':
+        # Return the converted CSV so the JS can use it in the confirm step.
+        result['csv_content'] = csv_content
+    return result
 
 
 # ---------------------------------------------------------------------------

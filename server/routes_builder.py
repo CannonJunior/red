@@ -96,11 +96,45 @@ from server.routes.opportunities import (
     handle_task_history_api as handle_task_history_route,
     handle_opportunities_delete_all_api as handle_opportunities_delete_all_route,
     handle_opportunities_import_parse_api as handle_opportunities_import_parse_route,
+    handle_opportunities_import_xls_parse_api as handle_opportunities_import_xls_parse_route,
     handle_opportunities_import_confirm_api as handle_opportunities_import_confirm_route,
     handle_opportunities_export_api as handle_opportunities_export_route,
     handle_pipeline_stats_api as handle_pipeline_stats_route,
 )
 from server.routes.source_tree import handle_source_tree_api as handle_source_tree_route
+from server.routes.color_team import (
+    handle_color_team_upload,
+    handle_color_team_job_status,
+    handle_compliance_assessment,
+    handle_color_team_comments,
+    handle_color_team_export,
+)
+from server.routes.proposal_drafts import (
+    handle_proposal_docs_list,
+    handle_proposal_docs_create,
+    handle_proposal_doc_detail,
+    handle_proposal_doc_update,
+    handle_proposal_doc_delete,
+    handle_proposal_doc_sections,
+    handle_proposal_doc_section_create,
+    handle_proposal_doc_apply_template,
+    handle_proposal_doc_stage_snapshot,
+    handle_proposal_doc_export,
+    handle_proposal_section_detail,
+    handle_proposal_section_update,
+    handle_proposal_section_delete,
+    handle_proposal_section_versions_list,
+    handle_proposal_section_versions_create,
+    handle_proposal_section_restore,
+    handle_proposal_section_comments_list,
+    handle_proposal_section_comments_create,
+    handle_proposal_comment_update,
+    handle_proposal_comment_delete,
+    handle_proposal_comment_resolve,
+    handle_proposal_section_llm,
+    handle_proposal_doc_types,
+    handle_proposal_llm_actions,
+)
 from server.routes.settings_api import (
     handle_tracking_tasks_settings_get as handle_tracking_tasks_get_route,
     handle_tracking_tasks_settings_put as handle_tracking_tasks_put_route,
@@ -309,13 +343,13 @@ def build_router() -> Router:
     r.add('GET', lambda p: p.startswith('/api/shredding/requirements/'),      lambda h: handle_shredding_requirements_route(h, h.path, _qp(h.path)))
     r.add('GET', lambda p: p.startswith('/api/shredding/matrix/'),            lambda h: handle_shredding_matrix_route(h, h.path, _qp(h.path)))
     r.add('GET', lambda p: p == '/api/todos/users' and TODOS_AVAILABLE,                      handle_users_list_route)
-    r.add('GET', lambda p: (p == '/api/todos/lists' or p.startswith('/api/todos/lists?')) and TODOS_AVAILABLE, handle_lists_list_route)
+    r.add('GET', lambda p: TODOS_AVAILABLE and (p == '/api/todos/lists' or p.startswith('/api/todos/lists?')), handle_lists_list_route)
     r.add('GET', lambda p: p == '/api/todos/shared' and TODOS_AVAILABLE,                     handle_shared_lists_route)
     r.add('GET', lambda p: p == '/api/todos/today' and TODOS_AVAILABLE,                      handle_todos_today_route)
     r.add('GET', lambda p: p == '/api/todos/upcoming' and TODOS_AVAILABLE,                   handle_todos_upcoming_route)
     r.add('GET', lambda p: p == '/api/todos/search' and TODOS_AVAILABLE,                     handle_todos_search_route)
     r.add('GET', lambda p: p == '/api/todos/tags' and TODOS_AVAILABLE,                       handle_tags_list_route)
-    r.add('GET', lambda p: (p == '/api/todos' or p.startswith('/api/todos?')) and TODOS_AVAILABLE, handle_todos_list_route)
+    r.add('GET', lambda p: TODOS_AVAILABLE and (p == '/api/todos' or p.startswith('/api/todos?')), handle_todos_list_route)
     r.add('GET', lambda p: p.startswith('/api/todos/lists/') and p.endswith('/shares') and TODOS_AVAILABLE, lambda h: handle_lists_shares_route(h, _second_last(h.path)))
     r.add('GET', lambda p: p.startswith('/api/todos/users/') and TODOS_AVAILABLE,            lambda h: handle_users_detail_route(h, _last(h.path)))
     r.add('GET', lambda p: p.startswith('/api/todos/lists/') and TODOS_AVAILABLE,            lambda h: handle_lists_detail_route(h, _last(h.path)))
@@ -394,6 +428,7 @@ def build_router() -> Router:
     r.add('POST', lambda p: p.startswith('/api/todos/') and p.endswith('/archive') and TODOS_AVAILABLE, lambda h: handle_todos_archive_route(h, _second_last(h.path)))
     r.add('POST', lambda p: p.startswith('/api/todos/') and TODOS_AVAILABLE,                 lambda h: handle_todos_update_route(h, _last(h.path)))
     r.add('POST', lambda p: p == '/api/opportunities/import/parse',           handle_opportunities_import_parse_route)
+    r.add('POST', lambda p: p == '/api/opportunities/import/xls-parse',      handle_opportunities_import_xls_parse_route)
     r.add('POST', lambda p: p == '/api/opportunities/import/confirm',         handle_opportunities_import_confirm_route)
     r.add('POST', lambda p: p == '/api/opportunities',                        handle_opportunities_create_route)
     r.add('POST', lambda p: p.startswith('/api/opportunities/') and '/tasks' in p, lambda h: handle_tasks_create_route(h, h.path.split('?')[0].split('/')[3]))
@@ -451,5 +486,38 @@ def build_router() -> Router:
     r.add('PUT', lambda p: p == '/api/settings/tracking-tasks',               handle_tracking_tasks_put_route)
     r.add('PUT', lambda p: p == '/api/settings/categories',                   handle_categories_put_route)
     r.add('PUT', lambda p: p.startswith('/api/proposals/') and PROPOSALS_AVAILABLE,          handle_proposals_update_route)
+
+    # ---- Proposal Drafts ----------------------------------------------------
+    r.add('GET',    lambda p: p == '/api/proposal-doc-types',                               handle_proposal_doc_types)
+    r.add('GET',    lambda p: p == '/api/proposal-llm-actions',                             handle_proposal_llm_actions)
+    r.add('GET',    lambda p: p == '/api/proposal-docs' or p.startswith('/api/proposal-docs?'), handle_proposal_docs_list)
+    r.add('POST',   lambda p: p == '/api/proposal-docs',                                    handle_proposal_docs_create)
+    r.add('GET',    lambda p: p.startswith('/api/proposal-docs/') and p.endswith('/sections'), handle_proposal_doc_sections)
+    r.add('POST',   lambda p: p.startswith('/api/proposal-docs/') and p.endswith('/sections'), handle_proposal_doc_section_create)
+    r.add('POST',   lambda p: p.startswith('/api/proposal-docs/') and p.endswith('/apply-template'),    handle_proposal_doc_apply_template)
+    r.add('POST',   lambda p: p.startswith('/api/proposal-docs/') and p.endswith('/stage-snapshot'),    handle_proposal_doc_stage_snapshot)
+    r.add('GET',    lambda p: p.startswith('/api/proposal-docs/') and p.endswith('/export'),              handle_proposal_doc_export)
+    r.add('GET',    lambda p: p.startswith('/api/proposal-docs/') and '/sections' not in p and '/apply-template' not in p and '/stage-snapshot' not in p and '/export' not in p and '/color-team' not in p and '/compliance-assessment' not in p, handle_proposal_doc_detail)
+    r.add('PUT',    lambda p: p.startswith('/api/proposal-docs/'),                          handle_proposal_doc_update)
+    r.add('DELETE', lambda p: p.startswith('/api/proposal-docs/'),                          handle_proposal_doc_delete)
+    r.add('GET',    lambda p: p.startswith('/api/proposal-sections/') and p.endswith('/versions'),  handle_proposal_section_versions_list)
+    r.add('POST',   lambda p: p.startswith('/api/proposal-sections/') and p.endswith('/versions'),  handle_proposal_section_versions_create)
+    r.add('POST',   lambda p: p.startswith('/api/proposal-sections/') and '/restore/' in p,         handle_proposal_section_restore)
+    r.add('GET',    lambda p: p.startswith('/api/proposal-sections/') and p.endswith('/comments'),  handle_proposal_section_comments_list)
+    r.add('POST',   lambda p: p.startswith('/api/proposal-sections/') and p.endswith('/comments'),  handle_proposal_section_comments_create)
+    r.add('POST',   lambda p: p.startswith('/api/proposal-sections/') and p.endswith('/llm'),        handle_proposal_section_llm)
+    r.add('GET',    lambda p: p.startswith('/api/proposal-sections/') and '/versions' not in p and '/comments' not in p and '/llm' not in p and '/restore' not in p, handle_proposal_section_detail)
+    r.add('PUT',    lambda p: p.startswith('/api/proposal-sections/'),                      handle_proposal_section_update)
+    r.add('DELETE', lambda p: p.startswith('/api/proposal-sections/'),                      handle_proposal_section_delete)
+    r.add('PUT',    lambda p: p.startswith('/api/proposal-comments/') and '/resolve' not in p, handle_proposal_comment_update)
+    r.add('POST',   lambda p: p.startswith('/api/proposal-comments/') and p.endswith('/resolve'), handle_proposal_comment_resolve)
+    r.add('DELETE', lambda p: p.startswith('/api/proposal-comments/'),                      handle_proposal_comment_delete)
+
+    # ---- Color Team Review --------------------------------------------------
+    r.add('GET',  lambda p: p.startswith('/api/color-team-jobs/'),                                         handle_color_team_job_status)
+    r.add('POST', lambda p: p.startswith('/api/proposal-docs/') and p.endswith('/color-team-upload'),      handle_color_team_upload)
+    r.add('GET',  lambda p: p.startswith('/api/proposal-docs/') and p.endswith('/compliance-assessment'),  handle_compliance_assessment)
+    r.add('GET',  lambda p: p.startswith('/api/proposal-docs/') and p.endswith('/color-team-comments'),    handle_color_team_comments)
+    r.add('GET',  lambda p: p.startswith('/api/proposal-docs/') and '/color-team-export' in p,             handle_color_team_export)
 
     return r
